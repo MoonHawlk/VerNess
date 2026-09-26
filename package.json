@@ -11,6 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc -b tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "profile:sync": "node scripts/profile-sync.mjs"
   }
 }

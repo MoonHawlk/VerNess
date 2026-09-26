@@ -1,0 +1,10 @@
+# VerNess profile patch layer — the single place where our out-of-tree plugins enter the
+# composed dsh tree. Applied after every bundle layer (dsh-base, dsh-headless).
+# Source of truth lives here in the repo; `npm run profile:sync` copies it into
+# $DSH_HOME/profiles/verness/. See docs/RUNBOOK.md.
+
+- insert:
+    # M1 spike: registers the `verness_ping` diagnostic tool. Stays PENDING until ctx.tools exists,
+    # so its position in this list does not matter.
+    - id: verness-spike
+      name: '@verness/spike'

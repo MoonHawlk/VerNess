@@ -14,13 +14,13 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [x] T-008 `docs/RUNBOOK.md` skeleton written with `VERIFY` markers — M1 turns it into a tested recipe
 
 ## M1 — Load-bearing spike
-- [ ] T-010 Install `@deepseek-ai/dsh` globally (or via pnpm dlx) and run it once headless; record the exact version + `DSH_HOME` path
-- [ ] T-011 `dsh --profile web --dump-config > docs/research/dump-config.baseline.txt` (the patchable row inventory)
-- [ ] T-012 `packages/spike/` — minimal plugin: `name`, `apply(ctx)`, `inject=['tools']`, registers `verness.ping`
-- [ ] T-013 `profiles/verness/` — profile dir + `cordis.patch.yml` with an `insert:` row naming our package specifier
-- [ ] T-014 Load it: `dsh --profile verness --dump-config` shows the row; call `verness.ping` in a session
-- [ ] T-015 Resolve peer-version gate (match `peerDependencies` to the running runtime; document `compatibility.json` escape hatch)
-- [ ] T-016 Write up the working recipe in `docs/RUNBOOK.md`; if the spike failed, open ADR-0004 with the fallback (in-tree package inside the submodule)
+- [x] T-010 `@deepseek-ai/dsh@0.1.7-rc.2` installed globally; `DSH_HOME = C:/Users/totov/.dsh`; pnpm 11.7.0 installed via npm (corepack needs admin)
+- [x] T-011 Baseline captured: `docs/research/dump-config.headless.txt` (376 rows; headless is our target surface)
+- [x] T-012 `packages/spike/` — plain-ESM plugin (`name`, `inject=['tools']`, `apply`) registering `verness_ping` + mount/dispose markers
+- [x] T-013 `profiles/verness/cordis.patch.yml` (`insert:` row `@verness/spike`) + `scripts/profile-sync.mjs` (`npm run profile:sync`)
+- [x] T-014 Row appears in `--dump-config`; a boot writes `mounted`/`disposed` markers and registers the tool with no activation warning. Calling it in a live session still needs `DEEPSEEK_API_KEY` (owner-supplied)
+- [x] T-015 Peer gate passes with exact pins (`@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/dsh-tools@0.1.7-rc.2`); no `compatibility.json` exemption needed
+- [x] T-016 `docs/RUNBOOK.md` rewritten as a verified recipe. **Spike succeeded — ADR-0002 confirmed, no fallback needed.**
 
 ## M2 — Contracts
 - [ ] T-020 `packages/contracts/` package skeleton (type-only, `@deepseek-ai/cordis` peer)
