@@ -104,6 +104,18 @@ function loadConfig() {
 export const loadConfigForCli = () => loadConfig()
 
 /**
+ * Build a command context for a standalone script entry point (loop-task, dashboard and friends),
+ * so those tools get the same `dsh` runner, route environment and conversation the REPL uses.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {Promise<object>} the context.
+ */
+export async function makeCliContext(cfg) {
+  const commands = await loadCommands()
+  const convo = conversation(REPO.replace(/[\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+  return makeCtx(cfg, commands, convo)
+}
+
+/**
  * Run a command, inheriting stdio unless capturing.
  * @param {string} cmd - executable name.
  * @param {string[]} args - arguments.
