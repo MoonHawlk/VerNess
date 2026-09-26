@@ -137,6 +137,23 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 }
 ```
 
+### Decision model (Laya)
+
+```sh
+./turn_on.sh decision up       # start the Laya sidecar (first run installs laya[serve])
+/decide <task text>            # in the REPL: Laya vs the rules, side by side
+```
+
+Laya runs in **shadow mode**. It answers three routing questions for each task (`level`, `tier`,
+`pipeline`) and the answer is logged to `.verness/decisions/` next to what the rules decided. The
+rules still make every real decision.
+
+> **Reminder: Laya only evolves as much as you validate it.** Out of the box it scores close to
+> chance. Its decisions improve only through the loop you drive: use it on real tasks, label what
+> the right answer was, measure it against the rules, and refit it. A question is handed to Laya
+> only when its measured accuracy *and* calibration beat the rules (the T-223 gate). That takes at
+> least 50 labelled decisions per question, and about 200 is better. No labels, no progress.
+
 ---
 
 ## Features
