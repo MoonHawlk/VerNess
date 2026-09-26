@@ -453,3 +453,69 @@
 - **Docs**: README (dashboard, features, releases, development, structure), docs index, 07, 06.
 - **Tests**: `pnpm test` 130/130; `pnpm typecheck` clean.
 
+
+## 2026-09-26 — priority change: WS-E (Laya decision layer) first
+- The owner moved WS-E ahead of M3/T-030. **Next**: WS-E Task 1 (shadow records gain `id`, `v: 2`,
+  per-question `probabilities` and option-set `hash`), then T-220 labelling.
+
+## 2026-09-26 — WS-E Task 1 done; first Laya trial (13 tasks)
+- **Task 1**: shadow records are `v: 2` with a 12-hex `id`; each question stores `answer`,
+  `confidence`, `probabilities` and the option-set `hash` (`optionHash`). `readAnswer(body, key,
+  question)` returns `{invalid: true}` for a choice outside the criteria. `shadowRoute` and `/decide`
+  share `modelAnswers()`. `npm test` 131/131.
+- **README**: a Laya section with the reminder that Laya only evolves as far as it is validated
+  (label → measure → refit → gate).
+- **Trial**: `decision up` then `/decide` on 13 short operator tasks (create a file, grep/cat
+  searches, load the dashboard, change persona, call a higher LLM, review a result, plus one harder
+  variant of each). About 0.9 s per call on CPU. The 13 records were written before the id fix landed
+  and were backfilled with `v: 2` + `id` (content unchanged). Laya vs rules agreement: **level 5/13,
+  tier 9/13, pipeline 7/13**.
+- What the trial shows (not labelled yet, so no accuracy claims):
+  - `level`: Laya leans to `standard` for anything longer than a few words; confidence 0.31–0.51.
+  - `pipeline`: Laya picks `adaptive` for persona switches and "call a higher llm". Those are
+    harness commands, so `decision` (or no model turn at all) is probably right. Neither side chose it.
+  - Laya's `tier` goes up to `local_large` for review tasks where the rules stay `local_small`.
+    That is plausibly better and should be settled by labels.
+  - Every confidence is ≤ 0.76. That fits "near chance zero-shot" and is what the refit (T-222) is for.
+- Shadow log now: 14 records, 13 of them v2. **Next**: T-220 `/decisions-data label`.
+
+## 2026-09-26 — WS-E Task 2 done: `/decisions-data label` (T-220 / T-260)
+- `/decisions-data label [--question q] [--limit N]` (alias `/dd`) walks unlabelled shadow records
+  oldest first. By default it asks all three questions per record, so the task is read once.
+  It is blind: the rules' and the model's answers are shuffled and unmarked. Records logged under a
+  different option set (hash mismatch) are not offered. `/decisions-data` alone prints the status
+  table: labelled, skipped and unlabelled per question, against the gate's 50.
+- Input is read through readline's line iterator, not `rl.question()`. `question()` dropped lines
+  that arrived early (a paste) and never settled on EOF. Ctrl+C gets a SIGINT handler scoped to the
+  session, because nothing in the REPL handles SIGINT and it would otherwise kill the REPL.
+- Verified by driving the loop with piped input and a faked TTY (junk rejected; number, name, `s`,
+  `q`; resume at the first unlabelled question; EOF and SIGINT exit cleanly and remove the handler).
+  Those test labels were deleted. `npm test` 139/139.
+- **Next**: operator labelling (T-392, ≥ 50 per question), and in parallel Task 3 (metrics + refit, T-221/T-222).
+
+## 2026-09-26 — first labelled set (T-392 in progress; logged as T-389 before the merge with epic, which already used T-389)
+- The owner labelled every shadow record: **20 per question** (60 labels, 0 skipped). The gate needs 50.
+- Unofficial first look (n=20, too small to gate on): correct vs label, model / rules:
+  level 3 / 7, tier 9 / 10, pipeline 10 / 10. Laya's `level` leans on `standard` and trails the rules.
+- Three labels flagged to the owner for a second look (possible slips); relabelling needs a
+  `--relabel` option the labeller does not have yet.
+
+## 2026-09-26 — Windows: no more terminal windows flashing at boot
+- **Symptom**: starting the harness on Windows opened and closed a burst of terminal windows.
+- **Cause, measured** with a WMI process-creation watcher during boot: `ollama serve` was started
+  with `spawn(..., {detached: true})`. On Windows that means `DETACHED_PROCESS`, so the server has no
+  console at all. Ollama then launches about 20 console helpers at startup (`llama-server
+  --list-devices`, `gpu-discover`, runner probes). Each got its own new console, and with Windows
+  Terminal as the default terminal, a new `WindowsTerminal.exe` + `OpenConsole.exe` window: about 30
+  windows per boot. `laya-serve` was started the same way.
+- **Fix**: `startBackground()` in `scripts/lib/util.mjs`. On Windows it uses
+  `Start-Process -WindowStyle Hidden -PassThru` (via `powershell.exe`, itself `windowsHide`), which
+  gives the server a hidden console that its helpers inherit. It still outlives the launcher, and it
+  returns the real PID for the run state. macOS/Linux are unchanged (detached spawn).
+  `windowsHide: true` alone cannot fix it: Windows ignores `CREATE_NO_WINDOW` alongside
+  `DETACHED_PROCESS`. And a non-detached child dies with the launcher (libuv's kill-on-close job).
+- **Verified**: the same boot now creates 0 `WindowsTerminal.exe` / `OpenConsole.exe` (was ~30); all
+  Ollama helpers share one hidden console. `decision down` → `up` → `down` works, with the recorded PID
+  equal to the live `laya-serve.exe`. `npm test` 142/142 (quoting tests in `util.background.test.mjs`).
+- Also: boot ran `dsh --version` twice in a row; it now reuses the first result.
+- Not ours: `docker.exe context ls` processes seen during boot come from Docker Desktop.

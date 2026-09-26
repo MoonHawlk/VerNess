@@ -13,6 +13,10 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 > are partly built; the built part is archived and only the gap is listed here. T-180/T-181 are new
 > IDs for Tier L items whose old IDs collided with the command-layer defects (see the archive).
 
+> **Priority (owner, 2026-09-26): WS-E — the Laya decision layer — goes first.** Start with WS-E
+> Task 1 in `05-decision-calibration-routing.md` (log probabilities, option-set hash and record id in
+> shadow records; **done 2026-09-26**), then T-220 (**done 2026-09-26**) → T-221 → T-222 → T-223. Other workstreams wait unless they block it.
+
 ---
 
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
@@ -95,7 +99,7 @@ Cost control (Engram)
 
 ## WS-E — Decision layer: calibration, routing, first uses (plan `05-decision-calibration-routing.md`)
 Measurement, which gates everything else
-- [ ] T-220 / T-260 Labelling tool: `/decisions label` walks unlabelled shadow records and stores human labels in `.verness/decisions/labels.jsonl` (T-220 and T-260 are the same task, one set for all three questions)
+- [ ] T-392 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
 - [ ] T-221 `/decisions report`: accuracy, ECE (10 bins) and AUROC per question for the model and for the rule baseline; publish to `docs/research/decision-calibration.md`
 - [ ] T-222 / T-261 Temperature refit per (question, option count) on the labelled set, stored in `.verness/decisions/temperatures.json`, applied in `readAnswer`; re-measure
 - [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE *and* accuracy beat the rule baseline it replaces. Encode the gate as `decisionGate(question)` reading the latest report

@@ -75,7 +75,7 @@ Inherit the master plan. Also:
 - Shadow records gain, per question: `probabilities` (the full map), `hash`; and at the top level:
   `id` (a random 12-char id, the label key), `v: 2`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```js
 // scripts/test/decisions.log.test.mjs
@@ -104,11 +104,11 @@ test('probabilities are passed through', () => {
 })
 ```
 
-- [ ] **Step 2: Implement.** `optionHash` uses `node:crypto` `createHash('sha256')`. In `shadowRoute`
+- [x] **Step 2: Implement.** `optionHash` uses `node:crypto` `createHash('sha256')`. In `shadowRoute`
 and `/decide`, store `model[k] = { answer, confidence, probabilities, hash: optionHash(ROUTING_QUESTIONS[k]) }`,
 and add `id: randomBytes(6).toString('hex')` and `v: 2` to the record. Old `v`-less records stay
 readable; Task 2 treats them as having no probabilities.
-- [ ] **Step 3: Tests, commit** — `feat(decisions): log probabilities and option hashes for calibration`
+- [x] **Step 3: Tests, commit** — `feat(decisions): log probabilities and option hashes for calibration`
 
 ---
 
@@ -128,14 +128,14 @@ readable; Task 2 treats them as having no probabilities.
   `label [1-5 | s=skip | q=quit]` with the question's options numbered. It writes each label as it
   is entered, so quitting loses nothing. Non-TTY: refuse with `labelling needs a terminal`.
 
-- [ ] **Step 1: Failing tests** for `readLabels` (later wins), `unlabelled` (a label for a different
+- [x] **Step 1: Failing tests** for `readLabels` (later wins), `unlabelled` (a label for a different
 question does not count; `skip` counts as labelled), and `readShadow` (a bad line is skipped,
 legacy ids are derived). Use temp dirs as in the other plans.
-- [ ] **Step 2: Implement** the pure functions and the command. Register the command as
+- [x] **Step 2: Implement** the pure functions and the command. Register the command as
 `name: 'decisions-data'`, alias `dd`, group `decisions`, usage
 `'/decisions-data label | report | refit | gate'`. The existing `/decision` owns the name
 `decisions` as an alias, and the registry test (WS-A Task 2) forbids the clash.
-- [ ] **Step 3: Commit** — `feat(decisions): /decisions-data label, a blind labelling loop (T-220, T-260)`
+- [x] **Step 3: Commit** — `feat(decisions): /decisions-data label, a blind labelling loop (T-220, T-260)`
 
 **Operator step (not code):** label at least 50 records per question. The handoff recommends ~200.
 Record the count and date in `docs/04-PROGRESS.md`. Tasks 3–4 are code that works at any `n`; their

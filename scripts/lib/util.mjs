@@ -143,6 +143,54 @@ export function shAsync(cmd, args, opts = {}) {
 }
 
 /**
+ * The PowerShell line that starts a background server in a hidden console and prints its PID.
+ * Each argument is quoted for the Windows command line, then the whole thing is single-quoted for
+ * PowerShell (`'` doubled), so neither layer can split or expand it.
+ * @param {string} file - the executable.
+ * @param {string[]} args - its arguments.
+ * @returns {string} the `-Command` text.
+ */
+export function hiddenStartCommand(file, args) {
+  const ps = s => `'${String(s).replaceAll("'", "''")}'`
+  const argv = args.map(a => (a === '' || /[\s"]/.test(a) ? `"${String(a).replaceAll('"', '\\"')}"` : a)).join(' ')
+  return `(Start-Process -FilePath ${ps(file)}${argv === '' ? '' : ` -ArgumentList ${ps(argv)}`} -WindowStyle Hidden -PassThru).Id`
+}
+
+/**
+ * Start a long-lived server that outlives the launcher (the model engine, the decision sidecar).
+ *
+ * On Windows this cannot be `spawn(..., {detached: true})`. That creates the child with
+ * `DETACHED_PROCESS`, i.e. with no console at all, and every console helper the server launches
+ * (Ollama's GPU discovery and runners, Python subprocesses) then gets a brand-new visible console:
+ * a burst of terminal windows flashing open and shut. `windowsHide` cannot help, because Windows
+ * ignores `CREATE_NO_WINDOW` alongside `DETACHED_PROCESS`; and a non-detached child is killed with
+ * the launcher (libuv's kill-on-close job). `Start-Process -WindowStyle Hidden` gives the server a
+ * console of its own that is hidden, which its helpers inherit, and it survives the launcher.
+ * @param {string} file - the executable (on Windows, resolved through PATH by PowerShell).
+ * @param {string[]} args - its arguments.
+ * @param {{env?: Record<string,string>, cwd?: string}} [opts] - extra environment and working directory.
+ * @returns {{pid?: number, error?: string}} the server's PID, or why it did not start.
+ */
+export function startBackground(file, args, opts = {}) {
+  const env = { ...process.env, ...opts.env }
+  const cwd = opts.cwd ?? REPO
+  if (!WIN) {
+    try {
+      const child = spawn(file, args, { detached: true, stdio: 'ignore', env, cwd })
+      child.on('error', () => { /* callers probe readiness and report it */ })
+      child.unref()
+      return { pid: child.pid }
+    } catch (e) { return { error: String(e.message ?? e) } }
+  }
+  // Start-Process inherits this PowerShell's environment, which is `env`.
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', hiddenStartCommand(file, args)], {
+    env, cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  })
+  const pid = Number.parseInt(String(r.stdout ?? '').trim(), 10)
+  return Number.isInteger(pid) && pid > 0 ? { pid } : { error: String(r.stderr || r.error?.message || 'Start-Process failed').trim() }
+}
+
+/**
  * @param {number} bytes - a byte count.
  * @returns {string} a human-readable size.
  */

@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
-  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute,
+  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, modelAnswers, ruleRoute,
 } from '../lib/decisions.mjs'
 import { head, info, paint, RUN_DIR, table, warn } from '../lib/util.mjs'
 
@@ -57,14 +57,13 @@ export default {
     if (!r.ok) { warn(`decision service error: ${r.error ?? `HTTP ${r.status}`}`); return 1 }
 
     const rows = []
-    const answers = {}
+    const answers = modelAnswers(r.body)
     for (const key of Object.keys(ROUTING_QUESTIONS)) {
-      const a = readAnswer(r.body, key)
-      answers[key] = a
+      const a = answers[key]
       const agree = a.answer === rules[key]
       rows.push([
         key,
-        `${a.answer ?? '?'} (${(a.confidence ?? 0).toFixed(2)})`,
+        a.invalid === true ? paint('yellow', 'invalid option') : `${a.answer ?? '?'} (${(a.confidence ?? 0).toFixed(2)})`,
         rules[key],
         agree ? paint('green', 'agree') : paint('yellow', 'differ'),
       ])
@@ -72,7 +71,7 @@ export default {
     head(`decision in ${r.ms} ms`)
     for (const l of table(['question', 'decision model', 'rules', ''], rows)) console.log(`  ${l}`)
 
-    const top = readAnswer(r.body, 'level').probabilities
+    const top = answers.level.probabilities
     if (top !== undefined) {
       info(`level distribution: ${Object.entries(top).map(([k, v]) => `${k} ${Number(v).toFixed(2)}`).join('  ')}`)
     }
@@ -83,7 +82,7 @@ export default {
       source: '/decide',
       task: text.slice(0, 500),
       ms: r.ms,
-      model: { ...Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, { answer: v.answer, confidence: v.confidence }])) },
+      model: answers,
       rules,
       agreement: Object.keys(ROUTING_QUESTIONS).filter(k => answers[k].answer === rules[k]).length,
     })
