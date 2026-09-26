@@ -284,6 +284,7 @@ Pet (boot companion, `scripts/lib/pet.mjs`)
 - [x] T-332 The pet replaces the one-line boot banner on an interactive terminal; `/pet` (aliases `/ness`, `/status`) redraws it live; `pet.enabled`/`pet.name` in the config, `VERNESS_NO_PET=1` per run
 - [x] T-333 Render test `scripts/test/pet.render.mjs`: every mood, both layouts, width limits, unknown values, no escape codes off a TTY
 - [ ] T-334 Show running `/loop-task` and `/team` runs as live workers, not only the last finished one (needs a pid/heartbeat file per run)
+- [ ] T-336 A boot from a second checkout (clone, worktree) overwrites the shared `~/.dsh` profile patch with its own persona state; key the profile by checkout, or warn when the patch was written by another one
 - [ ] T-335 Let the pet animate while a turn runs (blink/idle frames) once the editor owns a status line that can be redrawn safely
 
 ## Parking lot (not scheduled)

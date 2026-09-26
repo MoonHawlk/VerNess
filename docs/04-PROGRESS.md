@@ -295,9 +295,12 @@
 - Its mood is derived, not decorative: **worried** when something is wrong (substrate drift, engine
   down, decisions enabled with the sidecar down) with the one line that says what to run,
   **sleepy** when the engine is up but nothing is warm, **happy** otherwise.
-- Boot cost is bounded: probes run in parallel, capped at 600 ms each, over HTTP and files; the only
-  spawn is `git rev-parse` without a shell, and the dsh version is the one the launcher already read.
-  Measured: `/pet` end to end in ~0.4 s including its own `dsh --version`.
+- Boot cost is bounded: HTTP probes (600 ms cap) and two shell-free `git` calls (1.2 s cap) all run
+  in parallel; the dsh version is the one the launcher already read. `git status` skips submodules -
+  a worktree without `upstream/` initialised would otherwise hide what walking the substrate costs
+  in the real checkout. Measured: `/pet` end to end in ~0.4 s including its own `dsh --version`.
+- Found while testing from a worktree: booting any second checkout syncs ITS persona into the shared
+  `~/.dsh/profiles/<name>/cordis.patch.yml`, silently switching the live profile (T-336).
 - It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
   `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
   before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.

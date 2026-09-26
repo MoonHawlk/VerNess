@@ -7,12 +7,13 @@
  * capped at a few hundred milliseconds, so boot never waits on a dead port), and `renderPet` is a
  * pure function of the vitals, so it can be tested without a network or a terminal.
  *
- * No probe spawns a process except `git rev-parse` (no shell): versions come from files, HTTP and
- * the `dsh` version the launcher already computed. Nothing here costs a token.
+ * The only processes spawned are two `git` calls (no shell, run alongside the HTTP probes); versions
+ * otherwise come from files, HTTP and the `dsh` version the launcher already computed. Nothing here
+ * costs a token.
  * @module scripts/lib/pet
  */
 
-import { spawnSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -39,13 +40,25 @@ async function probe(url) {
   } catch { return { ok: false } }
 }
 
-/** @returns {string|undefined} the short commit of the checkout, plus `*` when it has changes. */
-function commit() {
-  const run = args => spawnSync('git', args, { cwd: REPO, encoding: 'utf8', timeout: 1500 })
-  const head = run(['rev-parse', '--short', 'HEAD'])
-  if (head.status !== 0) return undefined
-  const dirty = run(['status', '--porcelain', '--untracked-files=no'])
-  return `${head.stdout.trim()}${dirty.status === 0 && dirty.stdout.trim() !== '' ? '*' : ''}`
+/**
+ * @param {string[]} args - git arguments.
+ * @returns {Promise<string|undefined>} stdout, or undefined on failure or timeout.
+ */
+const git = args => new Promise(done => {
+  execFile('git', args, { cwd: REPO, encoding: 'utf8', timeout: PROBE_MS * 2 }, (err, out) => done(err ? undefined : out.trim()))
+})
+
+/**
+ * The short commit of the checkout, plus `*` when tracked files have changes. Submodules are skipped:
+ * `upstream/` is read-only by convention and walking a whole substrate tree would dominate boot time.
+ * @returns {Promise<string|undefined>} e.g. `a934f9f*`, or undefined outside a repository.
+ */
+async function commit() {
+  const [head, dirty] = await Promise.all([
+    git(['rev-parse', '--short', 'HEAD']),
+    git(['status', '--porcelain', '--untracked-files=no', '--ignore-submodules']),
+  ])
+  return head === undefined ? undefined : `${head}${dirty !== undefined && dirty !== '' ? '*' : ''}`
 }
 
 /** @returns {{outcome: string, at: number, objective: string}|undefined} the newest `/loop-task` record. */
@@ -95,10 +108,11 @@ export async function gatherVitals(cfg, known = {}) {
   const local = r.engine !== undefined
   const dc = decisionConfig(cfg)
 
-  const [version, ps, health] = await Promise.all([
+  const [version, ps, health, sha] = await Promise.all([
     local ? probe(`${apiRoot(r.baseURL)}/api/version`) : Promise.resolve(undefined),
     local ? probe(`${apiRoot(r.baseURL)}/api/ps`) : Promise.resolve(undefined),
     probe(`${dc.baseURL}/health`),
+    commit(),
   ])
 
   let pkg
@@ -119,7 +133,7 @@ export async function gatherVitals(cfg, known = {}) {
     session: known.session,
     versions: {
       verness: pkg.version ?? '?',
-      commit: commit(),
+      commit: sha,
       node: process.versions.node,
       dsh: { installed: known.dsh, pinned: cfg.substrate?.version },
       engine: local ? { name: r.engine, version: version?.body?.version } : undefined,
@@ -263,7 +277,8 @@ export function renderPet(v, opts = {}) {
   const label = Math.max(...rows.map(([l]) => l.length))
   const cols = opts.columns
   const side = cols !== undefined && cols >= 64
-  const room = side ? cols - art[0].length - 3 : (cols ?? Infinity) - 2
+  // One column of slack: a line that fills the last column makes conhost wrap an empty line.
+  const room = side ? cols - art[0].length - 4 : (cols ?? Infinity) - 3
 
   const draw = ([l, parts]) => {
     let left = room - (parts === title ? 0 : label + 2)

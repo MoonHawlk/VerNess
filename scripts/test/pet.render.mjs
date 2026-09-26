@@ -57,7 +57,7 @@ assert.match(petArt('sleepy')[0], /z Z/)
 const wide = renderPet(base(), { columns: 100 })
 assert.ok(!wide.some(l => ANSI.test(l)), 'stdout is not a TTY here, so no escape codes')
 assert.ok(wide.some(l => l.includes('/\\_____/\\') && l.includes('versions')), 'side by side')
-assert.ok(wide.every(l => l.length <= 100), 'fits 100 columns')
+assert.ok(wide.every(l => l.length < 100), 'fits 100 columns, leaving the last one free')
 const text = wide.join('\n')
 for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 0.32.13', 'up - qwen3:0.6b warm 800 MiB',
   'decide  off', 'loop done 2h ago', 'team analysis-review 3d ago', 'a55aee3c', 'Ness: all workers awake']) {
@@ -67,7 +67,7 @@ for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 
 // Narrow terminal and pipes (columns undefined): stacked, and still within the width when known.
 const narrow = renderPet(base(), { columns: 50 })
 assert.ok(!narrow.some(l => l.includes('/\\_____/\\') && l.includes('versions')), 'stacked under 64 columns')
-assert.ok(narrow.every(l => l.length <= 50), 'fits 50 columns')
+assert.ok(narrow.every(l => l.length < 50), 'fits 50 columns, leaving the last one free')
 assert.ok(narrow.some(l => l.includes('~')), 'long lines are cut, visibly')
 const piped = renderPet(base(), {})
 assert.ok(piped.some(l => l.includes('hf') || l.includes('qwen3')) && piped.every(l => !l.includes('~')), 'a pipe is never truncated')
