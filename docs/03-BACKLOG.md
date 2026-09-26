@@ -18,7 +18,6 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
 Foundation
-- [ ] T-183 Make `npm test` real: replace the dead `vitest run` / `tsc -b` scripts with `node --test` over `scripts/test/`; convert the two existing test scripts to `node:test`
 - [ ] T-135 Registry conformance test: load every command file, assert shape, and assert no duplicate names or aliases
 - [ ] T-182 Unique-prefix match (`/mo` → `/model` when unambiguous) and the `//` escape (a line starting `//` is sent to the model as a literal task starting with `/`)
 - [ ] T-130 **`/btw <note>`**: append/show/clear/drop operator side notes in `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, 2000-character cap with a warning at 80%. Spec in `docs/07-COMMAND-LAYER.md`
@@ -51,18 +50,17 @@ Launcher lifecycle
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
 
 ## WS-C — Pet (plan `03-pet-animation.md`)
-> **In flight (2026-09-26):** two drawings exist. `main`'s working tree (uncommitted) has a circle
-> with moods `happy | curious | sad`, `petAnimFrames` and a one-shot boot animation `animatePet`.
-> Branch `epic` (5338fd4) has a baby sheep with moods `happy | sleepy | worried` and a matching
-> render test. In `main`, `scripts/test/pet.render.mjs` fails until one drawing is chosen (T-338).
-> The tasks below are written against frame lists and an exported `PET_MOODS`, not a drawing.
+> **State (v0.2.0):** one drawing — Ness is a baby sheep from the block sprite, moods
+> `happy | sleepy | worried`, with `petAnimFrames` and a one-shot boot animation `animatePet`
+> (`scripts/lib/pet.mjs`). `scripts/test/pet.render.mjs` passes but is still a plain script, not
+> `node:test` (T-338). The tasks below are written against frame lists, not a drawing.
 - [ ] T-338 Rewrite `scripts/test/pet.render.mjs` as a mood-agnostic `node:test` suite over `PET_MOODS` (every frame the same size, ASCII only, broken > idle > ok)
 - [ ] T-335 Animations. Frames stay ASCII and minimal
   - [ ] T-335a Frame model *(remaining part)*: `petAnimFrames(mood)` exists; add a per-frame timing (`{lines, ms}`) and a `loop` vs `once` flag per mood
   - [ ] T-335b Blink: happy eyes → closed for ~150 ms every few seconds, at a randomised interval
-  - [ ] T-335c Idle loop for `curious`: the `?` mark drifts, then restarts
+  - [ ] T-335c Idle loop for `sleepy`: a `z` drifts up, then restarts
   - [ ] T-335d Talking *(blocked)*: `dsh` streams straight to stdout during a turn, so nothing may draw then. Re-scoped: a one-line status spinner once the REPL reads the `--json` event stream, as `/loop-task` already does
-  - [ ] T-335e `sad`: the `!` pulses until the problem it names is fixed
+  - [ ] T-335e `worried`: the `!` pulses until the problem it names is fixed
   - [ ] T-335f Safe redraw: repaint only the art's rows in place (cursor save/restore), never while the line editor is drawing its dropdown; one timer, cleared on exit and on ctrl+c
   - [ ] T-335g Off switch: `pet.animate` (default true), forced off when stdout is not a TTY, when `NO_COLOR`/`CI` is set, or when the terminal is narrower than the side-by-side layout
   - [ ] T-335h Simulated-terminal test: fake clock, frames advance, timers stop, nothing written off a TTY

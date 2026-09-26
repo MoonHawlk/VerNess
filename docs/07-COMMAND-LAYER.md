@@ -1,7 +1,8 @@
-# 07 — Command layer and quick-tools (planned, not yet built)
+# 07 — Command layer and quick-tools
 
-> Status: **design only.** Nothing in this document is implemented. Tasks T-130..T-166 in
-> `docs/03-BACKLOG.md` track the work. Capability survey: `docs/research/claude-code-capability-map.md`.
+> Status (v0.2.0): **largely built.** The registry, `/help`, `/cost`, `/usage`, `/sessions`, `/resume`,
+> `/tools`, `/agents`, `/persona`, `/team`, `/loop-task`, `/dashboard` and persona-scoped commands exist in
+> `scripts/commands/`. Open items stay in `docs/03-BACKLOG.md` (WS-A/WS-B). Capability survey: `docs/research/claude-code-capability-map.md`.
 
 ## Goal
 
@@ -107,6 +108,21 @@ implementation belongs on `ctx.subagents` and `ctx.jobs` (T-154), which already 
 
 Before any parallelism: measure. One local model serving two concurrent sessions contends for the
 same weights, so "parallel" can be slower than sequential on a single machine.
+
+## `/dashboard` — the task board (T-389)
+
+`/dashboard` (alias `/dash`; `node scripts/dashboard.mjs` from a shell) writes a static
+`.verness/dashboard.html` and opens it. No server, no network, zero tokens.
+
+- **Backlog** first: every `- [ ] T-NNN` line of `docs/03-BACKLOG.md`, grouped by workstream, with
+  subtasks under their parent. Each gets a P0–P3 picker saved in the browser's localStorage
+  (`verness.backlog.priority`), so priorities survive regenerating the page; filter by workstream or
+  priority, sort, and *copy as markdown* to paste the ranked list back into a doc or a prompt. The
+  backlog file itself is rendered below (`scripts/lib/backlog.mjs`, no dependency).
+- Then sessions (turns, tool calls, tokens, wall time, click-through timeline), shadow decisions and
+  team runs.
+
+Priorities are a per-browser view, not a source of truth: to make one stick, reorder the backlog file.
 
 ## Challenges, recorded before coding
 

@@ -438,3 +438,18 @@
 - **Engram graph** rebuilt after M2: 513 nodes / 1592 edges / 19 communities (was 315 / 974 / 13);
   it now covers `packages/contracts/src/*`.
 - **Next**: M3 / T-030 — the decisions plugin.
+
+## 2026-09-26 — v0.2.0 released; dashboard backlog; terse skill (T-389..T-391)
+- **Release**: `epic` merged into `main` (`13c94d4`), tagged `v0.2.0` and pushed; `epic` re-created
+  from it for further work.
+- **Dashboard backlog** (T-389): `/dashboard` now opens on a Backlog section built from
+  `docs/03-BACKLOG.md` — each open task gets a P0–P3 picker (kept in the browser's localStorage under
+  `verness.backlog.priority`), with filters by workstream/priority, sort, and copy-as-markdown; the
+  file itself is rendered below. Parser and renderer: `scripts/lib/backlog.mjs`, no dependency.
+- **Wall-time fix** (T-390): session wall time starts at the first timed event, not at an untimed
+  header, so it is no longer inflated.
+- **Terse skill** (T-391): `.claude/skills/terse/SKILL.md` — agents drop filler and hedging, use
+  plain short phrasing, and keep code, paths, commands and errors exact, to cut token cost.
+- **Docs**: README (dashboard, features, releases, development, structure), docs index, 07, 06.
+- **Tests**: `pnpm test` 130/130; `pnpm typecheck` clean.
+
