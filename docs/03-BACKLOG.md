@@ -187,7 +187,7 @@ Protocol and provider
 
 Lifecycle (mirrors the model engine, ADR-0007)
 - [ ] T-210 Detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
-- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — bind loopback if the server offers a host flag, and otherwise always generate and set a key. Never start it open on a LAN
+- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — set `LAYA_HOST=127.0.0.1` (and `LAYA_PORT`), and set a generated `LAYA_API_KEY` as well. Never start it open on a LAN
 - [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question
 - [ ] T-213 `decision down`: stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
 - [ ] T-214 Config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
@@ -197,7 +197,7 @@ Calibration and evaluation — the gate before any policy use
 - [ ] T-221 Measure zero-shot accuracy, ECE and AUROC on that set; publish the numbers in `docs/research/`
 - [ ] T-222 Refit one temperature per (question type, option count) and re-measure (the card reports mean ECE 0.466 -> 0.081 from exactly this)
 - [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE beats the rule baseline it replaces. Until then every provider is opt-in
-- [ ] T-224 Measure CPU-only latency on a developer laptop — every published figure is a T4 GPU, and the cheap-decision premise depends on this
+- [ ] T-224 Confirm CPU latency on this laptop against the documented **193–464 ms CPU vs 32.8 ms T4** — the widely quoted ~33 ms is a GPU figure, and the cheap-decision premise for local development rests on the CPU number
 
 First real uses
 - [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids. Depends on T-145 (the runner's prompts are truncated on Windows today) and T-144
@@ -208,7 +208,7 @@ First real uses
 
 Deferred / investigate
 - [ ] T-240 MCP path (`laya[mcp]`): expose Laya to the MODEL as a tool — complementary to, not a replacement for, harness-side control flow
-- [ ] T-241 ONNX path (`laya[onnx]`): if the decision head survives export, a Node runtime removes the sidecar entirely
+- [ ] T-241 **`laya-ts` path — the intended end state**: the upstream repo ships a TypeScript reimplementation over a split ONNX export (`encoder.onnx` + `head.onnx`, export verified to 1e-4), so a decision provider can run inside a Cordis plugin with no sidecar and no Python at run time. Blockers: `laya-ts` is not on npm (404 — must be vendored or built from the monorepo) and the export needs a one-time Python run
 - [ ] T-242 Fine-tune on our own decisions once T-220 has a labelled set (the card's own advice: 0.362 -> 0.766 on its benchmark)
 - [ ] T-243 Guardrail/moderation question on inbound tasks — one extra question in an existing call is nearly free
 

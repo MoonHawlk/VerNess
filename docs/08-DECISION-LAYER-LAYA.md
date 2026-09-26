@@ -85,8 +85,19 @@ LLM call for one `POST /v1/systemone`. One notable gap: `mcp-client` has **no co
 for tools** — filtering needs a companion plugin calling `ctx.tools.restrict({allow, deny})`, which
 is also the primitive the persona tool policy (M4) will need.
 
-**C. ONNX, no Python at all** — `laya[onnx]` suggests an export path; if the decision head survives
-export, a Node ONNX runtime would remove the sidecar entirely. Unverified, and gated on (A) working.
+**C. `laya-ts` — no Python in the serving process.** Verified in
+`docs/research/laya-model-digest.md`: the upstream repo contains `laya-ts/`, a from-scratch
+TypeScript reimplementation for Node and the browser, driven by a split ONNX export
+(`encoder.onnx` + `head.onnx`) whose export script checks torch-vs-ONNX agreement within 1e-4. It
+ports `decide()`, the shortlist and per-language calibration, with `onnxruntime-node` as an optional
+peer dependency.
+
+This is the end state we actually want — a decision provider running *inside* a Cordis plugin, no
+sidecar, no HTTP hop, no Python at run time. Two real blockers keep it out of phase 1: **`laya-ts` is
+not published on npm** (checked: `registry.npmjs.org/laya-ts` returns 404), so it must be vendored or
+built from the monorepo; and the ONNX export itself still requires a one-time Python run. Tracked as
+T-241, and the `DecisionModel` contract is what makes swapping A for C a provider change rather than
+a rewrite.
 
 ## Task block
 
@@ -121,13 +132,26 @@ Ordered by (value ÷ effort). Each is a separate proposal, not a commitment.
 | 8 | **Fine-tune on our own decisions** — the card's own advice (0.362 → 0.766 on its benchmark) | The only route to decisions we would actually trust; needs a labelled set we do not have yet | T-220..T-223 |
 | 9 | **Guardrail/moderation pass** on inbound tasks, using the same sidecar | The model is explicitly trained for it; one more question in an existing call is ~free | T-206 |
 
-## Open questions
+## Answers to the questions this plan opened
 
-- Does `laya-serve` return per-option probabilities, or only the winning option plus a confidence?
-  Our `DecisionResult` wants the distribution (needed for the confidence bands in feature 4).
-- Cold-start: download size and first-load time for each checkpoint, and whether the sidecar can run
-  fully offline afterwards.
-- CPU-only latency on a developer laptop. Every published figure is a T4 GPU; if CPU latency is
-  seconds rather than ~40 ms, the "cheap decision" premise weakens for local development.
-- Windows support for the sidecar, including whether the launcher can manage its lifecycle the same
-  way it manages the model engine.
+From `docs/research/laya-model-digest.md` (sourced to the repo and model card; the live server
+settles anything still ambiguous, T-200):
+
+- **Per-option probabilities: yes.** A `choice` answer carries a `probabilities` map
+  (`{"billing": 0.94, "technical": 0.05, ...}`) alongside `confidence` and `answer_confidence`, so
+  the confidence bands feature 4 needs are available. `confidence` for choice/score is
+  `1 − normalised entropy` over that distribution; `answer_confidence` is the Jev-portable field, so
+  our adapter thresholds on it.
+- **Binding is configurable**: `LAYA_HOST` (default `0.0.0.0`) and `LAYA_PORT` (default `8000`).
+  T-211 therefore sets `LAYA_HOST=127.0.0.1` — loopback by construction, not by hope.
+- **CPU latency is 193–464 ms per request**, against 32.8 ms on a T4. This matters: the ~33 ms figure
+  everyone quotes is a GPU figure. On a developer laptop a decision costs a few hundred milliseconds
+  — still one to two orders cheaper than an LLM turn, but not free, and batching is what recovers it
+  (~10 ms → ~1 ms per decision when batched on GPU).
+- **Checkpoint switching is expensive**: 7.4 s (CPU) / 10.3 s (T4) per reload, so a long-lived
+  preloaded sidecar beats per-call loading, which is an argument for path (A) over naive in-process
+  loading until (C) is ready.
+
+Still open: cold-start download sizes per checkpoint and true offline operation after first pull;
+Windows lifecycle management of the sidecar; and whether our own decisions land in Laya's strong
+regime at all — which only T-220..T-223 can answer.
