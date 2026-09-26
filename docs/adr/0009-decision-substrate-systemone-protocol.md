@@ -57,6 +57,10 @@ tracked, not assumed.
   `act_probability`, issue #185). The contract stays clean; the workarounds stay in the adapter.
 - Every Laya-vs-Jev number we cite is vendor-published and third-party sourced. We may repeat it
   with attribution; we may not present it as measurement of ours.
+- **The sidecar must never be started open.** `laya-serve` binds `0.0.0.0` with no authentication
+  unless `LAYA_API_KEY` is set (model card, *Self-hosting*). Our lifecycle command binds loopback
+  where the server allows it and otherwise generates a key every time — a decision service reachable
+  from the LAN is an unauthenticated classifier anyone can drive.
 - Python becomes a *development* prerequisite for anyone who wants the decision layer — the first
   dependency in this project that is not Node. `doctor` must say so plainly, and the harness must
   stay fully usable without it.

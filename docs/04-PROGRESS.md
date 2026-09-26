@@ -166,7 +166,7 @@
   second pass before T-134 onward.
 
 ## 2026-09-26 — the decision layer finds its provider (planning only)
-- Investigated `convaiinnovations/laya` (Hugging Face, Apache-2.0, 3.7k likes, published 2026-09-18).
+- Investigated `convaiinnovations/laya` (Hugging Face, Apache-2.0, published 2026-09-18; the Hub API reports 3,689 likes and 0 downloads eight days in — recorded as data, not as evidence of quality).
   It is **not** another generative model: it is a non-autoregressive System-1 decision model — typed
   questions in, typed answers with calibrated probabilities out, every question in a call answered in
   one forward pass, ~33-40 ms on a T4. It never generates text.

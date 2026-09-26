@@ -54,13 +54,14 @@ Three, in order of effort. The chosen path is (A); (B) is the fallback and (C) i
 
 **What installing it actually costs** (PyPI metadata for `laya` 0.3.20, verified 2026-09-26):
 Python ≥3.10, Apache-2.0, and the required dependencies are `torch>=2.0.0`, `transformers>=4.48.0`,
-`safetensors`, `huggingface_hub`, `numpy` — so the first install pulls PyTorch (a multi-GB download),
+`safetensors`, `huggingface_hub`, `numpy` — so the first install pulls PyTorch (wheel size varies by platform and by CPU vs CUDA build — measure before quoting a number),
 plus `fastapi`+`uvicorn` for the `serve` extra and `mcp>=2.2.0` for the `mcp` extra. Checkpoint
 weights are separate: ModernBERT-large 421M total (English) and mmBERT-base 322M (multilingual).
 This is the single biggest reason the sidecar stays optional and out of process.
 
 **A. HTTP sidecar speaking the SystemOne protocol** — `pip install "laya[serve]"`, then
-`laya-serve` (binds `0.0.0.0:8000`; `LAYA_API_KEY` enables bearer auth). Our side is one
+`laya-serve`. **It binds `0.0.0.0:8000` with no authentication unless `LAYA_API_KEY` is set**, so our
+lifecycle command binds loopback where possible and always sets a key otherwise (T-211). Our side is one
 `fetch` to `POST /v1/systemone`. No Python in *our* process, no new runtime in the harness, and the
 same adapter works against Jev. Managed by the launcher exactly like the model engine
 (`up`/`stats`/`down`, ADR-0007), as a second engine class.
@@ -110,13 +111,13 @@ Ordered by (value ÷ effort). Each is a separate proposal, not a commitment.
 
 | # | Feature | Why it is worth doing | Depends on |
 |---|---|---|---|
-| 1 | **`/decide` quick-tool** — ask a typed question from the REPL, get answer + confidence, zero LLM tokens | The cheapest possible way to *feel* what the decision model is good and bad at, before trusting it anywhere | T-206 |
-| 2 | **Team task router** — pick the persona that should own a task with one `choice` over persona ids | Directly improves the team runner that already exists; a wrong answer is cheap and visible | T-206 |
+| 1 | **`/decide` quick-tool** — ask a typed question from the REPL, get answer + confidence, zero LLM tokens | The cheapest possible way to *feel* what the decision model is good and bad at, before trusting it anywhere | T-201 + T-140 (REPL dispatch) |
+| 2 | **Team task router** — pick the persona that should own a task with one `choice` over persona ids | Improves the team runner once it works: today it is committed but unwired, its `--parallel` is a no-op, and on Windows `cmd.exe` truncates its multi-line prompts | T-201, T-144, T-145 |
 | 3 | **Escalation gate in the supervisor** — continue / retry / complete / escalate as a 4-option choice | The core loop from TODO.md §13–21, and a 4-option space is Laya's strong regime | M7 + T-206 |
 | 4 | **Tool-risk gate on `tools/pre-execute`** — score a tool call, map confidence bands to allow/ask/deny | Makes approvals proportional instead of all-or-nothing; the seam already exists | M9 + calibration |
 | 5 | **Evaluator pre-filter** — Laya screens obvious pass/fail before an LLM evaluator is paid for | Generator ≠ evaluator (law 4) gets cheaper, so we can afford to always evaluate | M7 |
 | 6 | **Progressive reduction for data work** — rank 100k candidates, send the top-k to the LLM | The 500M-row scenario in TODO.md §16–17, finally with a real ranker | M8 |
-| 7 | **Decision accounting in `/cost`** — count decision calls separately and show LLM calls avoided | Turns "cheapest reliable computation first" from a slogan into a number on screen | `/cost` wired |
+| 7 | **Decision accounting in `/cost`** — count decision calls separately and show LLM calls avoided | Turns "cheapest reliable computation first" from a slogan into a number on screen | T-136 (`/cost` wired) + T-142 |
 | 8 | **Fine-tune on our own decisions** — the card's own advice (0.362 → 0.766 on its benchmark) | The only route to decisions we would actually trust; needs a labelled set we do not have yet | T-220..T-223 |
 | 9 | **Guardrail/moderation pass** on inbound tasks, using the same sidecar | The model is explicitly trained for it; one more question in an existing call is ~free | T-206 |
 

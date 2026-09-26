@@ -110,9 +110,18 @@ Survey behind the choices: `docs/research/claude-code-capability-map.md`. Tiers:
 - [ ] T-130 **`/btw <note>`** — the first command: append/show/clear/drop operator side notes, persisted to `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, hard character cap with a warning at 80% (L). Spec in `docs/07-COMMAND-LAYER.md`
 - [ ] T-131 Split mutable state into `verness.state.json` so commands never rewrite the commented `verness.config.json` (challenge #4 — decide before any config-writing command)
 - [ ] T-132 Command registry: `scripts/command.mjs` + auto-discovered `scripts/commands/*.mjs`, uniform `{name, summary, usage, group, run(ctx,args)}`, `ctx = {cfg, paths, state, sync, out, dsh}`; REPL dispatch for `/x`, `//` literal escape, unique-prefix match, "did you mean"
-- [ ] T-133 Session-log reader: resolve the concatenated-zstd problem (challenge #2) — prefer `@deepseek-ai/dsh-session-query` over parsing `session.v4.jsonl.zstd` ourselves. **Blocks T-136/T-137**
+- [x] T-133 Session-log reader: **the concatenated-zstd problem is solved, not open** — `scripts/lib/sessions.mjs` splits on the zstd magic and decodes frame by frame (measured: 10 frames -> 24 events on a log that `zstdDecompressSync` read as 1 event). `@deepseek-ai/dsh-session-query` remains the supported alternative if the format changes. Caveat in T-143
 - [ ] T-134 `/help` generated from the registry, grouped, with usage lines (L)
 - [ ] T-135 Registry conformance test: load every command file, assert shape, assert no duplicate names/prefixes
+
+Known defects in the WIP command layer (commit 1515661) — fix before wiring anything else
+- [ ] T-140 **REPL and CLI do not dispatch `/` input to the registry yet** — every quick-tool is unreachable until they do
+- [ ] T-141 **`/persona` has no effect**: `writePatch` in `scripts/verness.mjs` still uses its own inline persona resolution and ignores the `state.json` override written by the command. Make it use `lib/personas.mjs` (`activePersonaId`, file-based personas, `persona.model.id`)
+- [ ] T-142 **`/usage` can attribute tokens to the wrong route**: `summarizeSession` charges usage to the last *inserted* route key rather than the route of the current `request/header`. Track a `currentRoute` updated by each header event
+- [ ] T-143 **Frame-split zstd decoding can silently drop events**: if the magic bytes occur inside compressed data a slice fails to decode and is swallowed, so `/usage` undercounts without warning. On failure, merge the slice with the next boundary and retry, then report any frames still skipped
+- [ ] T-144 **`--parallel` in the team runner does nothing**: `execute()` calls `sh()` which is `spawnSync`, so it blocks the event loop and `Promise.race` never overlaps. Use async `spawn` wrapped in a promise, or drop the concurrency claim (and reconcile with ADR-0008, which says teams are sequential v1)
+- [ ] T-145 **Windows argument passing is broken for real prompts** (everything goes through `cmd.exe`): a newline in an argument ends the command, so the team runner's upstream-context block is truncated; the 8191-character command-line limit is easy to exceed; and the `%` -> `%^` escape is wrong (inside double quotes `^` is literal, so "grew 10%" arrives as "grew 10%^"). Fix all three by resolving `<npm root -g>/@deepseek-ai/dsh/package.json` -> `bin.dsh` and spawning `process.execPath` with that JS file and **no shell**
+- [ ] T-146 **`/model` delegates to a `builtins.model` handler that does not exist**; `describePersona` labels the model line `[enforced]`, which only becomes true once T-141 lands
 
 ### Tier L — local commands, zero token cost
 - [ ] T-136 `/cost` — tokens in/out and wall time for the session; `0` cost on a local route, never an estimated price (challenge #3)
@@ -174,11 +183,11 @@ Protocol and provider
 - [ ] T-203 `RuleDecisionProvider` (declarative, no network) — the baseline every model provider must beat
 - [ ] T-204 `CompositeDecisionModel`: rules -> decision model -> LLM, with confidence thresholds and cost accounting
 - [ ] T-205 `JevProvider` proven by construction: same adapter, different base URL (no new code — if it needs code, the abstraction is wrong)
-- [ ] T-206 `/decide` quick-tool: ask a typed question from the REPL, print answer + confidence + provider, zero LLM tokens
+- [ ] T-206 `/decide` quick-tool: ask a typed question from the REPL, print answer + confidence + provider, zero LLM tokens. Depends on T-201 and T-140 (REPL dispatch)
 
 Lifecycle (mirrors the model engine, ADR-0007)
 - [ ] T-210 Detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
-- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state
+- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — bind loopback if the server offers a host flag, and otherwise always generate and set a key. Never start it open on a LAN
 - [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question
 - [ ] T-213 `decision down`: stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
 - [ ] T-214 Config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
@@ -191,7 +200,7 @@ Calibration and evaluation — the gate before any policy use
 - [ ] T-224 Measure CPU-only latency on a developer laptop — every published figure is a T4 GPU, and the cheap-decision premise depends on this
 
 First real uses
-- [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids
+- [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids. Depends on T-145 (the runner's prompts are truncated on Windows today) and T-144
 - [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice (a small option space is Laya's strong regime)
 - [ ] T-232 Decision accounting in `/cost`: count decision calls separately and report LLM calls avoided
 - [ ] T-233 Tool-risk gate on `tools/pre-execute`, modelled on the in-tree precedent `packages/experimental/auto-review` (classifier -> allow/deny/ask, integrates with permission presets); swap its LLM call for one `POST /v1/systemone`. Blocked on T-223
