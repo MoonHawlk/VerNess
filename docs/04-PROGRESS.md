@@ -477,3 +477,10 @@
   `q`; resume at the first unlabelled question; EOF and SIGINT exit cleanly and remove the handler).
   Those test labels were deleted. `npm test` 139/139.
 - **Next**: operator labelling (T-389, ≥ 50 per question), and in parallel Task 3 (metrics + refit, T-221/T-222).
+
+## 2026-09-26 — first labelled set (T-389 in progress)
+- The owner labelled every shadow record: **20 per question** (60 labels, 0 skipped). The gate needs 50.
+- Unofficial first look (n=20, too small to gate on): correct vs label, model / rules:
+  level 3 / 7, tier 9 / 10, pipeline 10 / 10. Laya's `level` leans on `standard` and trails the rules.
+- Three labels flagged to the owner for a second look (possible slips); relabelling needs a
+  `--relabel` option the labeller does not have yet.
