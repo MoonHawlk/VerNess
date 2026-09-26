@@ -173,6 +173,7 @@ computations). Global commands always win on a name clash. How to write one:
 ./turn_on.sh decision up       # start the Laya sidecar (first run installs laya[serve])
 /decide <task text>            # in the REPL: Laya vs the rules, side by side
 /decisions-data label          # label logged decisions (blind); /decisions-data shows the count
+/dd label --relabel <words>    # fix a label: re-asks records by id or task words; newest label wins
 ```
 
 Laya runs in **shadow mode**. It answers three routing questions for each task (`level`, `tier`,

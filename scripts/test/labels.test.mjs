@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { appendLabel, labelCounts, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
+import { appendLabel, labelCounts, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
 
 /** @param {(dir: string) => void} fn - body run against a fresh temp directory. */
 function inTemp(fn) {
@@ -59,4 +59,16 @@ test('parseLabelInput: numbers, names, skip, quit, junk', () => {
   assert.deepEqual(parseLabelInput('q', opts), { quit: true })
   assert.deepEqual(parseLabelInput('4', opts), { invalid: true })
   assert.deepEqual(parseLabelInput('', opts), { invalid: true })
+})
+
+test('matchRecords: an exact id wins; otherwise a case-insensitive task substring', () => {
+  const recs = [
+    { id: 'a1b2c3d4e5f6', task: 'create a file called notes.txt' },
+    { id: 'ffffffffffff', task: 'Switch to the reviewer persona' },
+    { id: 'eeeeeeeeeeee', task: 'switch to the data-scientist persona' },
+  ]
+  assert.deepEqual(matchRecords(recs, 'a1b2c3d4e5f6').map(r => r.id), ['a1b2c3d4e5f6'])
+  assert.deepEqual(matchRecords(recs, 'SWITCH TO').map(r => r.id), ['ffffffffffff', 'eeeeeeeeeeee'])
+  assert.deepEqual(matchRecords(recs, 'nothing like this'), [])
+  assert.deepEqual(matchRecords(recs, '   '), [])
 })

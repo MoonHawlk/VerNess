@@ -13,7 +13,7 @@
 import { createInterface } from 'node:readline'
 
 import { ROUTING_QUESTIONS, decisionsDir, optionHash } from '../lib/decisions.mjs'
-import { appendLabel, labelCounts, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
+import { appendLabel, labelCounts, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
 import { head, info, ok, paint, table, warn } from '../lib/util.mjs'
 
 /** Labels per question below which the gate refuses to judge (T-223). */
@@ -78,18 +78,24 @@ async function askLabel(lines, options) {
  * @param {string} dir - the decisions directory.
  * @param {string[]} questions - which questions to label.
  * @param {number} limit - at most this many records.
+ * @param {string} [relabel] - relabel the records matching this id or task text, labelled or not.
  * @returns {Promise<number>} exit code.
  */
-async function label(dir, questions, limit) {
+async function label(dir, questions, limit, relabel) {
   if (process.stdin.isTTY !== true) { warn('labelling needs a terminal'); return 1 }
   const labels = readLabels(dir)
-  const pending = readShadow(dir)
-    .map(rec => ({ rec, qs: questions.filter(q => labels.get(rec.id)?.[q] === undefined && sameOptions(rec, q)) }))
+  const records = relabel === undefined ? readShadow(dir) : matchRecords(readShadow(dir), relabel)
+  const pending = records
+    .map(rec => ({ rec, qs: questions.filter(q => (relabel !== undefined || labels.get(rec.id)?.[q] === undefined) && sameOptions(rec, q)) }))
     .filter(p => p.qs.length > 0)
     .slice(0, limit)
-  if (pending.length === 0) { ok('nothing to label - every shadow record already has a label'); printStatus(dir, questions); return 0 }
+  if (pending.length === 0) {
+    if (relabel !== undefined) { warn(`no shadow record matches "${relabel}" - use a record id or words from the task`); return 1 }
+    ok('nothing to label - every shadow record already has a label'); printStatus(dir, questions); return 0
+  }
 
-  head(`labelling ${pending.length} record(s): the right answer for each question, in your judgement`)
+  head(`${relabel === undefined ? 'labelling' : 'relabelling'} ${pending.length} record(s): the right answer for each question, in your judgement`)
+  if (relabel !== undefined) info('your current label is shown; the newest label wins, so nothing is lost')
   info('the two suggestions are the rules and the model, shuffled and unmarked - pick what is right, not who')
   info('s skips a task no option fits (it is not asked again); q stops - every label is saved as you go')
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false })
@@ -114,6 +120,8 @@ async function label(dir, questions, limit) {
         const seen = [...new Set([rec.rules?.[q], rec.model?.[q]?.answer].filter(a => options.includes(a)))]
         if (Math.random() < 0.5) seen.reverse()
         if (seen.length > 0) info(`suggested: ${seen.join(' · ')}`)
+        const current = labels.get(rec.id)?.[q]
+        if (current !== undefined) info(`your current label: ${current}  (id ${rec.id})`)
         const p = await askLabel(lines, options)
         if ('quit' in p) { ok(`stopped - ${written} label(s) saved`); printStatus(dir, questions); return 0 }
         appendLabel(dir, { id: rec.id, question: q, label: p.label })
@@ -131,10 +139,11 @@ export default {
   aliases: ['dd'],
   group: 'decisions',
   summary: 'label shadow decisions so the decision model can be measured: /decisions-data label',
-  usage: '/decisions-data [status] | label [--question level|tier|pipeline] [--limit N] | report | refit | gate',
+  usage: '/decisions-data [status] | label [--question level|tier|pipeline] [--limit N] [--relabel <id | task words>] | report | refit | gate',
   details: [
     'status  labels per question against the 50 the gate needs (200 is better)',
     'label   blind labelling loop over unlabelled shadow records; saved as you go',
+    '        --relabel <id | task words> re-asks matching records, labelled or not; the newest label wins',
     'report, refit, gate  come with WS-E Tasks 3 and 4',
   ],
   /**
@@ -156,7 +165,15 @@ export default {
     if (!(limit > 0)) { warn('--limit takes a positive number'); return 1 }
 
     if (sub === 'status') { printStatus(dir, questions); return 0 }
-    if (sub === 'label') return label(dir, questions, limit)
+    const rAt = args.indexOf('--relabel')
+    let relabel
+    if (rAt >= 0) {
+      // The query runs until the next flag, so task words need no quoting.
+      const end = args.findIndex((a, i) => i > rAt && a.startsWith('--'))
+      relabel = args.slice(rAt + 1, end < 0 ? undefined : end).join(' ')
+      if (relabel.trim() === '') { warn('--relabel takes a record id or words from the task'); return 1 }
+    }
+    if (sub === 'label') return label(dir, questions, limit, relabel)
     if (sub === 'report' || sub === 'refit' || sub === 'gate') {
       warn(`/decisions-data ${sub} is not built yet (WS-E Tasks 3-4) - label first, it needs ${MIN_LABELS} per question`)
       return 1

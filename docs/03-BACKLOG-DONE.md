@@ -115,6 +115,7 @@ Verified: `pnpm typecheck` clean, `pnpm test` 125/125 (on Node 26; Node 22.19 no
 - [x] T-252 `/decide` runs the three routing questions on the given input with Laya and the rules side by side, confidences included. Same code as T-206 (`scripts/commands/decide.mjs`)
 - [x] WS-E Task 1: shadow records are `v: 2` with an `id`; each question logs `probabilities` and an option-set `hash`; `readAnswer` rejects out-of-set choices (`scripts/test/decisions.log.test.mjs`)
 - [x] T-220 / T-260 `/decisions-data label` (alias `/dd`): blind labelling loop (rules and model answers shuffled and unmarked), every label appended to `.verness/decisions/labels.jsonl` as it is entered, `s` skips, `q`/ctrl+c/EOF stop cleanly, refuses without a terminal. `/decisions-data status` counts labels against the 50 the gate needs. Pure layer in `scripts/lib/labels.mjs` (`scripts/test/labels.test.mjs`)
+  - `--relabel <id | task words>` (2026-09-26): re-asks matching records whether labelled or not, shows the operator's own current label (never the rules' or model's), newest label wins; `matchRecords` in `scripts/lib/labels.mjs`
 
 ## Observability
 - [x] T-270 `/dashboard`: self-contained static HTML from session logs, shadow decisions and team runs
