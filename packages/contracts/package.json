@@ -1,0 +1,20 @@
+{
+  "name": "@verness/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "description": "VerNess vocabulary: types and dependency-free validators. No runtime behaviour.",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+    "./src/*": "./src/*"
+  },
+  "files": ["lib/index.js", "lib/**/*.js", "lib/types/**/*.d.ts"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --outDir lib --declarationDir lib/types --declaration --rewriteRelativeImportExtensions",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": { "@deepseek-ai/cordis": "4.0.4" },
+  "devDependencies": { "@deepseek-ai/cordis": "4.0.4" }
+}
