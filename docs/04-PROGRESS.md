@@ -304,8 +304,12 @@
 - It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
   `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
   before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.
-- Redesigned on request: Ness is now a **triangle with a face in it** (brows, pupils, a two-row curved
-  smile; closed eyes and `z Z` when sleepy; raised brows, a frown and `!` when worried). The triangle
-  is generated from the face rows, so its sides stay straight whatever the mood draws inside, and
-  the panel is bottom-aligned so Ness speaks beside its base.
+- Redesigned on request, twice. The triangle with a detailed face read as scary; Ness is now a
+  **cube - a little TV** with a deliberately small face on its screen (`o   o` over `u`; `-   -`
+  over `.` with a `z` when sleepy; `~` and a `!` when worried). The design effort went into the
+  cube: oblique projection, a 13x6 front face that reads square because a terminal cell is about
+  twice as tall as it is wide, and a 3-row depth stepping one column per row so every receding edge
+  is a single `/`. It is generated from those three numbers, the face pieces are odd-width on an
+  odd-width screen so they centre exactly, and the test checks every corner and edge (T-337).
+  Animations are planned, not built (T-335a..h).
 

@@ -285,7 +285,16 @@ Pet (boot companion, `scripts/lib/pet.mjs`)
 - [x] T-333 Render test `scripts/test/pet.render.mjs`: every mood, both layouts, width limits, unknown values, no escape codes off a TTY
 - [ ] T-334 Show running `/loop-task` and `/team` runs as live workers, not only the last finished one (needs a pid/heartbeat file per run)
 - [ ] T-336 A boot from a second checkout (clone, worktree) overwrites the shared `~/.dsh` profile patch with its own persona state; key the profile by checkout, or warn when the patch was written by another one
-- [ ] T-335 Let the pet animate while a turn runs (blink/idle frames) once the editor owns a status line that can be redrawn safely
+- [x] T-337 Ness is a cube - a little TV with a small face on its screen, built from its geometry (13x6 front, 3-row depth) so the edges stay parallel; the render test checks every corner and edge
+- [ ] T-335 Animations for the cube. Frames stay ASCII and minimal - only the face (and the mark above) changes, the cube never moves:
+  - [ ] T-335a Frame model: `petArt(mood, frame)` returns one frame; a mood owns a short frame list plus a timing per frame
+  - [ ] T-335b Blink: happy eyes `o   o` -> `-   -` for ~150 ms every few seconds, at a randomised interval so it never looks mechanical
+  - [ ] T-335c Sleepy: the `z` drifts up and right over three frames, then restarts
+  - [ ] T-335d Talking: while a model turn streams, the mouth alternates `u` / `o`; stops the moment the turn ends
+  - [ ] T-335e Worried: the `!` pulses (shown / hidden) until the problem it names is fixed
+  - [ ] T-335f Safe redraw: repaint only the art's rows in place (cursor save/restore), never while the line editor is drawing its dropdown; one timer, cleared on exit and on ctrl+c
+  - [ ] T-335g Off switch: `pet.animate` (default true), forced off when stdout is not a TTY, when `NO_COLOR`/`CI` is set, or when the terminal is narrower than the side-by-side layout
+  - [ ] T-335h Simulated-terminal test in the style of `prompt.simulated-tty.mjs`: fake clock, assert frames advance, timers stop, and nothing is written off a TTY
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5

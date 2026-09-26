@@ -49,22 +49,37 @@ assert.equal(moodOf(remote).mood, 'happy', 'a remote route is never "down" just 
 for (const m of ['happy', 'sleepy', 'worried']) {
   const a = petArt(m)
   assert.equal(a.length, 10)
-  assert.ok(a.every(l => l.length === 18), `${m} art is 18 columns wide`)
-  assert.equal(a[1].trim(), '/\\', `${m} has an apex`)
-  assert.equal(a[9], `/${'_'.repeat(16)}\\`, `${m} has a closed base`)
-  for (const [i, l] of a.slice(1).entries()) {
-    assert.equal(l.indexOf('/'), 8 - i, `${m} row ${i} left side is straight`)
-    assert.equal(l.lastIndexOf('\\'), 9 + i, `${m} row ${i} right side is straight`)
+  assert.ok(a.every(l => l.length === 16), `${m} art is 16 columns wide`)
+  const cube = a.slice(1)
+  const edge = `+${'-'.repeat(11)}+`
+  // Eight corners: back face top at column 3, front face top at row 3, both bottoms closed.
+  assert.equal(cube[0], `   ${edge}`, `${m} back top edge`)
+  assert.equal(cube[3].slice(0, 13), edge, `${m} front top edge`)
+  assert.equal(cube[8].trimEnd(), edge, `${m} front bottom edge`)
+  assert.equal(cube[5][15], '+', `${m} back bottom-right corner`)
+  // Receding edges are single diagonals: top-left, top-right and bottom-right all step one column per row.
+  for (const r of [1, 2]) {
+    assert.equal(cube[r].indexOf('/'), 3 - r, `${m} top-left edge row ${r}`)
+    assert.equal(cube[r].indexOf('/', 4 - r), 15 - r, `${m} top-right edge row ${r}`)
   }
+  for (const r of [6, 7]) assert.equal(cube[r].lastIndexOf('/'), 20 - r, `${m} bottom-right edge row ${r}`)
+  // Front face sides are straight, and the back-right edge is vertical until its corner.
+  for (let r = 4; r < 8; r++) assert.ok(cube[r][0] === '|' && cube[r][12] === '|', `${m} front sides row ${r}`)
+  for (let r = 1; r < 5; r++) assert.equal(cube[r][15], '|', `${m} back-right edge row ${r}`)
+  // The face is centred exactly on the 11-column screen.
+  const screen = cube[5].slice(1, 12)
+  assert.equal(screen.indexOf(screen.trim()), screen.length - screen.trimEnd().length, `${m} eyes centred`)
+  assert.equal(cube[6].slice(1, 12).indexOf(cube[6].slice(1, 12).trim()), 5, `${m} mouth centred`)
 }
-assert.match(petArt('sleepy')[0], /z Z/)
-assert.ok(petArt('happy').join('\n').includes("'-..-'"), 'happy smiles')
-assert.ok(petArt('worried').join('\n').includes('(O)  (O)'), 'worried stares')
+assert.match(petArt('sleepy')[0], /z/)
+assert.match(petArt('worried')[0], /!/)
+assert.equal(petArt('happy')[0].trim(), '', 'happy needs no mark')
+assert.ok(petArt('happy')[7].includes('  u  '), 'happy smiles, small')
 
 // Wide terminal: art beside the panel, every line within the width.
 const wide = renderPet(base(), { columns: 100 })
 assert.ok(!wide.some(l => ANSI.test(l)), 'stdout is not a TTY here, so no escape codes')
-assert.ok(wide.some(l => l.includes('/  \\') && l.includes('versions')), 'side by side')
+assert.ok(wide.some(l => l.includes('/|') && l.includes('versions')), 'side by side')
 assert.ok(wide.every(l => l.length < 100), 'fits 100 columns, leaving the last one free')
 const text = wide.join('\n')
 for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 0.32.13', 'up - qwen3:0.6b warm 800 MiB',
@@ -74,7 +89,7 @@ for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 
 
 // Narrow terminal and pipes (columns undefined): stacked, and still within the width when known.
 const narrow = renderPet(base(), { columns: 50 })
-assert.ok(!narrow.some(l => l.includes('/  \\') && l.includes('versions')), 'stacked under 64 columns')
+assert.ok(!narrow.some(l => l.includes('/|') && l.includes('versions')), 'stacked under 64 columns')
 assert.ok(narrow.every(l => l.length < 50), 'fits 50 columns, leaving the last one free')
 assert.ok(narrow.some(l => l.includes('~')), 'long lines are cut, visibly')
 const piped = renderPet(base(), {})
