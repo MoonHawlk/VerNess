@@ -53,3 +53,11 @@ needed, not by convenience.
   needs an operator-written price table.
 - Command breadth should follow M4, since the persona concept absorbs a third of the surface.
 - `/` needs an escape (`//`) so a task beginning with a POSIX path still works.
+
+## Amendment (2026-09-26, M2)
+- Personas shipped as **JSON/JSONC** files, `personas/<id>.json`, not YAML. The shape is `PersonaFile`
+  in `@verness/contracts`; every file is validated at load by `validatePersonaFile`, and
+  `/persona check` reports issues as `personas/x.json:L:C path: message`.
+- A persona's `commands` load `personas/<id>/commands/<name>.mjs` after the global commands; globals
+  win and a collision warns, naming the owner.
+- Teams likewise shipped as `teams/<id>.json`.

@@ -120,22 +120,6 @@ Deferred / investigate
 - [ ] T-242 Fine-tune on our labelled decisions once T-220 has a set
 - [ ] T-243 Guardrail/moderation question on inbound tasks (one more question in an existing call)
 
-## WS-F — M2 Contracts (plan `06-contracts-m2.md`)
-- [ ] T-020 `packages/contracts/` TypeScript package skeleton (type-only, `@deepseek-ai/cordis` peer), `tsconfig.json`, `node --test` harness
-- [ ] T-021 `DecisionModel`, `DecisionRequest`, `DecisionResult`, `DecisionCapabilities`, `ReasonCode`
-- [ ] T-022 `Persona`, `PersonaIdentity`, `ModelPolicy`, `DecisionPolicy`, `ToolPolicy`, `MemoryPolicy`, `SecurityPolicy`, `EvaluationPolicy`
-- [ ] T-023 `Skill`, `SkillContext`, `SkillActivation`, `SkillRef`
-- [ ] T-024 `Task`, `TaskState`, `Step`, `Plan`, `TaskBudget`, `TaskConstraints`, `TaskMetrics`
-- [ ] T-025 `Evaluator`, `EvaluationResult`, `Artifact`, `ArtifactRef`, `Evidence`
-- [ ] T-026 `ModelCapabilities` + capability vocabulary (`code`, `reasoning`, `vision`, `structured_output`, `tool_calling`, `context`)
-- [ ] T-027 Runtime validators for every file-authored contract (persona JSON, skill metadata) + round-trip tests
-
-Personas as files, continued (launcher side, lands with M2)
-- [ ] T-162 *(remaining part)* Persona schema gains `models.requirements`, `tools.approval`, `commands`
-- [ ] T-163 *(remaining part)* Validation with `file:line` diagnostics, using the T-027 validators
-- [ ] T-164 *(remaining part)* Persona files for `data-analyst` (today inline in the config) and `reviewer`
-- [ ] T-165 Persona-scoped commands from `personas/<id>/commands/*.mjs`
-
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions
 - [ ] T-030 `packages/decisions/`; `ctx.decisions` Service + `declare module` augmentation
@@ -239,6 +223,17 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 
 ## Launcher & branch integration
 - [ ] T-372 Boot the REPL and the web UI from the merged `epic` tree, then run `off` against a real running web UI; also exercise `off` through the Windows PowerShell wrapper. A second checkout must not be booted until T-336 is fixed
+- [ ] T-380 Single `verness` command: expose the launcher as a `bin` (package.json `"bin": {"verness": "scripts/verness.mjs"}` + shebang; `pnpm link -g` / install doc) so `verness <subcommand>` replaces calling turn_on.sh/.ps1/.cmd; keep turn_on.* as thin shims (Node-on-PATH check) and update 06-SETUP-AND-LAUNCHER + RUNBOOK
+- [ ] T-381 Model-less start: `verness --no-model` (alias `--no-start`) enters the REPL without booting a model/substrate — settings, /persona, /config, /help and other Tier L commands only; model-requiring commands and free-text tasks print a hint to restart without the flag. Default start unchanged (with model)
+
+## M2 follow-ups (deferred from the M2 final review, `@verness/contracts`)
+- [ ] T-382 Verify Node 22.19 exactly: `npx -y node@22.19 --test scripts/test/smoke.test.mjs`, and check whether the launcher path prints the type-stripping `ExperimentalWarning`; if it does, suppress that one class in the `turn_on.*` wrappers or document it
+- [ ] T-383 Friendly error on old Node: the static `.ts` import chain (`verness.mjs` → `lib/personas.mjs` → contracts) fails at link time before `nodeOk()` runs; make it a lazy `await import()` after the version check (or check the version in `turn_on.*`)
+- [ ] T-384 `packages/contracts/package.json` `files` still lists `lib/`, which is never built; drop it or add a build step
+- [ ] T-385 Enforce `<= 8` options when a decision validator lands (today only a comment in `decision.ts`)
+- [ ] T-386 A `.d.ts` for `scripts/lib/util.mjs` so `packages/contracts/test/persona.test.ts` can drop its `@ts-expect-error` on the `parseJsonc` import
+- [ ] T-387 Validator edge minors: `__proto__` keys in `tools.approval` / `decisions.apply` are dropped silently; `isObject` accepts non-plain objects; duplicate array entries are not flagged; `name: ''` is accepted
+- [ ] T-388 Owner: delete the inline `data-analyst` definition in `verness.config.json` (~line 83); it is shadowed by `personas/data-analyst.json`
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
 Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
@@ -252,5 +247,5 @@ Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-comman
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
-- CLI `verness run --persona X --mode adaptive "..."` (today: `dsh` + profile)
-- Real Jev API credentials; CI (GitHub Actions) once WS-F lands
+- CLI `verness run --persona X --mode adaptive "..."` (today: `dsh` + profile) (see T-380)
+- Real Jev API credentials; CI (GitHub Actions) now that M2 has landed (`pnpm test`, `pnpm typecheck`)

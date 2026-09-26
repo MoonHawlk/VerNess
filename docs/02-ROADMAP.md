@@ -9,8 +9,8 @@ parallel to M2–M9; see `docs/superpowers/plans/2026-09-26-00-master-plan.md` f
 |---|---|---|---|
 | M0 | Foundation & plan | make the work resumable and the substrate pinned | **done** |
 | M1 | Load-bearing spike | prove an out-of-tree plugin loads into `dsh` on Windows | **done** |
-| M2 | Contracts | freeze the vocabulary before any behavior | **next** |
-| M3 | Decisions | the project's core conceptual contribution | todo |
+| M2 | Contracts | freeze the vocabulary before any behavior | **done** |
+| M3 | Decisions | the project's core conceptual contribution | **next** |
 | M4 | Personas | makes the system usable end-to-end | todo |
 | M5 | Skills | procedural knowledge, Hermes-style | todo |
 | M6 | Routing | capability-based model selection | todo |
@@ -43,6 +43,11 @@ Types + schemastery schemas only, zero runtime behavior: `Persona`, `Skill`, `De
 `DecisionRequest/Result`, `ModelCapabilities`, `Task`, `TaskState`, `Evaluator`, `Artifact`,
 `Evidence`, `Budget`, `Policy`.
 **Exit:** `tsc` clean; schema round-trip unit tests; no dependency on any vendor package.
+**Done 2026-09-26** (`@verness/contracts@0.0.1`): the schemas are hand-written validators returning
+`Result<T>` with every `Issue` (not schemastery), plus `locate()` for line:column in JSONC. Exit
+verified with `pnpm typecheck` (clean) and `pnpm test` (125/125); `package.json` has no
+`dependencies`. Persona files (`personas/<id>.json`) are validated by the launcher today — see
+`07-COMMAND-LAYER.md`.
 
 ## M3 — Decisions (`@verness/decisions`)
 `ctx.decisions` service + `RuleDecisionProvider` (first) + `LlmDecisionProvider` (wraps `ctx.llm`)
@@ -53,7 +58,7 @@ HMR-safety test (dispose fiber → registry clean); every result carries
 `{decision, confidence, reason_code, provider}`.
 
 ## M4 — Personas (`@verness/personas`)
-YAML loader + registry + `system-prompt/assemble` contribution + tool allow/deny/approval
+JSON/JSONC loader (the M2 validator and `/persona check` already exist) + registry + `system-prompt/assemble` contribution + tool allow/deny/approval
 enforcement on `tools/pre-execute`. First personas: `data-analyst`, `data-scientist`.
 **Exit:** a denied tool is refused with a persona-attributed reason; `approval: human` triggers
 one `ctx.approval` prompt; switching persona changes the assembled prompt and the tool set.

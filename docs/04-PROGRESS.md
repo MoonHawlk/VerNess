@@ -409,3 +409,32 @@
   (`docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`), not yet in `epic`, and
   awaits an implementation plan. Tasks T-374..T-378. Per-persona `tools.allow`/`deny` remain
   unenforced (M4) and are out of that scope.
+
+## 2026-09-26 — M2 done: contracts as types, zero dependencies (T-020..T-027, T-162..T-165)
+- **Exit criteria verified**: `pnpm typecheck` (`tsc -p packages/contracts`) clean; `pnpm test`
+  125/125 pass; `packages/contracts/package.json` has no `dependencies`. `@verness/contracts` is
+  erasable-only TypeScript run directly by Node's type stripping; `exports` points at `./src/index.ts`.
+- **Tooling**: root dev tooling via pnpm (the declared `packageManager`), `pnpm-lock.yaml` committed.
+  Node floor is `^22.19.0 || >=24`; `nodeOk()` rejects 23.x. Only Node 26 was used for the run —
+  22.19 itself is **not yet verified** (T-382), nor is whether it prints an `ExperimentalWarning`.
+- **Persona files are JSON/JSONC**, not YAML: `id, name, description, prompt.prefix/suffix, model,
+  models.requirements, tools.allow/deny/approval, skills, evaluators, tips, commands`. ADR-0008's
+  YAML wording is superseded (amendment added there).
+- **Validation at load**: `validatePersonaFile` checks every `personas/*.json`; a broken file is listed,
+  never a crash. `/persona check` prints `personas/x.json:L:C path: message` via `locate()`.
+- **Persona-scoped commands**: `personas/<id>/commands/<name>.mjs`, loaded after the globals; globals
+  win and the collision warning names the owner. Example: `/hypotheses` (data-scientist), zero tokens.
+- **Personas**: `data-analyst`, `data-engineer`, `data-scientist`, `researcher`, `reviewer`,
+  `software-engineer` as files, plus the inline `generalist` — 7 in all, all valid. The inline
+  `data-analyst` block in `verness.config.json` is now shadowed by the file; the owner may delete it
+  (T-388). Inline config definitions are not validated.
+- **Final-review fixes** (`fd09901`): a persona file whose JSON is `null` no longer crashes
+  `loadPersonas`; `loadCommands` guards persona command names against path escape; `nodeOk` rejects
+  23.x; contracts `exports` → `src`; contracts README uses pnpm; `parseJsonc` shared from
+  `scripts/lib/util.mjs`; tests for the collision warn count and a JSONC comment/trailing-comma case.
+- **Deferred**: T-382..T-388 in the backlog (Node 22.19 check, lazy `.ts` import for a friendly
+  old-Node error, stale `files: lib/`, `<= 8` decision options, a `.d.ts` for util.mjs, validator edge
+  minors, removing the shadowed inline persona).
+- **Engram graph** rebuilt after M2: 513 nodes / 1592 edges / 19 communities (was 315 / 974 / 13);
+  it now covers `packages/contracts/src/*`.
+- **Next**: M3 / T-030 — the decisions plugin.

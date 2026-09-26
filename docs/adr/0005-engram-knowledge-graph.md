@@ -62,3 +62,8 @@ location. Tracked as T-102.
   CLAUDE.md section plus the PreToolUse hook belong to the separate `engram claude install`, which
   we have not run.
 - The "14 nodes / 20 edges / 3 communities" measure in the caveat predates this rebuild.
+
+## Addendum (2026-09-26, after M2)
+- Rebuilt after M2: 513 nodes / 1592 edges / 19 communities (was 315 / 974 / 13). The graph now
+  includes `packages/contracts/src/*`, so the contract types and validators are navigable via
+  `/engram` (or the `.engram/` output) instead of reading files one by one.
