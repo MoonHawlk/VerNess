@@ -206,6 +206,17 @@ First real uses
 - [ ] T-233 Tool-risk gate on `tools/pre-execute`, modelled on the in-tree precedent `packages/experimental/auto-review` (classifier -> allow/deny/ask, integrates with permission presets); swap its LLM call for one `POST /v1/systemone`. Blocked on T-223
 - [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin — the primitive both MCP tool filtering and the M4 persona tool policy need (`packages/core/tools/src/index.ts:701-711`)
 
+Decision-driven routing — task level, model tier, pipeline (handoff: `docs/09-HANDOFF-DECISION-ROUTING.md`)
+- [ ] T-250 Shadow-mode logger: ask the three routing questions per task and log answer + `answer_confidence` + rule answer + outcome to `.verness/decisions/*.jsonl`. **No behaviour change** — this is how the labelled set for T-260 gets built
+- [ ] T-251 Rule baseline for all three questions (keyword/length/path heuristics): the thing Laya must beat, and the fallback whenever confidence is low
+- [ ] T-252 `/decide` extended: run the three routing questions on the current input, printing Laya and rules side by side with confidences
+- [ ] T-253 Capability router: persona requirements + model capabilities -> eligible -> cost/latency/policy -> model. **Tier is an input, never a model id** (high-cardinality choice is Laya's documented weak spot)
+- [ ] T-254 Pipeline executor for `standard`; the other three modes belong to M7
+- [ ] T-255 `/routing` quick-tool: last N routing decisions and the Laya-vs-rules agreement rate
+- [ ] T-260 Label the shadow set; publish accuracy, ECE and AUROC per question against the rule baseline
+- [ ] T-261 Refit one temperature per (question type, option count) and re-measure
+- [ ] T-262 Gated rollout, one question at a time, high-confidence band only: `pipeline` first (cheapest to get wrong), then `level`, then `tier`
+
 Deferred / investigate
 - [ ] T-240 MCP path (`laya[mcp]`): `laya-mcp-server` is **stdio-only** (no HTTP/SSE) and exposes 5 tools (`laya_status`, `laya_route`, `laya_predict`, `laya_shortlist`, `laya_preset`). The substrate registers stdio MCP servers as a loader row, so this is near-zero code — but it exposes Laya to the MODEL as a callable tool, which is complementary to, not a replacement for, harness-side control flow
 - [ ] T-241 **`laya-ts` path — the intended end state**: the upstream repo ships a TypeScript reimplementation over a split ONNX export (`encoder.onnx` + `head.onnx`, export verified to 1e-4), so a decision provider can run inside a Cordis plugin with no sidecar and no Python at run time. Blockers: `laya-ts` is not on npm (404 — must be vendored or built from the monorepo) and the export needs a one-time Python run

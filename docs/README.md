@@ -17,6 +17,7 @@ Read in this order:
 | [06-SETUP-AND-LAUNCHER.md](06-SETUP-AND-LAUNCHER.md) | The setup file and the cross-platform launcher (start here to run it) |
 | [07-COMMAND-LAYER.md](07-COMMAND-LAYER.md) | Planned command layer, personas-as-files and teams (design only) |
 | [08-DECISION-LAYER-LAYA.md](08-DECISION-LAYER-LAYA.md) | The decision layer: the SystemOne protocol, Laya as first provider, and what it cannot yet be trusted with |
+| [09-HANDOFF-DECISION-ROUTING.md](09-HANDOFF-DECISION-ROUTING.md) | **Start here for the next session**: decision-driven routing, the three questions, shadow mode |
 | [RUNBOOK.md](RUNBOOK.md) | Manual commands behind the launcher, and every gotcha we hit |
 | [adr/](adr/) | Architecture Decision Records (one file per irreversible choice) |
 | [research/](research/) | Read-only digests of upstream repos (source of truth for seam names) |

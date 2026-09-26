@@ -189,3 +189,16 @@
   conflating them is how a system ends up routing real work on a coin flip.
 - Two subagents were dispatched for the details we should not guess at: the exact `laya-serve` /
   `laya[mcp]` interfaces, and the substrate's MCP and HTTP seams.
+
+## 2026-09-26 — handoff written for decision-driven routing
+- Goal for the next session: Laya answers three typed questions per task — **task level**, **model
+  tier**, **pipeline** — so cheap computation narrows the problem before an LLM turn is spent.
+- Written: `docs/09-HANDOFF-DECISION-ROUTING.md` (the three question schemas, shadow-mode rollout,
+  confidence bands, first-session commands) and backlog **T-250..T-262**.
+- One design decision recorded up front: **Laya is never asked for a model id.** It answers a
+  three-option *tier*; the capability router maps tier -> model. High-cardinality choice is its
+  documented weak spot (0.425 vs Jev 0.870 on 77 labels) and model ids churn anyway.
+- Rollout is **shadow mode first**: rules keep deciding, Laya decides in parallel, both are logged
+  with the outcome. That is the only way to get the labelled set the calibration gate (T-223) needs,
+  and it costs one ~200 ms call per task. Nothing Laya says steers anything until its measured ECE
+  beats the rule baseline it would replace.
