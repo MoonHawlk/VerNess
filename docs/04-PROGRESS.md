@@ -484,3 +484,23 @@
   level 3 / 7, tier 9 / 10, pipeline 10 / 10. Laya's `level` leans on `standard` and trails the rules.
 - Three labels flagged to the owner for a second look (possible slips); relabelling needs a
   `--relabel` option the labeller does not have yet.
+
+## 2026-09-26 — Windows: no more terminal windows flashing at boot
+- **Symptom**: starting the harness on Windows opened and closed a burst of terminal windows.
+- **Cause, measured** with a WMI process-creation watcher during boot: `ollama serve` was started
+  with `spawn(..., {detached: true})`. On Windows that means `DETACHED_PROCESS`, so the server has no
+  console at all. Ollama then launches about 20 console helpers at startup (`llama-server
+  --list-devices`, `gpu-discover`, runner probes). Each got its own new console, and with Windows
+  Terminal as the default terminal, a new `WindowsTerminal.exe` + `OpenConsole.exe` window: about 30
+  windows per boot. `laya-serve` was started the same way.
+- **Fix**: `startBackground()` in `scripts/lib/util.mjs`. On Windows it uses
+  `Start-Process -WindowStyle Hidden -PassThru` (via `powershell.exe`, itself `windowsHide`), which
+  gives the server a hidden console that its helpers inherit. It still outlives the launcher, and it
+  returns the real PID for the run state. macOS/Linux are unchanged (detached spawn).
+  `windowsHide: true` alone cannot fix it: Windows ignores `CREATE_NO_WINDOW` alongside
+  `DETACHED_PROCESS`. And a non-detached child dies with the launcher (libuv's kill-on-close job).
+- **Verified**: the same boot now creates 0 `WindowsTerminal.exe` / `OpenConsole.exe` (was ~30); all
+  Ollama helpers share one hidden console. `decision down` → `up` → `down` works, with the recorded PID
+  equal to the live `laya-serve.exe`. `npm test` 142/142 (quoting tests in `util.background.test.mjs`).
+- Also: boot ran `dsh --version` twice in a row; it now reuses the first result.
+- Not ours: `docker.exe context ls` processes seen during boot come from Docker Desktop.

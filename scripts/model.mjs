@@ -15,10 +15,12 @@
  * @module scripts/model
  */
 
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { startBackground } from './lib/util.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
@@ -138,10 +140,10 @@ export async function modelUp(cfg, model) {
   let pid = readRunState()?.pid
   if ((await engineVersion(base)) === undefined) {
     step(`starting the engine server on ${apiRoot(base)}`)
-    const child = spawn(WIN ? 'ollama.exe' : 'ollama', ['serve'], { detached: true, stdio: 'ignore' })
-    child.on('error', () => { /* the readiness probe below reports this */ })
-    child.unref()
-    pid = child.pid
+    // Hidden console on Windows: a detached start makes each Ollama helper flash a terminal window.
+    const started = startBackground(WIN ? 'ollama.exe' : 'ollama', ['serve'])
+    if (started.error !== undefined) info(started.error.split(/\r?\n/)[0])
+    pid = started.pid
     startedByUs = true
     for (let i = 0; i < 24 && (await engineVersion(base)) === undefined; i++) await new Promise(r => setTimeout(r, 500))
   }

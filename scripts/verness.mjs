@@ -878,7 +878,7 @@ async function prepareRoute(cfg, ready) {
  */
 async function cmdRun(cfg, task) {
   const dshVersion = version('dsh', '--version')
-  if (version('dsh', '--version') === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
+  if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
   if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
   syncPatch(cfg)
   const ready = new Set()

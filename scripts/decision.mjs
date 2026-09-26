@@ -13,14 +13,14 @@
  * @module scripts/decision
  */
 
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, readAnswer } from './lib/decisions.mjs'
-import { REPO, RUN_DIR, WIN, head, info, ok, paint, step, table, warn } from './lib/util.mjs'
+import { REPO, RUN_DIR, WIN, head, info, ok, paint, startBackground, step, table, warn } from './lib/util.mjs'
 
 const RUN_FILE = join(RUN_DIR, 'decision.json')
 const KEY_FILE = join(RUN_DIR, 'laya.key')
@@ -88,18 +88,16 @@ export async function decisionUp(cfg) {
     step(`starting the sidecar on ${url.hostname}:${url.port || 8000} (loopback, key required)`)
     mkdirSync(RUN_DIR, { recursive: true })
     const log = join(RUN_DIR, 'laya-serve.log')
-    const child = spawn(serve, [], {
-      detached: true,
-      stdio: ['ignore', 'ignore', 'ignore'],
-      env: { ...process.env, LAYA_HOST: url.hostname, LAYA_PORT: url.port || '8000', [dc.apiKeyEnv]: key },
+    // Hidden console on Windows: a detached start makes each Python helper flash a terminal window.
+    const started = startBackground(serve, [], {
+      env: { LAYA_HOST: url.hostname, LAYA_PORT: url.port || '8000', [dc.apiKeyEnv]: key },
     })
-    child.on('error', () => { /* the readiness probe reports this */ })
-    child.unref()
-    writeFileSync(RUN_FILE, `${JSON.stringify({ pid: child.pid, startedByUs: true, baseURL: dc.baseURL, at: new Date().toISOString() }, null, 2)}\n`, 'utf8')
+    if (started.error !== undefined) info(started.error.split(/\r?\n/)[0])
+    writeFileSync(RUN_FILE, `${JSON.stringify({ pid: started.pid, startedByUs: true, baseURL: dc.baseURL, at: new Date().toISOString() }, null, 2)}\n`, 'utf8')
     info(`first start downloads the checkpoints; log: ${log}`)
     for (let i = 0; i < 120 && !(await decisionHealth(dc)); i++) await new Promise(r => setTimeout(r, 1000))
     if (!(await decisionHealth(dc))) { warn('the sidecar did not become healthy in time'); return false }
-    ok(`sidecar up (pid ${child.pid})`)
+    ok(`sidecar up (pid ${started.pid})`)
   }
 
   process.env[dc.apiKeyEnv] ??= ensureKey()
