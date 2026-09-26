@@ -252,3 +252,16 @@
   as sensitive as the logs themselves); environment as a first-class dimension rather than a second
   copy of the tool; live updates by watching the existing files; and the static export kept as a
   first-class mode, because that is how a run gets archived or shared offline.
+
+## 2026-09-26 — a near-miss worth remembering: the repo could not be cloned
+- `.gitignore` carried a bare `lib/` for build output. It also matched `scripts/lib/`, where every
+  launcher module lives - util, sessions, personas, teams, commands, decisions, prompt, loop.
+  **None of the eight was ever tracked.** `git add` skips ignored paths without an error, so eight
+  commits reported success while adding nothing, and `git status` stayed clean throughout.
+- Nothing local ever failed, which is exactly why it went unnoticed: the files were on disk here. A
+  clone would have crashed on the first import.
+- Fixed by scoping the rule to `/lib/` and `packages/*/lib/`, then **verified by actually cloning the
+  repo into a temp directory and running the launcher there** (8 modules present, `help` works).
+- Convention added to `docs/05-CONVENTIONS.md`: verify from a clean clone before claiming a feature
+  ships, and check `git ls-files` when a new source directory appears - an ignored file is invisible
+  to both `git add` and `git status`.

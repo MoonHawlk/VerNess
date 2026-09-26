@@ -28,6 +28,22 @@
   test (upstream `docs/testing.md:38-40` — hand-built `ctx.plugin()` suites alone are insufficient).
 - Every registry ships an HMR-safety test: dispose the contributing fiber, assert cleanup.
 
+## Verify from a clean clone, not from your working directory
+
+A feature is not shipped because it runs here. On 2026-09-26 a bare `lib/` in `.gitignore` also
+matched `scripts/lib/`, so **none** of the launcher's eight modules was ever tracked: `git add`
+skips ignored paths silently, eight commits reported success while adding nothing, and a clone of
+the repo could not start at all. Everything passed locally the whole time.
+
+Before claiming a feature ships:
+
+```sh
+git clone . "$(mktemp -d)/fresh" && cd "$_" && node scripts/verness.mjs help
+```
+
+If a new directory of source ever appears, check `git ls-files` covers it rather than trusting a
+clean `git status` — an ignored file is invisible to both.
+
 ## How to resume work (read this first after a break)
 1. `git log --oneline -5` and `docs/04-PROGRESS.md` — where we stopped.
 2. `docs/02-ROADMAP.md` — the current milestone and its exit criteria.

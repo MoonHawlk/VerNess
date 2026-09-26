@@ -262,6 +262,11 @@ TUI
 - [ ] T-302 Wrap long input lines in the editor — the dropdown is suppressed rather than mis-positioned when the input exceeds the terminal width
 - [ ] T-303 Suggest task text too, not only commands: recent prompts from the session log as history-backed completions
 
+Repo hygiene
+- [x] T-310 `.gitignore` no longer swallows `scripts/lib/`; all eight launcher modules are tracked and a fresh clone starts (verified by cloning and running `help`)
+- [ ] T-311 Add the clean-clone check to a pre-push hook or CI so an untracked source directory fails loudly instead of silently
+- [ ] T-312 Assert at startup that every `./lib/*.mjs` the launcher imports is tracked by git, and warn if not
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
