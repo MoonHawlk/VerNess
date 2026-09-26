@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
+import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
@@ -547,6 +548,7 @@ function makeCtx(cfg, commands, convo) {
     builtins: {
       up: async () => ((await modelUp(cfg)) ? 0 : 1),
       down: async a => ((await modelDown(cfg, { force: a.includes('--force') })) ? 0 : 1),
+      off: async a => ((await cmdOff(cfg, { force: a.includes('--force') })) ? 0 : 1),
       stats: async () => ((await modelStats(cfg)) ? 0 : 1),
       doctor: async () => { await cmdDoctor(cfg); return 0 },
       sync: () => { syncPatch(cfg); return 0 },
@@ -868,6 +870,33 @@ async function cmdRunWeb(cfg) {
   step('booting the web surface')
   info('open http://localhost:6173 in your browser once the server is ready')
   dsh(['--profile', webName], { env })
+/**
+ * Turn everything off: the web UI server, the decision sidecar and the model engine.
+ * The web UI runs in the foreground of whichever terminal launched it, so it is found by its port.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {{force?: boolean}} [opts] - `force` also stops servers VerNess did not start.
+ * @returns {Promise<boolean>} whether every part shut down cleanly.
+ */
+async function cmdOff(cfg, opts = {}) {
+  step('stopping the web UI (port 6173)')
+  if (WIN) {
+    const r = sh('powershell', ['-NoProfile', '-Command', 'Get-NetTCPConnection -LocalPort 6173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }'], { capture: true, allowFail: true })
+    ok(r.code === 0 ? 'web UI stopped (if it was running)' : 'no web UI running')
+  } else {
+    const pids = (sh('lsof', ['-ti', 'tcp:6173', '-sTCP:LISTEN'], { capture: true, allowFail: true }).out).split(/\s+/).filter(Boolean)
+    if (pids.length === 0) ok('no web UI running')
+    else {
+      for (const pid of pids) { try { process.kill(Number(pid), 'SIGTERM') } catch { warn(`pid ${pid} was already gone`) } }
+      ok(`web UI stopped (pid ${pids.join(', ')})`)
+    }
+  }
+  step('stopping the decision sidecar')
+  const d = await decisionDown(cfg, opts)
+  step('stopping the local model')
+  const m = await modelDown(cfg, opts)
+  return d && m
+}
+
 }
 
 /** Rebuild the local knowledge graph (AST only, no LLM calls). */
@@ -887,6 +916,8 @@ commands
   setup         install/repair pnpm, dsh, both profiles (CLI + web), deps and local model
   up            start the local model: engine, weights (Hugging Face GGUF), warm-up
   stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
+  off           turn everything off: web UI, decision sidecar and local model
+                  (add --force to also stop servers VerNess did not start)
   down          unload the model, free its memory and stop the engine we started
                   (add --force to stop a server VerNess did not start)
   doctor        show what is installed and what is missing
@@ -924,6 +955,7 @@ switch (first) {
   case 'down': process.exitCode = (await modelDown(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'setup': await cmdSetup(cfg); break
   case 'doctor': await cmdDoctor(cfg); break
+  case 'off': case 'stop': process.exitCode = (await cmdOff(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'sync': syncPatch(cfg); break
   case 'web': await cmdRunWeb(cfg); break
   case 'graph': cmdGraph(); break
