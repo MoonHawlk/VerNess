@@ -23,8 +23,18 @@ shell on Windows and quotes every argument itself).
 ./turn_on.sh graph          # rebuild the Engram knowledge graph (no LLM calls)
 ./turn_on.sh help
 ```
-Windows: `.\turn_on.ps1 <same commands>` (or `turn_on.cmd` from `cmd.exe`).
-npm equivalents exist for habit: `npm start`, `npm run setup|doctor|sync|graph`.
+Windows: `.\turn_on.cmd <same commands>` works everywhere, including from PowerShell.
+`.\turn_on.ps1` is equivalent but **PowerShell blocks unsigned scripts by default**:
+
+```
+.\turn_on.ps1 : ... não pode ser carregado porque a execução de scripts foi desabilitada neste sistema
+File ... cannot be loaded because running scripts is disabled on this system
+```
+Three ways out, least commitment first: use `.\turn_on.cmd`; use `npm start`; or allow local scripts
+for your user only with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (no admin rights needed,
+but it is a user-wide policy change — the first two options change nothing).
+
+npm equivalents exist for habit: `npm start`, `npm run setup|doctor|sync|graph|model:up|model:stats|model:down`.
 
 `setup` does, in order: check Node → install pnpm if missing → install the pinned `dsh` → fetch the
 read-only submodule → create the profile from its template → install the route adapter → **link**

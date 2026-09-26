@@ -131,3 +131,10 @@
   `ollama pull` can print `Error:` while **exiting 0** — so `up` verifies through `/api/tags`.
 - `/api/ps` counts the context allocation, so a 610 MiB GGUF shows as 5.2 GiB resident. That is real
   memory held — the reason a `down` command exists at all.
+
+## 2026-09-26 — Windows execution policy
+- First real launch attempt failed on `.\turn_on.ps1`: PowerShell refuses unsigned scripts by default
+  (`PSSecurityException / UnauthorizedAccess`). Nothing to do with the launcher itself.
+- Documented three exits in `docs/06-SETUP-AND-LAUNCHER.md`, least-commitment first: `.\turn_on.cmd`
+  (works from PowerShell too), `npm start`, or `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+  `turn_on.cmd` is therefore the recommended Windows entry point, not the `.ps1`.
