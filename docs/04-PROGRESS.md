@@ -242,3 +242,13 @@
 - The design's centre of gravity is the failure mode, not the feature: an unbounded self-written
   memory poisons itself, so persistence is explicit, evidence-gated, attributed to the session and
   model that produced it, revocable, and contradictions surface rather than overwrite.
+
+## 2026-09-26 — standalone dashboard requested, deferred
+- The current `/dashboard` is a generator inside the launcher: one workspace, static file, built on
+  demand. The request is to decouple it into a service that is available whenever the harness is
+  active and can show several environments at once.
+- Recorded as **T-274..T-279**, not started. The constraints worth keeping when it is built: loopback
+  by default with a token before any wider bind (a dashboard renders session transcripts, so it is
+  as sensitive as the logs themselves); environment as a first-class dimension rather than a second
+  copy of the tool; live updates by watching the existing files; and the static export kept as a
+  first-class mode, because that is how a run gets archived or shared offline.

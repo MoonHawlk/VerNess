@@ -229,6 +229,17 @@ Observability
 - [ ] T-272 Dashboard: filter by persona and by route; today it shows everything in the workspace
 - [ ] T-273 Dashboard: `--watch` to rebuild on change, for a second screen during long runs
 
+**Standalone dashboard service** (requested 2026-09-26; deliberately deferred). Today `/dashboard`
+is a generator inside the launcher: it builds a static file on demand from one workspace. The ask is
+to decouple it, so a dashboard is available whenever the harness is active and can show more than
+one environment.
+- [ ] T-274 Run the dashboard as its own process (`verness-dashboard`), independent of any REPL or task run — the harness must work with it down, and it must work with no REPL open
+- [ ] T-275 Serve over HTTP on **loopback by default**, with a generated token required before any non-loopback bind. Same rule as the decision sidecar (ADR-0009): a page exposing session transcripts is not something to leave open on a LAN
+- [ ] T-276 Multi-environment: read several sources at once (different `DSH_HOME`s, profiles and workspaces), declared in config, with the environment as a first-class column and filter
+- [ ] T-277 Live updates: watch the session-log directory, the decisions JSONL and the run transcripts, and push changes (SSE or a poll interval) rather than requiring a rebuild
+- [ ] T-278 Keep the static export as a first-class mode — it is how a run gets shared or archived offline, and it must not regress when the service exists
+- [ ] T-279 Decide the read path: reuse `scripts/lib/sessions.mjs` in-process, or move to `@deepseek-ai/dsh-session-query` if watching many workspaces makes repeated full reads too costly. Measure before choosing
+
 Thought graph — ephemeral and persistent working memory (design: `docs/10-THOUGHT-GRAPH.md`)
 - [ ] T-280 `thought/node` session event + `thoughts` projection: log-only (so compaction cannot shadow it), versioned `stateVersion`, folds to empty on task start
 - [ ] T-281 Node schema + boundary validation: `scope`, `kind`, one-sentence capped `claim`, `evidence[]`, `confidence`, `derivedFrom[]`
