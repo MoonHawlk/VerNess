@@ -272,10 +272,13 @@ function npmRootGlobal() {
   return r.code === 0 ? r.out.split('\n').pop().trim() : undefined
 }
 
-/** @returns {boolean} whether the running Node satisfies the substrate engine range. */
+/**
+ * @returns {boolean} whether the running Node satisfies the substrate engine range
+ *   (`^22.19.0 || >=24.0.0` in `package.json`) — note major 23 is not in range.
+ */
 function nodeOk() {
   const [maj, min, pat] = process.versions.node.split('.').map(Number)
-  if (maj > NODE_MIN[0]) return true
+  if (maj >= 24) return true
   return maj === NODE_MIN[0] && (min > NODE_MIN[1] || (min === NODE_MIN[1] && pat >= NODE_MIN[2]))
 }
 

@@ -23,6 +23,7 @@ export interface TaskState {
 export interface Task {
   id: TaskId
   objective: string
+  /** A persona is referenced like a skill: an id, with an optional version. */
   persona: SkillRef | { id: string }
   mode: TaskMode
   state: TaskState

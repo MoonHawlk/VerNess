@@ -7,33 +7,10 @@ import type { Issue, Result } from '../src/issue.ts'
 import type { Persona } from '../src/persona.ts'
 import { PERSONA_FIELDS } from '../src/persona.ts'
 import { personaToFile, validatePersonaFile } from '../src/validate-persona.ts'
+// @ts-expect-error - the launcher module has no type declarations
+import { parseJsonc } from '../../../scripts/lib/util.mjs'
 
 const PERSONAS_DIR = join(import.meta.dirname, '..', '..', '..', 'personas')
-
-/**
- * Copy of the launcher's `parseJsonc` (scripts/lib/util.mjs): strip `//` and `/* *​/` comments
- * outside strings, drop trailing commas, then parse.
- */
-function parseJsonc(text: string): unknown {
-  let out = ''
-  let inStr = false
-  let esc = false
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (inStr) {
-      out += ch
-      if (esc) esc = false
-      else if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
-    if (ch === '"') { inStr = true; out += ch; continue }
-    if (ch === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i++; out += '\n'; continue }
-    if (ch === '/' && text[i + 1] === '*') { i += 2; while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++; i++; continue }
-    out += ch
-  }
-  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'))
-}
 
 function ok(r: Result<Persona>): Persona {
   if (!r.ok) assert.fail(`expected ok, got ${JSON.stringify(r.errors)}`)

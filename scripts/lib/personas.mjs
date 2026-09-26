@@ -58,7 +58,7 @@ export function loadPersonas(cfg, { dir = personasDir() } = {}) {
       if (!result.ok) {
         const issues = result.errors.map(issue => formatIssue(source, text, issue))
         out.set(expectedId, normalize(expectedId, {
-          name: raw.name ?? id,
+          name: typeof raw?.name === 'string' ? raw.name : id,
           broken: issues[0],
           issues,
           source,

@@ -6,7 +6,7 @@ export const REASON_CODES = [
 ] as const
 export type ReasonCode = typeof REASON_CODES[number]
 
-/** A choice over a small, fixed option set (<= 8). The only question type we use (no score, no noul). */
+/** A choice over a small, fixed option set (<= 8 by convention, not validated yet). The only question type we use (no score, no null). */
 export interface ChoiceQuestion<O extends string = string> {
   type: 'choice'
   instructions: string

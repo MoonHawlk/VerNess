@@ -19,6 +19,14 @@ import { REPO, warn } from './util.mjs'
 export const commandsDir = () => join(REPO, 'scripts', 'commands')
 
 /**
+ * A persona `id` or command `name` used to build a path must be a plain, single path segment —
+ * file-based personas (`personas/<id>.json`) are schema-validated, but inline config personas
+ * (`verness.config.json`) are not (Ruling R4), so a value like `../evil` must be rejected here
+ * before it is ever joined into a path.
+ */
+const SAFE_NAME = /^[a-z][a-z0-9-]*$/
+
+/**
  * Load one command file and register its default export plus any named export shaped like a
  * command — so a set of closely related one-liners can live in one file instead of one file each.
  * @param {Map<string, object>} out - the registry to fill.
@@ -27,9 +35,12 @@ export const commandsDir = () => join(REPO, 'scripts', 'commands')
  * @param {(cmd: object) => boolean} [accept] - called before a name is registered; returning
  *   `false` refuses the command (with a warning) instead of adding it. Defaults to accepting
  *   everything, which is how the global directory has always behaved.
+ * @param {Map<string, string>} [owner] - filled with `name -> ownerLabel` for every command
+ *   registered here, so a later collision warning can name the actual owner.
+ * @param {string} [ownerLabel] - the label to record in `owner` for commands from this file.
  * @returns {Promise<void>}
  */
-async function loadCommandFile(out, dir, f, accept = () => true) {
+async function loadCommandFile(out, dir, f, accept = () => true, owner, ownerLabel) {
   let mod
   try { mod = await import(pathToFileURL(join(dir, f)).href) } catch (e) { warn(`command ${f} failed to load: ${e.message}`); return }
   // A module namespace's `Object.values` already includes its `default` key, so spreading both
@@ -43,7 +54,8 @@ async function loadCommandFile(out, dir, f, accept = () => true) {
     if (!names.every(n => accept(n))) continue
     if (out.has(cmd.name) && out.get(cmd.name) !== cmd) warn(`command "${cmd.name}" in ${f} overrides an earlier one`)
     out.set(cmd.name, cmd)
-    for (const a of cmd.aliases ?? []) out.set(a, cmd)
+    owner?.set(cmd.name, ownerLabel)
+    for (const a of cmd.aliases ?? []) { out.set(a, cmd); owner?.set(a, ownerLabel) }
   }
 }
 
@@ -66,23 +78,26 @@ async function loadCommandFile(out, dir, f, accept = () => true) {
 export async function loadCommands({ persona, root = REPO } = {}) {
   const dir = join(root, 'scripts', 'commands')
   const out = new Map()
+  const owner = new Map()
   if (existsSync(dir)) {
     for (const f of readdirSync(dir).sort()) {
-      if (f.endsWith('.mjs')) await loadCommandFile(out, dir, f)
+      if (f.endsWith('.mjs')) await loadCommandFile(out, dir, f, () => true, owner, 'a global command')
     }
   }
 
   const id = typeof persona === 'string' ? persona : persona?.id
   const names = typeof persona === 'string' ? undefined : persona?.commands
   if (id !== undefined && names !== undefined) {
+    if (!SAFE_NAME.test(id)) { warn(`persona id "${id}" is not a safe path component (expected ${SAFE_NAME.source}) — skipping its commands`); return out }
     const personaDir = join(root, 'personas', id, 'commands')
     for (const name of names) {
+      if (!SAFE_NAME.test(name)) { warn(`persona "${id}" command name "${name}" is not a safe path component (expected ${SAFE_NAME.source}) — skipping`); continue }
       const f = `${name}.mjs`
       if (!existsSync(join(personaDir, f))) { warn(`persona "${id}" lists command "${name}" but ${join(personaDir, f)} is missing`); continue }
       await loadCommandFile(out, personaDir, f, n => {
-        if (out.has(n)) { warn(`persona "${id}" command "${n}" collides with a global command — refused`); return false }
+        if (out.has(n)) { warn(`persona "${id}" command "${n}" collides with ${owner.get(n) ?? 'a global command'} — refused`); return false }
         return true
-      })
+      }, owner, `persona "${id}"'s command`)
     }
   }
   return out

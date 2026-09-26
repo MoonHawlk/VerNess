@@ -100,3 +100,90 @@ test('loadCommands warns and skips a persona command whose file is missing', asy
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('loadCommands skips a persona command name that is not a safe path component', async (t) => {
+  const root = makeRoot()
+  try {
+    const log = t.mock.method(console, 'log', () => {})
+    // Inline (verness.config.json) personas are never schema-validated (Ruling R4), so a
+    // maliciously- or accidentally-crafted `commands` entry like "../evil" must be rejected before
+    // it is ever joined into a path, rather than trusted like a file-based persona's commands.
+    const persona = { id: 'scientist', commands: ['../evil'] }
+    const commands = await loadCommands({ persona, root })
+    assert.ok(!commands.has('../evil'))
+    assert.ok(!commands.has('evil'))
+    assert.ok(log.mock.callCount() > 0, 'a warning should have been logged')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('loadCommandFile\'s Set dedup: a single default export warns 0 times', async (t) => {
+  const root = makeRoot()
+  try {
+    const log = t.mock.method(console, 'log', () => {})
+    mkdirSync(join(root, 'personas', 'scientist', 'commands'), { recursive: true })
+    writeFileSync(
+      join(root, 'personas', 'scientist', 'commands', 'hypotheses.mjs'),
+      `export default { name: 'hypotheses', summary: 'persona-only', run: () => 0 }\n`,
+      'utf8',
+    )
+    const persona = { id: 'scientist', commands: ['hypotheses'] }
+    const commands = await loadCommands({ persona, root })
+    assert.ok(commands.has('hypotheses'))
+    assert.equal(log.mock.callCount(), 0, 'a single default export must not warn (no spurious self-collision)')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a persona command named "help" warns exactly once, naming the global as the owner', async (t) => {
+  const root = makeRoot()
+  try {
+    const log = t.mock.method(console, 'log', () => {})
+    mkdirSync(join(root, 'personas', 'scientist', 'commands'), { recursive: true })
+    writeFileSync(
+      join(root, 'personas', 'scientist', 'commands', 'help.mjs'),
+      `export default { name: 'help', summary: 'persona help - should be refused', run: () => 0 }\n`,
+      'utf8',
+    )
+    const persona = { id: 'scientist', commands: ['help'] }
+    const commands = await loadCommands({ persona, root })
+    assert.equal(commands.get('help').summary, 'global help')
+    assert.equal(log.mock.callCount(), 1, 'exactly one collision warning')
+    const [msg] = log.mock.calls[0].arguments
+    assert.ok(msg.includes('a global command'), `expected the owner to be named "a global command" in: ${msg}`)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a persona command colliding with another of the same persona\'s commands names the persona as the owner', async (t) => {
+  const root = makeRoot()
+  try {
+    const log = t.mock.method(console, 'log', () => {})
+    mkdirSync(join(root, 'personas', 'scientist', 'commands'), { recursive: true })
+    writeFileSync(
+      join(root, 'personas', 'scientist', 'commands', 'first.mjs'),
+      `export default { name: 'dup', summary: 'first', run: () => 0 }\n`,
+      'utf8',
+    )
+    writeFileSync(
+      join(root, 'personas', 'scientist', 'commands', 'second.mjs'),
+      `export default { name: 'dup', summary: 'second', run: () => 0 }\n`,
+      'utf8',
+    )
+    const persona = { id: 'scientist', commands: ['first', 'second'] }
+    const commands = await loadCommands({ persona, root })
+    assert.equal(commands.get('dup').summary, 'first', 'the first-registered persona command wins')
+    assert.equal(log.mock.callCount(), 1, 'exactly one collision warning')
+    const [msg] = log.mock.calls[0].arguments
+    assert.ok(
+      msg.includes('persona "scientist"\'s command'),
+      `expected the owner to be named as persona "scientist"'s command in: ${msg}`,
+    )
+    assert.ok(!msg.includes('a global command'), `owner must not be misreported as global in: ${msg}`)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

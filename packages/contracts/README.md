@@ -9,10 +9,8 @@ launcher) can agree on the same types without importing each other.
 
 Source is plain, erasable-only TypeScript (`erasableSyntaxOnly` in `tsconfig.json`), so it runs
 directly under `node --test` and the launcher's `node --experimental-strip-types`-style resolution
-with no build step. `tsc` is dev-only, for typechecking (`npm run typecheck`) and later for
-producing the published `lib/` output (`npm run build`).
-
-Later tasks in this milestone each add one paragraph here per contract they introduce.
+with no build step. `tsc` is dev-only, for typechecking (`pnpm typecheck`) and later for
+producing the published `lib/` output (`pnpm build`).
 
 ## Contracts
 
