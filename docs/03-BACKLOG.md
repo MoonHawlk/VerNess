@@ -10,8 +10,8 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [x] T-004 `.gitignore` (`.refs/`, `node_modules/`, build output, `.env`)
 - [x] T-005 Add `upstream/deepseek-harness` as a pinned git submodule (read-only) — pinned at tag `dsh-v0.1.7-rc.2` (`477b4f4`), `shallow = true`
 - [x] T-006 Target version decided: `dsh@0.1.7-rc.2` (published on npm, identical to the submodule pin); `@deepseek-ai/cordis@4.0.4` — see `04-PROGRESS.md`
-- [ ] T-007 Root `package.json` + `pnpm-workspace.yaml` (pnpm 11.x, Node >=22.19) — workspace only, no code yet
-- [ ] T-008 `docs/RUNBOOK.md` skeleton (how to install/run `dsh` with our profile on Windows)
+- [x] T-007 Root `package.json` + `pnpm-workspace.yaml` (pnpm 11.7.0, Node >=22.19) — workspace only, no code yet (no install run)
+- [x] T-008 `docs/RUNBOOK.md` skeleton written with `VERIFY` markers — M1 turns it into a tested recipe
 
 ## M1 — Load-bearing spike
 - [ ] T-010 Install `@deepseek-ai/dsh` globally (or via pnpm dlx) and run it once headless; record the exact version + `DSH_HOME` path

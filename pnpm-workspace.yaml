@@ -1,0 +1,6 @@
+# VerNess workspace. The upstream substrate lives in upstream/deepseek-harness as a pinned,
+# read-only git submodule and is deliberately NOT part of this workspace: our packages consume
+# the published @deepseek-ai/* artifacts from npm (see docs/adr/0002-repo-integration-submodule.md).
+packages:
+  - 'packages/*'
+  - 'profiles/*'

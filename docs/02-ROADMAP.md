@@ -5,8 +5,8 @@ Each milestone is small, independently verifiable, and ends with the system stil
 
 | M | Name | Why now | Status |
 |---|---|---|---|
-| M0 | Foundation & plan | make the work resumable and the substrate pinned | in progress |
-| M1 | Load-bearing spike | prove an out-of-tree plugin loads into `dsh` on Windows | todo |
+| M0 | Foundation & plan | make the work resumable and the substrate pinned | **done** |
+| M1 | Load-bearing spike | prove an out-of-tree plugin loads into `dsh` on Windows | **next** |
 | M2 | Contracts | freeze the vocabulary before any behavior | todo |
 | M3 | Decisions | the project's core conceptual contribution | todo |
 | M4 | Personas | makes the system usable end-to-end | todo |

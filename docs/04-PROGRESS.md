@@ -25,3 +25,9 @@
   `0.1.7-rc.2` exactly, and install with an explicit version/tag rather than `latest`.
   `@deepseek-ai/cordis`: `4.0.4` — that is the version vendored in the pinned tag
   (`upstream/deepseek-harness/vendor/cordis/package.json`), and it matches npm-latest.
+- Workspace scaffold only (no `pnpm install` executed, no dependencies added yet): root
+  `package.json` (private, `packageManager: pnpm@11.7.0`) + `pnpm-workspace.yaml`
+  (`packages/*`, `profiles/*`; the submodule is intentionally outside the workspace). (T-007)
+- `docs/RUNBOOK.md` skeleton written; all unproven steps carry a `VERIFY` marker for M1. (T-008)
+- **M0 complete. Next: M1 / T-010** — install `@deepseek-ai/dsh@0.1.7-rc.2`, capture
+  `--dump-config` baseline, then the out-of-tree plugin spike. M1 is the go/no-go for ADR-0002.
