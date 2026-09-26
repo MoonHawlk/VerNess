@@ -52,6 +52,13 @@ milestones, and conflating them is how a system ends up routing production traff
 
 Three, in order of effort. The chosen path is (A); (B) is the fallback and (C) is the long game.
 
+**What installing it actually costs** (PyPI metadata for `laya` 0.3.20, verified 2026-09-26):
+Python ≥3.10, Apache-2.0, and the required dependencies are `torch>=2.0.0`, `transformers>=4.48.0`,
+`safetensors`, `huggingface_hub`, `numpy` — so the first install pulls PyTorch (a multi-GB download),
+plus `fastapi`+`uvicorn` for the `serve` extra and `mcp>=2.2.0` for the `mcp` extra. Checkpoint
+weights are separate: ModernBERT-large 421M total (English) and mmBERT-base 322M (multilingual).
+This is the single biggest reason the sidecar stays optional and out of process.
+
 **A. HTTP sidecar speaking the SystemOne protocol** — `pip install "laya[serve]"`, then
 `laya-serve` (binds `0.0.0.0:8000`; `LAYA_API_KEY` enables bearer auth). Our side is one
 `fetch` to `POST /v1/systemone`. No Python in *our* process, no new runtime in the harness, and the
