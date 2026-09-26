@@ -57,3 +57,8 @@ Later tasks in this milestone each add one paragraph here per contract they intr
   produces and points to), `EvaluationResult` (`Verdict` `PASS`/`NEEDS_WORK`, reasons, evidence),
   and the `Evaluator` interface: it only ever sees the objective and the evidence/artifacts, never
   the generator's transcript (law 4).
+- **Locate** (`src/locate.ts`) — `locate(text, path)` maps an `Issue.path` back to a 1-based
+  `{line, column}` in the raw JSONC source (comments and trailing commas tolerated), pointing at
+  the value when the path resolves, or at the enclosing container's opening bracket when only the
+  last segment (a missing key or an out-of-range index) is absent. Used to turn a validator's
+  issues into editor-clickable `file:line:column` locations without stripping comments first.
