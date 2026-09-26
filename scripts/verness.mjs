@@ -149,6 +149,43 @@ function winQuote(a) {
   return `"${s.replaceAll('"', '\\"').replaceAll('%', '%^')}"`
 }
 
+/** Cached path to the substrate's JS entry point, so the lookup happens at most once per process. */
+let dshEntry
+
+/**
+ * Run the substrate directly, never through a shell.
+ *
+ * `sh()` has to use `cmd.exe` on Windows because `dsh` is a `.cmd` shim, and that mangles real task
+ * text three ways: a newline in an argument ends the command, the command line is capped near 8191
+ * characters, and `%` is expanded. Resolving the shim to its JS file and spawning `process.execPath`
+ * with it sidesteps all three, on every platform.
+ * @param {string[]} args - arguments for dsh.
+ * @param {{env?: Record<string,string>, capture?: boolean}} [opts] - options.
+ * @returns {{code: number, out: string}} exit status and captured output.
+ */
+function dsh(args, opts = {}) {
+  if (dshEntry === undefined) {
+    const root = npmRootGlobal()
+    const dir = root === undefined ? undefined : join(root, '@deepseek-ai', 'dsh')
+    try {
+      const bin = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).bin
+      const rel = typeof bin === 'string' ? bin : bin?.dsh
+      dshEntry = rel === undefined ? null : join(dir, rel)
+      if (dshEntry !== null && !existsSync(dshEntry)) dshEntry = null
+    } catch { dshEntry = null }
+  }
+  // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
+  if (dshEntry === null) return sh('dsh', args, opts)
+  const r = spawnSync(process.execPath, [dshEntry, ...args], {
+    cwd: REPO,
+    env: { ...process.env, ...opts.env },
+    stdio: opts.capture === true ? 'pipe' : 'inherit',
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
+}
+
 /**
  * @param {string} cmd - executable name.
  * @param {string} [arg] - the version flag.
@@ -323,6 +360,8 @@ function makeCtx(cfg, commands) {
     cfg,
     commands,
     sh,
+    // The team runner sends multi-line prompts, so it gets the shell-free runner.
+    dsh,
     sync: () => syncPatch(cfg),
     routeEnv: env,
     activePersonaId: activePersonaId(cfg),
@@ -414,7 +453,7 @@ async function cmdSetup(cfg) {
   const dir = profileDir(name)
   if (!existsSync(join(dir, 'package.json'))) {
     step(`creating profile "${name}" from the ${cfg.profile.template} template`)
-    if (sh('dsh', ['--profile', name, '--from-default-profile', cfg.profile.template, '--dump-config'], { capture: true }).code !== 0) {
+    if (dsh(['--profile', name, '--from-default-profile', cfg.profile.template, '--dump-config'], { capture: true }).code !== 0) {
       die(`could not create profile "${name}"`)
     }
   }
@@ -512,8 +551,8 @@ async function cmdRun(cfg, task) {
   }
 
   const args = ['--profile', cfg.profile.name]
-  if (task.length > 0) { sh('dsh', [...args, task.join(' ')], { env }); return }
-  if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); sh('dsh', args, { env }); return }
+  if (task.length > 0) { dsh([...args, task.join(' ')], { env }); return }
+  if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env }); return }
 
   const commands = await loadCommands()
   step(`ready - persona "${activePersonaId(cfg)}", model ${r.id} via ${route}`)
@@ -530,7 +569,7 @@ async function cmdRun(cfg, task) {
       if (!handled) warn(`no such command: ${line.split(/\s+/)[0]} - try /help`)
       continue
     }
-    sh('dsh', [...args, line], { env })
+    dsh([...args, line], { env })
   }
   rl.close()
 }

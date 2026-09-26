@@ -1,0 +1,23 @@
+{
+  "id": "analysis-review",
+  "name": "Analyse then review",
+  "description": "A two-step chain that exercises dependsOn: one persona produces, a different persona checks. Generator is never the evaluator (law 4).",
+  "concurrency": 1,
+  "members": [
+    { "role": "analyst", "persona": "data-scientist" },
+    { "role": "reviewer", "persona": "software-engineer" }
+  ],
+  "tasks": [
+    {
+      "id": "inventory",
+      "member": "analyst",
+      "prompt": "List every file under docs/ with its size in bytes, using your file tools. Then state which three documents are largest. Output a short table and nothing else."
+    },
+    {
+      "id": "review",
+      "member": "reviewer",
+      "dependsOn": ["inventory"],
+      "prompt": "The upstream task listed the documentation files. Check its table against the real filesystem with your own tools and report, in three bullets, anything it got wrong or omitted. If it is correct, say so plainly."
+    }
+  ]
+}
