@@ -50,7 +50,7 @@ Launcher lifecycle
 - [ ] T-167 *(remaining part)* Failure policy per team and per task: `onFailure: stop | skip | retry-once`, default `stop`; dependents of a failed task are marked `skipped`, never run
 - [ ] T-170 *(remaining part)* `/team status [<id>]`: read the newest `.verness/runs/<team>/<stamp>/` and print per-task status, exit, seconds; write a machine-readable `summary.json` next to `summary.md`
 - [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`: a one-task ad-hoc team run
-- [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E)
+- [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
 
 ## WS-C — Pet (plan `03-pet-animation.md`)
@@ -121,6 +121,38 @@ Deferred / investigate
 - [ ] T-241 `laya-ts` in-process provider over the split ONNX export (not on npm; vendor or build)
 - [ ] T-242 Fine-tune on our labelled decisions once T-220 has a set
 - [ ] T-243 Guardrail/moderation question on inbound tasks (one more question in an existing call)
+
+## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
+Catalog-wide (do T-393 first)
+- [ ] T-393 Persona conformance test `scripts/test/personas.catalog.test.mjs`: every real `personas/*.json` validates with zero issues, `id` equals the file name, every `commands` entry has its file, and no persona command clashes with a global command or alias
+- [ ] T-394 Add to `docs/12-PERSONAS.md` (the how-to guide exists): the catalog table (id, family, job, tool policy, command) and "which persona do I pick?" for the overlapping pairs (reviewer / qa / security; software-engineer / csharp / frontend; researcher / product-manager)
+- [ ] T-395 Optional persona `family` (`data | engineering | business | research`) in the contract and validator, set in every file; `/persona list` and `/agents` group by it
+- [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
+- [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)
+
+Engineering personas
+- [ ] T-400 `personas/qa-engineer.json`: test strategy, cases, regression, bug reports; allow read/write/edit/grep/glob/bash, deny `production.write`. Done: `/persona check` ok and `/agents` lists it
+- [ ] T-401 qa-engineer `/testplan <feature>`: prints a fixed test-plan checklist, zero tokens, only while qa-engineer is active
+- [ ] T-402 `personas/csharp-developer.json`: a .NET specialisation of software-engineer (same tool policy; C#/dotnet prompt and skills). Done: `/persona check` ok
+- [ ] T-403 csharp-developer `/dotnet-check`: prints the restore/build/test/format/vulnerable-package sequence and runs nothing
+- [ ] T-404 `personas/devops-engineer.json`: CI/CD, containers, IaC, release; deny `pipeline.deploy` and `production.write`, `bash` approval `ask`. Done: `/persona check` ok and `/agents` shows the approval as recorded
+- [ ] T-405 devops-engineer `/release-check`: prints a fixed pre-release and rollback checklist, zero tokens
+- [ ] T-406 `personas/security-engineer.json`: a read-only security specialisation of reviewer (deny write/edit; `web.fetch` for advisories). Done: `/persona check` ok
+- [ ] T-407 security-engineer `/threats <component>`: prints a STRIDE plus secrets/dependency checklist, zero tokens
+- [ ] T-408 `personas/frontend-developer.json`: web UI, components, accessibility. Done: `/persona check` ok and `/agents` lists it
+- [ ] T-409 frontend-developer `/a11y`: prints a WCAG AA quick checklist, zero tokens
+
+Business personas
+- [ ] T-420 `personas/hr-specialist.json`: JDs, interview plans, policies, onboarding; the prompt forbids decisions about real individuals, `write` is `ask`, shell and SQL are denied. Done: `/persona check` ok
+- [ ] T-421 hr-specialist `/jd-check`: prints a static job-description checklist, zero tokens
+- [ ] T-422 `personas/product-manager.json`: requirements, PRDs, user stories, prioritisation. Done: `/persona check` ok
+- [ ] T-423 product-manager `/prd [title]`: prints a PRD skeleton, zero tokens
+- [ ] T-424 `personas/technical-writer.json`: docs, READMEs, release notes, API docs; `bash` is `ask` (it only runs examples). Done: `/persona check` ok
+- [ ] T-425 technical-writer `/release-notes`: prints the Added/Changed/Fixed/Deprecated/Breaking/Upgrade template, each line naming its task ID
+- [ ] T-426 `personas/project-manager.json`: plans, milestones, status reports, risk registers. Done: `/persona check` ok
+- [ ] T-427 project-manager `/raid`: prints an empty RAID register, zero tokens
+- [ ] T-428 `personas/customer-support.json`: triage, reply drafts, known-issue summaries; drafts only (no edit, no production, no send). Done: `/persona check` ok
+- [ ] T-429 customer-support `/triage`: prints the S1–S4 severity rubric and escalation rules, zero tokens
 
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions

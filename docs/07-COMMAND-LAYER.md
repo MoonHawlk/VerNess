@@ -93,7 +93,8 @@ Optional fields: `model`, `models.requirements` (capability levels, see `capabil
   issue as `personas/x.json:L:C path: message` and exits non-zero on errors.
 - **Persona commands**: each name in `commands` loads `personas/<id>/commands/<name>.mjs` (same
   module shape as a global command) after the globals. Globals win; a collision is refused with a
-  warning that names the owner. Ids and command names must match `^[a-z][a-z0-9-]*$`.
+  warning that names the owner. Ids and command names must match `^[a-z][a-z0-9-]*$`. How to write
+  one, and what "only this persona" means: `docs/12-PERSONAS.md`.
 
 `tools`, `skills`, `evaluators` and `models.requirements` are **declared, not enforced** until
 M4–M7 land. Any command that displays them must label them as declared, or the surface lies.
