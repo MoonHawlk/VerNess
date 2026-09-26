@@ -25,7 +25,7 @@ import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
-import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.verness', 'run')
@@ -405,6 +405,9 @@ function resolveRoute(cfg) {
   return { route: eff.name, r: eff.route, model: eff.model, env, missingKey, error: eff.error }
 }
 
+/** Refit temperatures, read once per REPL start (`/decisions-data refit` writes them). */
+let shadowTemperatures
+
 /**
  * Shadow-route one task: ask the decision model what it would do, log it beside what the rules
  * decide, and change nothing. This is how the labelled set for calibration gets built, and it is the
@@ -422,7 +425,8 @@ async function shadowRoute(cfg, text) {
   const rules = ruleRoute(text)
   const r = await askDecision(dc, text, ROUTING_QUESTIONS, { retries: 1 })
   if (!r.ok) { info(paint(C.dim, `shadow: decision service unavailable (${r.error ?? r.status})`)); return }
-  const model = modelAnswers(r.body)
+  shadowTemperatures ??= loadTemperatures()
+  const model = modelAnswers(r.body, shadowTemperatures)
   const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
   logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules, agreement: agree.length })
   info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`

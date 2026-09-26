@@ -163,7 +163,7 @@ Record the count and date in `docs/04-PROGRESS.md`. Tasks 3–4 are code that wo
   One row per `(question, hash)` with at least one label. Rules use `conf = 1`. The refit is fitted on
   the train split and **evaluated on the holdout**. It is included only when `n ≥ 50` and holdout NLL improved.
 
-- [ ] **Step 1: Failing tests with hand-computed values**
+- [x] **Step 1: Failing tests with hand-computed values**
 
 ```js
 // scripts/test/calibration.test.mjs
@@ -214,18 +214,18 @@ test('fit: an over-confident model gets T > 1 and lower NLL', () => {
 })
 ```
 
-- [ ] **Step 2: Implement** exactly as the interface states. `ece` bin index is
+- [x] **Step 2: Implement** exactly as the interface states. `ece` bin index is
 `Math.min(bins − 1, Math.floor(conf * bins))`. `auroc` is O(P·N), which is fine at our sizes.
-- [ ] **Step 3: Wire `report` into `/decisions-data report`.** Print a table per question:
+- [x] **Step 3: Wire `report` into `/decisions-data report`.** Print a table per question:
 `n | model acc | model ECE | AUROC | refit ECE | T | rules acc | rules ECE`. With `--write`, also write
 `docs/research/decision-calibration.md`: date, machine, checkpoint, `n` per question, the table, and
 a one-paragraph reading that follows the style of `08-DECISION-LAYER-LAYA.md`.
-- [ ] **Step 4: `/decisions-data refit`** writes `.verness/decisions/temperatures.json` =
+- [x] **Step 4: `/decisions-data refit`** writes `.verness/decisions/temperatures.json` =
 `{ "<question>:<hash>": {T, n, at} }` for the questions whose refit was kept. Make `readAnswer`
 accept an optional `temperatures` map and, when an entry matches, apply it to `probabilities` and
 recompute `confidence` as the (new) max probability. `shadowRoute` loads the file once per REPL
 start. **Log both the raw and the refit confidence** (`confidenceRaw`, `confidence`).
-- [ ] **Step 5: Commit** — `feat(decisions): accuracy, ECE, AUROC and a held-out temperature refit (T-221, T-222, T-261)`
+- [x] **Step 5: Commit** — `feat(decisions): accuracy, ECE, AUROC and a held-out temperature refit (T-221, T-222, T-261)`
 
 ---
 
