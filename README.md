@@ -153,6 +153,20 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 }
 ```
 
+### Personas and their own commands
+
+```sh
+/persona                        # list personas; the active one is marked
+/persona data-scientist         # switch; the prompt, policy and command bar follow
+/hypotheses <question>          # exists only while data-scientist is active
+```
+
+A persona is one file, `personas/<id>.json`. It can also bring **commands that only it has**:
+`personas/<id>/commands/<name>.mjs`, listed in the file's `commands`. These are offered only while
+that persona is active, and they usually cost zero tokens (checklists, templates, local
+computations). Global commands always win on a name clash. How to write one:
+[docs/12-PERSONAS.md](docs/12-PERSONAS.md).
+
 ### Decision model (Laya)
 
 ```sh
@@ -185,7 +199,7 @@ rules still make every real decision.
 | Task dashboard + backlog | ✅ | `/dashboard`: prioritise open tasks, inspect sessions and costs |
 | Teams / `/loop-task` | ✅ | several tasks under different personas; `teams/*.json` |
 | Contracts (`@verness/contracts`) | ✅ M2 | types only, zero dependencies |
-| Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands |
+| Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands ([guide](docs/12-PERSONAS.md)) |
 | Decisions (shadow mode) | 🔄 M3 | Laya sidecar logs model-vs-rules; not yet authoritative |
 | Persona system | 🔄 M4 | identity = skills + tools + model policy; persona files validated (M2) |
 | Skills | 🔄 M5 | procedural knowledge, trigger-based |

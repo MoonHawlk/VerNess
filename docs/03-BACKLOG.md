@@ -125,7 +125,7 @@ Deferred / investigate
 ## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
 Catalog-wide (do T-393 first)
 - [ ] T-393 Persona conformance test `scripts/test/personas.catalog.test.mjs`: every real `personas/*.json` validates with zero issues, `id` equals the file name, every `commands` entry has its file, and no persona command clashes with a global command or alias
-- [ ] T-394 `docs/12-PERSONAS.md`: the catalog table (id, family, job, tool policy, command) and "which persona do I pick?" for the overlapping pairs (reviewer / qa / security; software-engineer / csharp / frontend; researcher / product-manager)
+- [ ] T-394 Add to `docs/12-PERSONAS.md` (the how-to guide exists): the catalog table (id, family, job, tool policy, command) and "which persona do I pick?" for the overlapping pairs (reviewer / qa / security; software-engineer / csharp / frontend; researcher / product-manager)
 - [ ] T-395 Optional persona `family` (`data | engineering | business | research`) in the contract and validator, set in every file; `/persona list` and `/agents` group by it
 - [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
 - [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)

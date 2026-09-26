@@ -128,7 +128,7 @@ is active, prints without a model call, and has a small `node:test` for its outp
 - **T-393 conformance test** (`scripts/test/personas.catalog.test.mjs`): every real `personas/*.json`
   validates with zero issues, `id` equals the file name, every `commands` entry has a file in
   `personas/<id>/commands/`, and no persona command name clashes with a global command or alias.
-- **T-394 `docs/12-PERSONAS.md`**: one table (id, family, one-line job, tool policy, command) plus the
+- **T-394 `docs/12-PERSONAS.md`** (the how-to guide already exists; add a catalog section): one table (id, family, one-line job, tool policy, command) plus the
   boundary lines above, and "which persona do I pick?" for the overlapping pairs (reviewer vs qa vs
   security, software-engineer vs csharp vs frontend, researcher vs product-manager).
 - **T-395 `family` field**: optional `family: 'data' | 'engineering' | 'business' | 'research'` in
