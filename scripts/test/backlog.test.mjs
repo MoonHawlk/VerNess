@@ -59,3 +59,11 @@ test('markdownToHtml: headings, nested checkbox lists, quotes, rules, fences', (
   assert.match(html, /<hr>/)
   assert.match(html, /<pre>&lt;raw&gt;<\/pre>/)
 })
+
+test('parseBacklog and markdownToHtml accept CRLF (a Windows checkout with core.autocrlf)', () => {
+  const md = '## WS-X — Thing\r\n- [ ] T-001 First task\r\n- [x] T-002 Done task\r\n'
+  const tasks = parseBacklog(md)
+  assert.equal(tasks.length, 1)
+  assert.equal(tasks[0].id, 'T-001')
+  assert.ok(!markdownToHtml(md).includes('\r'))
+})

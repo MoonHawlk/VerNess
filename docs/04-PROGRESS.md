@@ -534,3 +534,13 @@
 - Found while planning: the catalog would reach 17 personas, which breaks the 8-option limit
   (T-385) that T-230's single-choice persona router assumes. T-396 (two-stage routing) fixes the
   design, and the T-230 line now points to it.
+
+## 2026-09-26 — persona guide; branch merged; CRLF fix for the dashboard backlog
+- `docs/12-PERSONAS.md`: how to write a persona file, and persona-scoped commands (loaded only for
+  the active persona, globals win including aliases, and the scoping limits what is offered; it is
+  not a security boundary). Linked from the README, the docs index, 06 and 07.
+- `persona-tasks-and-calibration` merged into `epic` and deleted (it was never pushed).
+- **Bug found after that merge**: with `core.autocrlf=true`, a Windows checkout gives
+  `docs/03-BACKLOG.md` CRLF endings, and `parseBacklog`/`markdownToHtml` split on `\n` only, so the
+  dashboard showed 0 open tasks and `backlog.test.mjs` failed. The merge commit had been pushed
+  before that failure was checked. Fixed by splitting on `\r?\n`, with a CRLF test. `npm test` 148/148.

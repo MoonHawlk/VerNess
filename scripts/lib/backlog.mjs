@@ -41,7 +41,8 @@ export function parseBacklog(md) {
   let group = ''
   let sub = ''
   let lastTop
-  for (const line of md.split('\n')) {
+  // CRLF too: a Windows checkout with core.autocrlf rewrites the backlog's line endings.
+  for (const line of md.split(/\r?\n/)) {
     const h = /^##\s+(.+)$/.exec(line)
     if (h !== null) { group = h[1].replace(/\s+(?:—|\().*$/, '').trim(); sub = ''; continue }
     const t = /^(\s*)- \[ \] (T-\d+[a-z]?(?: \/ T-\d+)?)\s+(.*)$/.exec(line)
@@ -69,7 +70,7 @@ export function markdownToHtml(md) {
   const flush = () => { if (para.length > 0) { out.push(`<p>${inline(para.join(' '))}</p>`); para = [] } }
   const closeLists = (depth = 0) => { while (stack.length > depth) out.push(`</${stack.pop()}>`) }
   let fence = null
-  for (const raw of md.split('\n')) {
+  for (const raw of md.split(/\r?\n/)) {
     if (fence !== null) {
       if (raw.trim().startsWith('```')) { out.push(`<pre>${esc(fence.join('\n'))}</pre>`); fence = null } else fence.push(raw)
       continue
