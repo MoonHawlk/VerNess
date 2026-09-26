@@ -544,3 +544,19 @@
   `docs/03-BACKLOG.md` CRLF endings, and `parseBacklog`/`markdownToHtml` split on `\n` only, so the
   dashboard showed 0 open tasks and `backlog.test.mjs` failed. The merge commit had been pushed
   before that failure was checked. Fixed by splitting on `\r?\n`, with a CRLF test. `npm test` 148/148.
+
+## 2026-09-26 — `--relabel`; calibration report and refit (T-221, T-222); web branding planned (T-398, T-399)
+- `/dd label --relabel <id | task words>`: re-asks matching records, shows the operator's own current
+  label, and the newest label wins.
+- **T-221 / T-222 done**: `scripts/lib/calibration.mjs` (pure), `/dd report [--write]`, `/dd refit`,
+  and temperatures applied in `readAnswer` with `confidenceRaw` logged. First published run
+  (`docs/research/decision-calibration.md`, n=20 per question): model vs rules accuracy is
+  level 0.15/0.35, tier 0.45/0.50, pipeline 0.50/0.50. Model ECE is lower on all three (0.30, 0.16,
+  0.18 vs 0.65, 0.50, 0.50). AUROC 0.82 / 0.55 / 0.81: on level and pipeline the model's confidence
+  does separate its right answers from its wrong ones. Too few labels to gate or refit (T-392).
+- **Web branding checked**: logo and name are replaceable slots (`sidebar.brand.*`,
+  `conversation.hero.brand.mark`) via a replacement for `dsh-client-ui-brand-official`. Tab title
+  and favicons are build-time in the prebuilt frontend, so only a runtime swap is possible. Planned as
+  T-398, which starts with a spike proving an out-of-tree browser plugin loads. Also found: the
+  `dsh-web-ui` row (`@linxin666/dsh-web-all`) is enabled in the config but not installed in the web
+  profile (T-399).

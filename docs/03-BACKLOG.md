@@ -276,6 +276,15 @@ Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-comman
 - [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
 - [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
 
+## Web UI branding: VerNess logo and titles in the browser UI
+Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
+conversation-hero mark are **slots** that `dsh-client-ui-brand-official` occupies; its README says a
+deployment with another identity "leaves this package out and composes another package that
+occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
+(`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
+- [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
+- [ ] T-399 The `dsh-web-ui` plugin row (`@linxin666/dsh-web-all`, `settings.plugins` in `verness.config.json`) is enabled but not installed in the `verness-web` profile, whose UI comes from `@deepseek-ai/dsh-web-app`. Find out whether it warns or fails at boot and what it was meant to add, then install it properly or remove the row. Record the decision in `04-PROGRESS.md`
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
