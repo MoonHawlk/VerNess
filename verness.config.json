@@ -115,6 +115,16 @@
     "checkpoint": "english",
   },
 
+  // ---------------------------------------------------------------------- pet
+  // The companion that greets you at boot with versions and workers (model engine,
+  // decision sidecar, last loop/team run). `/pet` redraws it with fresh probes.
+  // Set enabled to false to boot with the one-line banner; VERNESS_NO_PET=1 does
+  // the same for a single run. It only draws on a real terminal, never in a pipe.
+  "pet": {
+    "enabled": true,
+    "name": "Ness",
+  },
+
   // ----------------------------------------------------------------- settings
   "settings": {
     // Tool presentation: native (default) | ptc | both.

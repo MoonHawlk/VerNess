@@ -285,3 +285,20 @@
 - Verification runs with no `--session-id`, so the checker has never seen the work and cannot be
   convinced by its own earlier reasoning. When the checker ignores the reply format the driver now
   says exactly that, instead of reporting an empty rejection.
+
+## 2026-09-26 — the pet: versions and workers at a glance (T-330..T-333)
+- The REPL now boots with a small ASCII companion (default name **Ness**) beside a status panel:
+  VerNess version and commit, node, **dsh installed vs the pinned substrate** (the most useful single
+  versions signal, since ADR-0002 pins it), the engine version, whether the model engine is up and
+  which model is warm with its memory, the decision sidecar, the last `/loop-task` and `/team` run,
+  the roster and the conversation. `/pet` redraws it with fresh probes.
+- Its mood is derived, not decorative: **worried** when something is wrong (substrate drift, engine
+  down, decisions enabled with the sidecar down) with the one line that says what to run,
+  **sleepy** when the engine is up but nothing is warm, **happy** otherwise.
+- Boot cost is bounded: probes run in parallel, capped at 600 ms each, over HTTP and files; the only
+  spawn is `git rev-parse` without a shell, and the dsh version is the one the launcher already read.
+  Measured: `/pet` end to end in ~0.4 s including its own `dsh --version`.
+- It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
+  `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
+  before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.
+

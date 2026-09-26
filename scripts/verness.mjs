@@ -20,6 +20,7 @@ import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
+import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute } from './lib/decisions.mjs'
 
@@ -43,11 +44,12 @@ const DEFAULTS = {
   personas: { active: 'generalist', definitions: { generalist: { prefix: '', suffix: '' } } },
   tips: [],
   settings: { toolsMode: 'native', plugins: [], linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
+  pet: { enabled: true, name: 'Ness' },
 }
 
 const C = {
   dim: '[2m', red: '[31m', green: '[32m',
-  yellow: '[33m', cyan: '[36m', off: '[0m',
+  yellow: '[33m', cyan: '[36m', bold: '[1m', off: '[0m',
 }
 const paint = (c, s) => (process.stdout.isTTY ? c + s + C.off : s)
 const step = s => console.log(paint(C.cyan, '==> ') + s)
@@ -714,7 +716,8 @@ async function cmdDoctor(cfg) {
  * @param {string[]} task - the task words, if any.
  */
 async function cmdRun(cfg, task) {
-  if (version('dsh', '--version') === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
+  const dshVersion = version('dsh', '--version')
+  if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
   if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
   syncPatch(cfg)
   const route = cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute
@@ -744,7 +747,15 @@ async function cmdRun(cfg, task) {
 
   const commands = await loadCommands()
   const count = new Set([...commands.values()]).size
-  step(`VerNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, r.id)} via ${route}`)
+  if (petEnabled(cfg)) {
+    // The pet is the boot banner: versions and workers at a glance. `/pet` redraws it later.
+    const vitals = await gatherVitals(cfg, { dsh: dshVersion, commands: count, session: convo.id() })
+    console.log()
+    for (const l of renderPet(vitals, { columns: process.stdout.columns })) console.log(l)
+    console.log()
+  } else {
+    step(`VerNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, r.id)} via ${route}`)
+  }
   console.log(paint(C.dim, `  ${count} quick-tools (tab completes, /help <name> explains):`))
   for (const l of commandBar(commands)) console.log(l)
   info(convo.id() === undefined
