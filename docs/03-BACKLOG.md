@@ -278,6 +278,15 @@ Autonomous task loop (`/loop-task`, research: `docs/research/task-loop-machinery
 - [ ] T-327 Per-round wall-clock budget — the research found no per-turn timeout in the harness, only token and round limits
 - [ ] T-328 Surface loop runs in `/dashboard`; they are already recorded in `.verness/loops/*.jsonl`
 
+Pet (boot companion, `scripts/lib/pet.mjs`)
+- [x] T-330 `gatherVitals`: versions (launcher + commit, node, dsh installed vs pinned, engine) and workers (model engine and what is warm, decision sidecar, last loop, last team run), every probe in parallel and capped at 600 ms, no shell spawns on the boot path
+- [x] T-331 Pure `renderPet` with a mood (worried > sleepy > happy) and one line saying what needs attention; side-by-side at 64+ columns, stacked below that and in pipes; ASCII-only art
+- [x] T-332 The pet replaces the one-line boot banner on an interactive terminal; `/pet` (aliases `/ness`, `/status`) redraws it live; `pet.enabled`/`pet.name` in the config, `VERNESS_NO_PET=1` per run
+- [x] T-333 Render test `scripts/test/pet.render.mjs`: every mood, both layouts, width limits, unknown values, no escape codes off a TTY
+- [ ] T-334 Show running `/loop-task` and `/team` runs as live workers, not only the last finished one (needs a pid/heartbeat file per run)
+- [ ] T-336 A boot from a second checkout (clone, worktree) overwrites the shared `~/.dsh` profile patch with its own persona state; key the profile by checkout, or warn when the patch was written by another one
+- [ ] T-335 Let the pet animate while a turn runs (blink/idle frames) once the editor owns a status line that can be redrawn safely
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters

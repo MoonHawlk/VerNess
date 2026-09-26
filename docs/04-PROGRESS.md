@@ -285,3 +285,27 @@
 - Verification runs with no `--session-id`, so the checker has never seen the work and cannot be
   convinced by its own earlier reasoning. When the checker ignores the reply format the driver now
   says exactly that, instead of reporting an empty rejection.
+
+## 2026-09-26 — the pet: versions and workers at a glance (T-330..T-333)
+- The REPL now boots with a small ASCII companion (default name **Ness**) beside a status panel:
+  VerNess version and commit, node, **dsh installed vs the pinned substrate** (the most useful single
+  versions signal, since ADR-0002 pins it), the engine version, whether the model engine is up and
+  which model is warm with its memory, the decision sidecar, the last `/loop-task` and `/team` run,
+  the roster and the conversation. `/pet` redraws it with fresh probes.
+- Its mood is derived, not decorative: **worried** when something is wrong (substrate drift, engine
+  down, decisions enabled with the sidecar down) with the one line that says what to run,
+  **sleepy** when the engine is up but nothing is warm, **happy** otherwise.
+- Boot cost is bounded: HTTP probes (600 ms cap) and two shell-free `git` calls (1.2 s cap) all run
+  in parallel; the dsh version is the one the launcher already read. `git status` skips submodules -
+  a worktree without `upstream/` initialised would otherwise hide what walking the substrate costs
+  in the real checkout. Measured: `/pet` end to end in ~0.4 s including its own `dsh --version`.
+- Found while testing from a worktree: booting any second checkout syncs ITS persona into the shared
+  `~/.dsh/profiles/<name>/cordis.patch.yml`, silently switching the live profile (T-336).
+- It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
+  `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
+  before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.
+- Redesigned on request: Ness is now a **triangle with a face in it** (brows, pupils, a two-row curved
+  smile; closed eyes and `z Z` when sleepy; raised brows, a frown and `!` when worried). The triangle
+  is generated from the face rows, so its sides stay straight whatever the mood draws inside, and
+  the panel is bottom-aligned so Ness speaks beside its base.
+
