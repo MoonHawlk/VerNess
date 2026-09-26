@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
+import { readShadow } from './lib/labels.mjs'
 import { listSessions, readSessionEvents } from './lib/sessions.mjs'
 import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
 
@@ -112,19 +113,13 @@ function detail(summary) {
   }
 }
 
-/** @returns {object[]} every shadow decision recorded, newest last. */
+/**
+ * Every shadow decision recorded, newest last. Only the per-day files: `labels.jsonl` sits in the
+ * same directory and is not a decision.
+ * @returns {object[]} the records.
+ */
 function readDecisions() {
-  const dir = join(REPO, '.verness', 'decisions')
-  if (!existsSync(dir)) return []
-  const out = []
-  for (const f of readdirSync(dir).sort()) {
-    if (!f.endsWith('.jsonl')) continue
-    for (const line of readFileSync(join(dir, f), 'utf8').split('\n')) {
-      if (line.trim() === '') continue
-      try { out.push(JSON.parse(line)) } catch { /* partial line */ }
-    }
-  }
-  return out
+  return readShadow(join(REPO, '.verness', 'decisions'))
 }
 
 /** @returns {object[]} recorded team runs, newest first. */
