@@ -229,6 +229,22 @@ Observability
 - [ ] T-272 Dashboard: filter by persona and by route; today it shows everything in the workspace
 - [ ] T-273 Dashboard: `--watch` to rebuild on change, for a second screen during long runs
 
+Thought graph — ephemeral and persistent working memory (design: `docs/10-THOUGHT-GRAPH.md`)
+- [ ] T-280 `thought/node` session event + `thoughts` projection: log-only (so compaction cannot shadow it), versioned `stateVersion`, folds to empty on task start
+- [ ] T-281 Node schema + boundary validation: `scope`, `kind`, one-sentence capped `claim`, `evidence[]`, `confidence`, `derivedFrom[]`
+- [ ] T-282 `/think add | list | show | link | promote | forget`
+- [ ] T-283 `think_add` / `think_search` / `think_open` tools so the model records and retrieves its own nodes
+- [ ] T-284 Persistent tier in `ctx.storage`, project-scoped, byte-capped, **errors when full** instead of dropping
+- [ ] T-285 Frozen session-start injection of `constraint` nodes only, hard-capped — mid-session rewrites would invalidate the prompt-cache prefix
+- [ ] T-286 Compaction hook: render the task's findings and decisions into the compacted context, replacing prose summary with structure
+- [ ] T-287 `confidence: verified` requires evidence read in-turn, enforced structurally (cwc default-FAIL gate)
+- [ ] T-288 Eviction by demotion to a stub with a recovery pointer, never deletion
+- [ ] T-289 Subagents receive only explicitly passed nodes — never the graph by inheritance
+- [ ] T-290 Dashboard panel: the graph with its edges, plus the promoted-node inventory
+- [ ] T-295 Decision-model assist, shadowed: "is this worth persisting?" and "does this contradict an existing node?"
+- [ ] T-296 Contradiction surfaces for resolution; a new finding never silently overwrites a persistent one
+- [ ] T-297 Poisoning guard: every persistent node records the session and model that produced it, so a bad run is traceable and revocable
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters

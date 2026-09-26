@@ -224,3 +224,21 @@
 - **Consequence**: shadow mode is not a formality, it is the correct default. `decisions.enabled` is
   `false` in the committed config, and even when enabled it only logs. Nothing the model says steers
   anything until calibration beats the rule baseline (T-223).
+
+## 2026-09-26 (overnight, continued) — visibility, dashboard, thought-graph design
+- **Command surface is visible** (T-140/T-146 follow-up): the REPL opens with all 17 quick-tools
+  grouped by area, tab completes command names and then their arguments (persona ids, team ids,
+  session ids, local models), carries a `persona · model · session` status line, and suggests near
+  matches on a typo.
+- **`/dashboard`** (T-270): a self-contained static HTML page built from the session logs, the shadow
+  decision log and team-run transcripts. Sessions with turns/tools/tokens/wall time, click-through to
+  a per-session timeline, decisions with agreement and latency, team runs with per-task outcomes.
+  53 KiB, no server, no dependencies, no external assets.
+- **Thought graph designed** (`docs/10-THOUGHT-GRAPH.md`, T-280..T-297) on two research digests. The
+  decisive substrate finding: **log-only session events are immune to compaction's surface-replace
+  shadowing**, so ephemeral nodes survive compaction for free simply by never being surface events.
+  Persistent nodes live in `ctx.storage` instead — outside the session log, no replay, capped, and
+  promoted only by an explicit verified act.
+- The design's centre of gravity is the failure mode, not the feature: an unbounded self-written
+  memory poisons itself, so persistence is explicit, evidence-gated, attributed to the session and
+  model that produced it, revocable, and contradictions surface rather than overwrite.
