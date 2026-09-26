@@ -19,6 +19,7 @@ Read in this order:
 | [08-DECISION-LAYER-LAYA.md](08-DECISION-LAYER-LAYA.md) | The decision layer: the SystemOne protocol, Laya as first provider, and what it cannot yet be trusted with |
 | [09-HANDOFF-DECISION-ROUTING.md](09-HANDOFF-DECISION-ROUTING.md) | **Start here for the next session**: decision-driven routing, the three questions, shadow mode |
 | [10-THOUGHT-GRAPH.md](10-THOUGHT-GRAPH.md) | Ephemeral and persistent working memory: node shape, what reaches the prompt, and the poisoning guard |
+| [11-MODELS-AND-API.md](11-MODELS-AND-API.md) | Install local models in one command, run the agent on a hosted API model, and choose how far its tools reach |
 | [RUNBOOK.md](RUNBOOK.md) | Manual commands behind the launcher, and every gotcha we hit |
 | [adr/](adr/) | Architecture Decision Records (one file per irreversible choice) |
 | [research/](research/) | Read-only digests of upstream repos (source of truth for seam names) |

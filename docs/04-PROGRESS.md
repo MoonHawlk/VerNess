@@ -313,3 +313,30 @@
   odd-width screen so they centre exactly, and the test checks every corner and edge (T-337).
   Animations are planned, not built (T-335a..h).
 
+## 2026-09-26 — models in one command, and the agent on a hosted API (T-350..T-356)
+- **Why**: adding a model meant editing the config and guessing which quant a Hugging Face repo
+  publishes; `/model <id>` failed with `UNKNOWN_MODEL` because the patch declared one model per
+  route; a hosted model needed a hand-written route plus an edit to `activeRoute`, and the REPL froze
+  its route at boot anyway. Five places computed "the active route", and disagreed.
+- **What**: `scripts/lib/routes.mjs` is now the single resolver. `/api use <provider> <model>` puts
+  the agent on any provider the installed route adapter ships a catalog for — the patch declares only
+  the key *variable*; endpoint, protocol and models come from the adapter, so our code names no
+  vendor (ADR-0010). `/models add` validates the quant against the repo's actual GGUF files, pulls,
+  warms and registers; the local route now declares every registered model. `/access` chooses the
+  substrate sandbox mode. Keys live in the gitignored `.env`. Guide: `docs/11-MODELS-AND-API.md`.
+- **Verified**: `dsh --dump-config` composes the catalog route; a task with the key unset is refused
+  with the exact `.env` line; with a deliberately invalid key the request reached the provider and
+  returned `401 authentication_error`. `/models add` refused a missing quant (listing the real
+  ones), resolved a Hugging Face URL, and a turn then ran on a newly registered model. The session
+  log records `sandbox/mode` per `/access`; under `read-only` it shows `Set-Content` refused by the
+  OS (`PermissionDenied`). A permitted write under `workspace` is unproven: the 0.6B model never
+  produced a valid call.
+- **Not verified**: a successful hosted turn — no provider key exists on this machine (T-357). The
+  0.6B local model emitted a `pwsh` call but omitted a required argument; that is the capability gap
+  hosted models are meant to close, not a wiring fault.
+- **Found on the way**: headless has no approval answerer, so any sandbox escalation fails closed —
+  the chosen mode is the whole policy. On Windows the sandbox restricts writes only, and sandboxed
+  PowerShell runs in ConstrainedLanguage, so .NET type creation fails (T-366).
+- **Fixed after review**: `/model reset` on an API route left it with no model and exited the REPL;
+  `/api use` now records the model on the route, so reset falls back to it.
+- Task IDs start at T-350: another checkout took T-330..T-336 concurrently.

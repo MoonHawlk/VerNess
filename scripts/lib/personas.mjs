@@ -151,7 +151,8 @@ export function writePersonaOverlay(persona, cfg) {
   ]
   if (persona.model.id !== undefined) {
     L.push('- id: agent-default-model', '  config:',
-      `    provider: ${persona.model.route ?? (cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute)}`,
+      // A persona model without a route is a local model preference (see lib/routes.mjs).
+      `    provider: ${persona.model.route ?? cfg.model.route}`,
       `    model: ${q(persona.model.id)}`)
   }
   mkdirSync(RUN_DIR, { recursive: true })

@@ -6,7 +6,8 @@
     - id: verness-spike
       name: '@verness/spike'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared
-    # OpenAI-compatible gateways given api + baseURL + a non-empty models list.
+    # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and
+    # catalog providers given only the variable their key is read from.
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
       config:
@@ -25,6 +26,7 @@
                 reasoningEfforts: false
 
 # A patch replaces the targeted row config wholesale, so every field is restated.
+# Model chosen by: route default.
 - id: agent-default-model
   config:
     provider: ollama-local
