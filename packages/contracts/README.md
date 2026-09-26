@@ -35,3 +35,25 @@ Later tasks in this milestone each add one paragraph here per contract they intr
   and records). `personaToFile` turns a `Persona` back into a file that re-validates to the same
   value. v1 files (`id`, `name`, `description`, `prompt`, `tools`, `skills`, `evaluators`, `tips`)
   are valid v2 files unchanged.
+- **Decision** (`src/decision.ts`) — the vocabulary for the small-choice decision path:
+  `REASON_CODES`/`ReasonCode` (13 codes covering rule matches, model confidence, fallbacks,
+  escalation, tool and budget failures, and provider/answer problems), `ChoiceQuestion` (a fixed
+  option set, `<= 8`), `DecisionRequest`/`DecisionResult`, `DecisionCapabilities`, and the
+  `DecisionModel` interface a decision provider implements (`decide`).
+- **Skill** (`src/skill.ts`, `src/validate-skill.ts`) — `SkillRef`, the file-authored
+  `SkillMetadata` (`name`, `description`, optional `activation.triggers`,
+  `requirements.tools`, `evaluators`, `version`), `SkillContext`/`SkillActivation` (what a skill
+  contributes at run time: prompt sections, tools, evaluators, and on-demand `references` for
+  3-tier disclosure), and the `Skill` interface (`activate`). `validateSkillMetadata(v)` checks a
+  parsed skill manifest — required non-empty `name`/`description`, string arrays for triggers,
+  tools and evaluators, unknown fields with "did you mean" at the top level and inside
+  `activation`/`requirements` — collecting every issue and returning a normalised, alias-free
+  copy with no defaults injected.
+- **Task** (`src/task.ts`) — `TaskMode`/`TaskStatus`/`TaskId`, `TaskBudget`/`TaskConstraints`,
+  `Step`/`Plan`, `TaskMetrics`/`TaskError`, the mutable `TaskState` a task accumulates as it runs
+  (steps, artifacts, evidence, errors, metrics, status), and the top-level `Task` that ties an
+  objective, persona, mode, state, budget and constraints together.
+- **Evaluation** (`src/evaluation.ts`) — `Evidence` and `ArtifactRef`/`Artifact` (what a task
+  produces and points to), `EvaluationResult` (`Verdict` `PASS`/`NEEDS_WORK`, reasons, evidence),
+  and the `Evaluator` interface: it only ever sees the objective and the evidence/artifacts, never
+  the generator's transcript (law 4).
