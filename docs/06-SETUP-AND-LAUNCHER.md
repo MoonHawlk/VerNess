@@ -55,7 +55,8 @@ unchanged beside it.
 - `setup` creates it, and the first `web` creates it if `setup` has not.
 - Flags pass through to the web app: `--port <n>`, `--no-open`, `--host <host>`.
 - The server is token-gated. It opens the browser for you; otherwise open the printed URL, since
-  it carries the login token. Pick the `VerNess` workspace, then type in the bar. Ctrl+C stops it.
+  it carries the login token. Pick the `VerNess` workspace, then type in the bar. Ctrl+C stops it. Launched as `/web` from
+  the REPL, it also ends the REPL, which shares the console.
 
 ## The setup file
 

@@ -809,7 +809,7 @@ async function cmdRun(cfg, task) {
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
   info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
-  info('prefer a chat window with a message bar? /web opens the browser UI')
+  info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
   const interactive = process.stdin.isTTY === true
