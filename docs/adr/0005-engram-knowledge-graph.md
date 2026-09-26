@@ -45,3 +45,20 @@ location. Tracked as T-102.
   `.engram/label-instructions/`) for an assistant to fill in node descriptions and community names.
   Filling them costs session tokens, so we skip it while the corpus is trivially small.
 - Keep the graph's freshness in mind: `GRAPH_REPORT.md` records the commit it was built from.
+
+## Addendum — 2026-09-26: installed and wired to Claude Code
+- **Installed:** `@sentropic/engram` 0.19.0, globally. It is the successor of graphify; `/graphify`
+  survives only as a deprecated alias of `/engram`.
+- **Claude Code skill:** `engram install` copied the `/engram` skill to
+  `~/.claude/skills/engram/` (user-level). `engram install --project` would place it in the repo
+  instead; we did not use it.
+- **Graph:** `engram update .` (also `./turn_on.sh graph`) built 315 nodes / 974 edges /
+  13 communities in ~4 s, AST only, no LLM call. `.engram/` stays gitignored.
+- **Not adopted yet, on purpose:** the optional LLM "description" batches, and
+  `engram claude install` (a CLAUDE.md section plus a PreToolUse hook).
+- **Install note:** npm skipped the tree-sitter packages' install scripts; the build worked anyway.
+- **Also written by `engram install`:** a 3-line trigger block in `~/.claude/CLAUDE.md` pointing at
+  the skill (same timestamp as the skill file), as the Consequences list above says. The larger
+  CLAUDE.md section plus the PreToolUse hook belong to the separate `engram claude install`, which
+  we have not run.
+- The "14 nodes / 20 edges / 3 communities" measure in the caveat predates this rebuild.

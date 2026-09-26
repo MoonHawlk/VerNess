@@ -168,11 +168,12 @@ Known defects in the WIP command layer (commit 1515661) — fix before wiring an
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop
 
 ## Cost control (Engram) — ADR-0005
-- [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it)
-- [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet
+- [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it). Re-installed on macOS 2026-09-26; `engram install` also put the `/engram` Claude Code skill in `~/.claude/skills/engram/`
+- [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet. Rebuilt 2026-09-26 (`./turn_on.sh graph`): 315 nodes / 974 edges / 13 communities in ~4 s, into the gitignored `.engram/`
 - [ ] T-102 **Where the payoff is**: build a code-only graph of `deepseek-harness` OUTSIDE the submodule (`engram clone`), so upstream navigation becomes graph queries instead of greps. Time-box it; measure tokens-per-question before/after
 - [ ] T-103 Re-evaluate committing `.engram/graph.json` + `GRAPH_REPORT.md` once `packages/*` holds real TypeScript
 - [ ] T-104 Optional: semantic extraction over `docs/` via the local route (`engram extract --backend ollama`) — only worth it with a stronger local model
+- [ ] T-379 Optional Engram extras not done yet: the description batches, and `engram claude install` (a CLAUDE.md section + a PreToolUse hook). Decide whether the hook earns its per-tool-call cost before installing it
 
 ## Decision layer — Laya / SystemOne protocol (ADR-0009, design in `docs/08-DECISION-LAYER-LAYA.md`)
 
@@ -316,6 +317,21 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [ ] T-364 Stop reading the adapter's `env-api-keys.js` by file path once the substrate exposes provider key names through a public seam (ADR-0010 consequence)
 - [ ] T-366 Windows: sandboxed PowerShell runs in ConstrainedLanguage (restricted token), so .NET type creation fails — including the substrate's own UTF-8 preamble. Measure what an API model can still do under `workspace`, and report upstream if the preamble should degrade gracefully
 - [ ] T-365 Tests: `parseRef`, `effectiveRoute` precedence, catalog-route patch rendering, `.env` parsing — plain node scripts under `scripts/test/`
+
+## Launcher & branch integration — 2026-09-26
+- [x] T-370 `./turn_on.sh off` (alias `stop`, `/off` in the REPL) stops the web UI (port 6173 listener, plus any process matching `profile <web profile>`), the decision sidecar and the local model; `--force` also stops servers VerNess did not start
+- [x] T-371 Integrate the feature branches into the new `epic` branch (`--no-ff`: fix-prompt-redraw, web-composer, models-and-api-routes, t144-parallel-team) and write the branch/version workflow into `05-CONVENTIONS.md`
+- [ ] T-372 Boot the REPL and the web UI from the merged `epic` tree, then run `off` against a real running web UI; also exercise `off` through the Windows PowerShell wrapper. A second checkout must not be booted until T-336 is fixed
+- [x] T-373 `README.md` was committed as UTF-16LE (11eeed4), so grep and GitHub treated it as binary; converted to UTF-8
+
+## Web commands bridge — design on branch `web-commands` (`docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`)
+Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
+`node scripts/verness.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
+- [ ] T-374 Spike: confirm that registering on cordis `ready` leaves `/model` to the substrate, and that headless does not mount the plugin
+- [ ] T-375 `node scripts/verness.mjs --list-commands` emits the quick-tools as JSON; a quick-tool can opt out with `web: false`
+- [ ] T-376 `@verness/commands` dsh plugin: register each listed quick-tool with dsh-commands, and a handler that runs it through the launcher
+- [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
+- [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
