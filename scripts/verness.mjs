@@ -15,6 +15,8 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { modelDown, modelStats, modelUp } from './model.mjs'
+
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
 const NODE_MIN = [22, 19, 0]
@@ -27,6 +29,7 @@ const DEFAULTS = {
     route: 'ollama-local', displayName: 'Ollama (local)', id: 'qwen3:0.6b',
     baseURL: 'http://127.0.0.1:11434/v1', apiKeyEnv: 'OLLAMA_API_KEY',
     apiKeyValue: 'ollama-local-no-auth', contextWindow: 32768, maxTokens: 4096,
+    engine: 'ollama', source: undefined, keepAliveMinutes: 10, autoInstallEngine: true,
     reasoning: false, autoServe: true, autoPull: true,
   },
   extraRoutes: {}, activeRoute: '',
@@ -89,6 +92,9 @@ function loadConfig() {
   }
   return cfg
 }
+
+/** @returns {typeof DEFAULTS} the merged configuration, for the `scripts/model.mjs` entry point. */
+export const loadConfigForCli = () => loadConfig()
 
 /**
  * Run a command, inheriting stdio unless capturing.
@@ -292,45 +298,6 @@ function syncPatch(cfg) {
   ok(`patch synced -> ${join(dir, 'cordis.patch.yml')}`)
 }
 
-// ------------------------------------------------------------------------ ollama
-
-/** @param {string} baseURL - the route base URL. @returns {Promise<boolean>} whether the server answers. */
-async function ollamaUp(baseURL) {
-  const root = String(baseURL).replace(/\/v1\/?$/, '')
-  try {
-    const r = await fetch(`${root}/api/version`, { signal: AbortSignal.timeout(2500) })
-    return r.ok
-  } catch { return false }
-}
-
-/**
- * Make sure the local model server is running and the configured model is present.
- * @param {typeof DEFAULTS} cfg - configuration.
- * @returns {Promise<boolean>} whether the model is ready to serve.
- */
-async function ensureOllama(cfg) {
-  const m = cfg.model
-  if (version('ollama') === undefined) { warn('ollama not found on PATH - install it from https://ollama.com/download'); return false }
-  if (!(await ollamaUp(m.baseURL))) {
-    if (m.autoServe !== true) { warn('ollama server is not running (model.autoServe is false)'); return false }
-    step('starting ollama server')
-    const child = spawn(WIN ? 'ollama.exe' : 'ollama', ['serve'], { detached: true, stdio: 'ignore' })
-    child.on('error', () => { /* reported by the readiness probe below */ })
-    child.unref()
-    for (let i = 0; i < 20 && !(await ollamaUp(m.baseURL)); i++) await new Promise(r => setTimeout(r, 500))
-  }
-  if (!(await ollamaUp(m.baseURL))) { warn(`no ollama server on ${m.baseURL}`); return false }
-  ok(`ollama serving on ${m.baseURL}`)
-  const list = sh('ollama', ['list'], { capture: true, allowFail: true }).out
-  if (!list.includes(m.id.split(':')[0])) {
-    if (m.autoPull !== true) { warn(`model ${m.id} is not pulled (model.autoPull is false)`); return false }
-    step(`pulling ${m.id} (first run only)`)
-    if (sh('ollama', ['pull', m.id]).code !== 0) { warn(`could not pull ${m.id}`); return false }
-  }
-  ok(`model ${m.id} available`)
-  return true
-}
-
 // ---------------------------------------------------------------------- commands
 
 /** Install or repair everything the harness needs. @param {typeof DEFAULTS} cfg - configuration. */
@@ -405,9 +372,20 @@ async function cmdSetup(cfg) {
   }
 
   syncPatch(cfg)
-  await ensureOllama(cfg)
+  await modelUp(cfg)
   step('setup complete')
   info(WIN ? 'next: .\\turn_on.ps1' : 'next: ./turn_on.sh')
+}
+
+/**
+ * @param {string} baseURL - the route base URL.
+ * @returns {Promise<boolean>} whether an engine server answers there.
+ */
+async function engineAnswers(baseURL) {
+  try {
+    const r = await fetch(`${String(baseURL).replace(/\/v1\/?$/, '')}/api/version`, { signal: AbortSignal.timeout(2500) })
+    return r.ok
+  } catch { return false }
 }
 
 /** Print what is installed and what is missing. @param {typeof DEFAULTS} cfg - configuration. */
@@ -417,7 +395,7 @@ async function cmdDoctor(cfg) {
     ['node', process.versions.node, nodeOk() ? 'ok' : `needs ${NODE_MIN.join('.')}+`],
     ['pnpm', version('pnpm') ?? '-', version('pnpm') === undefined ? 'missing' : 'ok'],
     ['dsh', dshv ?? '-', dshv === cfg.substrate.version ? 'ok' : `want ${cfg.substrate.version}`],
-    ['ollama', version('ollama') ?? '-', (await ollamaUp(cfg.model.baseURL)) ? 'serving' : 'not serving'],
+    ['engine', version(cfg.model.engine ?? 'ollama') ?? '-', (await engineAnswers(cfg.model.baseURL)) ? 'serving' : 'not serving'],
     ['engram', version('engram') ?? '-', version('engram') === undefined ? 'optional' : 'ok'],
     ['profile', profileDir(cfg.profile.name), existsSync(profileDir(cfg.profile.name)) ? 'ok' : 'run setup'],
     ['submodule', 'upstream/deepseek-harness', existsSync(join(REPO, 'upstream/deepseek-harness/package.json')) ? 'ok' : 'run setup'],
@@ -442,7 +420,7 @@ async function cmdRun(cfg, task) {
   syncPatch(cfg)
   const route = cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute
   const r = cfg.extraRoutes[route] ?? cfg.model
-  if (String(r.baseURL).includes('11434') && !(await ensureOllama(cfg))) die('the local model is not ready')
+  if (r.engine !== undefined && !(await modelUp(cfg))) die('the local model is not ready')
   const env = {}
   if (r.apiKeyEnv !== undefined && process.env[r.apiKeyEnv] === undefined) {
     if (r.apiKeyValue === undefined) die(`${r.apiKeyEnv} is not set and no apiKeyValue is configured for route "${route}"`)
@@ -478,6 +456,10 @@ commands
   (none)        boot the harness; headless profiles prompt for tasks in a loop
   "<task>"      run one task and exit
   setup         install/repair pnpm, dsh, the profile, its deps and the local model
+  up            start the local model: engine, weights (Hugging Face GGUF), warm-up
+  stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
+  down          unload the model, free its memory and stop the engine we started
+                  (add --force to stop a server VerNess did not start)
   doctor        show what is installed and what is missing
   sync          regenerate profiles/<name>/cordis.patch.yml from verness.config.json
   graph         rebuild the Engram knowledge graph (no LLM calls)
@@ -485,9 +467,24 @@ commands
 
 everything is configured in verness.config.json (personas, tips, model, plugins)`
 
-const [, , first, ...rest] = process.argv
-const cfg = loadConfig()
+// Only act as a CLI when invoked directly: `scripts/model.mjs` imports this module for its config.
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  const [, , first, ...rest] = process.argv
+  const cfg = loadConfig()
+  await dispatch(first, rest, cfg)
+}
+
+/**
+ * Route one command line.
+ * @param {string|undefined} first - the command word, if any.
+ * @param {string[]} rest - the remaining words.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ */
+async function dispatch(first, rest, cfg) {
 switch (first) {
+  case 'up': process.exitCode = (await modelUp(cfg)) ? 0 : 1; break
+  case 'stats': process.exitCode = (await modelStats(cfg)) ? 0 : 1; break
+  case 'down': process.exitCode = (await modelDown(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'setup': await cmdSetup(cfg); break
   case 'doctor': await cmdDoctor(cfg); break
   case 'sync': syncPatch(cfg); break
@@ -496,4 +493,5 @@ switch (first) {
   case 'run': await cmdRun(cfg, rest); break
   case undefined: await cmdRun(cfg, []); break
   default: await cmdRun(cfg, [first, ...rest])
+}
 }

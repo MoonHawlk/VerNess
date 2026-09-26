@@ -111,3 +111,23 @@
     Setup now verifies the outcome by reading the profile's `package.json`. (T-115)
 - Personas are honest about scope: the identity text is really injected (via `system-prompt`), while
   `tools`/`skills` in the config are recorded and NOT yet enforced — that is M4 (T-116).
+
+## 2026-09-25 — model lifecycle: up / stats / down, weights from Hugging Face (ADR-0007)
+- `scripts/model.mjs` owns the local model on all platforms; the launcher exposes it as
+  `./turn_on.sh up | stats | down` (also `npm run model:up|model:stats|model:down`). The duplicated
+  Ollama helper inside `verness.mjs` was removed — one engine code path. (T-120, T-122)
+- Weights now come **from Hugging Face**: `model.source = "hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0"`. Ollama
+  is used purely as the cross-platform runner (native builds for Windows/macOS/Linux, OpenAI-compatible
+  endpoint, pulls GGUF straight from a HF repo), which avoids a Python/PyTorch toolchain. (T-121)
+- Verified on this machine, all three commands:
+  - `up`: engine detected, server adopted, weights present, **warm in 7.5 s**, resident 10 min.
+  - `stats`: resident 5.2 GiB on GPU, 596M params, family qwen3; catalogue of 2; probe **60.2 tok/s**,
+    prompt eval 5732 ms, load 210 ms.
+  - `down`: **5.2 GiB released, 0 models resident**; server left running because VerNess had only
+    adopted it (`--force` overrides, untested here on purpose — it would kill the owner's process).
+  - A harness task through the launcher then called `verness_ping` successfully on the HF model.
+- Traps recorded in ADR-0007: only quants actually published in the HF repo are valid tags
+  (`Q4_K_M` on that repo fails with `400 ... tag is not available`, while `Q8_0` works), and
+  `ollama pull` can print `Error:` while **exiting 0** — so `up` verifies through `/api/tags`.
+- `/api/ps` counts the context allocation, so a 610 MiB GGUF shows as 5.2 GiB resident. That is real
+  memory held — the reason a `down` command exists at all.

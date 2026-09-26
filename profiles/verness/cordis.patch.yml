@@ -12,15 +12,15 @@
       config:
         providers:
           ollama-local:
-            displayName: 'Ollama (local)'
+            displayName: 'Qwen3 0.6B (local, Hugging Face GGUF)'
             apiKeyEnv: OLLAMA_API_KEY
             api: openai-completions
             baseURL: 'http://127.0.0.1:11434/v1'
             defaultContextWindow: 32768
             defaultMaxTokens: 4096
             models:
-              - id: 'qwen3:0.6b'
-                name: 'Ollama (local)'
+              - id: 'hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0'
+                name: 'Qwen3 0.6B (local, Hugging Face GGUF)'
                 contextWindow: 32768
                 reasoningEfforts: false
 
@@ -28,7 +28,7 @@
 - id: agent-default-model
   config:
     provider: ollama-local
-    model: 'qwen3:0.6b'
+    model: 'hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0'
 
 # Persona "generalist" + tips, injected through the existing system-prompt seam.
 - id: system-prompt

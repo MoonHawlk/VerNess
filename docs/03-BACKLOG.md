@@ -95,6 +95,11 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [x] T-113 Profile patch generated from the config (committed for reviewability); `scripts/profile-sync.mjs` removed
 - [x] T-114 Windows `.cmd` shim handling (Node refuses `.cmd` without a shell) with own argument quoting
 - [x] T-115 pnpm exit codes are not trusted — setup verifies outcomes by reading the profile `package.json`
+- [x] T-120 Model lifecycle script (`scripts/model.mjs`): `up` (engine install + serve + HF pull + warm), `stats` (telemetry), `down` (evict weights, stop only our own server, clear run state)
+- [x] T-121 Weights sourced from Hugging Face on every platform: `hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0` (ADR-0007)
+- [x] T-122 Launcher subcommands + npm aliases for the three lifecycle actions; run state in `.verness/run/` (gitignored)
+- [ ] T-123 `stats --watch` for continuous telemetry, and record probe results over time for regression tracking
+- [ ] T-124 Verify `up`/`down` on macOS and Linux (logic is platform-agnostic but only Windows is measured so far)
 - [ ] T-116 Enforce persona `tools.allow`/`tools.deny` from the same config keys once M4 lands (today they are recorded only)
 
 ## Cost control (Engram) — ADR-0005

@@ -26,3 +26,6 @@ verness-spike.log
 
 # Engram generated artifacts (see docs/adr/0005-engram-knowledge-graph.md)
 .engram/
+
+# Launcher run state (pids, logs) — see scripts/model.mjs
+.verness/

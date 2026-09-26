@@ -27,12 +27,23 @@
   },
 
   // -------------------------------------------------------------------- model
-  // A hand-declared OpenAI-compatible route. Ollama needs no adapter of ours.
-  // Swap `id` for any model you have pulled; `autoPull` fetches it if missing.
+  // A hand-declared OpenAI-compatible route. The engine (Ollama) ships native
+  // builds for Windows/macOS/Linux and pulls GGUF weights straight from Hugging
+  // Face, so `source` is the same string on every platform.
+  //   ./turn_on.sh up | stats | down     lifecycle, telemetry, shutdown
   "model": {
+    "engine": "ollama",
+    // Hugging Face GGUF reference: hf.co/<repo>:<quant>. Check available quants at
+    // https://huggingface.co/<repo> — only the quants published there are valid tags.
+    // Ollama-registry names (e.g. "qwen3:0.6b") also work here.
+    "source": "hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0",
     "route": "ollama-local",
-    "displayName": "Ollama (local)",
-    "id": "qwen3:0.6b",
+    "displayName": "Qwen3 0.6B (local, Hugging Face GGUF)",
+    // Must equal `source`: it is the name the engine serves it under.
+    "id": "hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0",
+    // How long the weights stay resident in RAM/VRAM after the last request.
+    "keepAliveMinutes": 10,
+    "autoInstallEngine": true,
     "baseURL": "http://127.0.0.1:11434/v1",
     "apiKeyEnv": "OLLAMA_API_KEY",
     // Any non-empty value: Ollama ignores bearer auth, but pi-ai demands a key.
