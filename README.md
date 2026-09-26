@@ -142,6 +142,7 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 ```sh
 ./turn_on.sh decision up       # start the Laya sidecar (first run installs laya[serve])
 /decide <task text>            # in the REPL: Laya vs the rules, side by side
+/decisions-data label          # label logged decisions (blind); /decisions-data shows the count
 ```
 
 Laya runs in **shadow mode**. It answers three routing questions for each task (`level`, `tier`,

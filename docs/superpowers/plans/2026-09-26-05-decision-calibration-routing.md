@@ -128,14 +128,14 @@ readable; Task 2 treats them as having no probabilities.
   `label [1-5 | s=skip | q=quit]` with the question's options numbered. It writes each label as it
   is entered, so quitting loses nothing. Non-TTY: refuse with `labelling needs a terminal`.
 
-- [ ] **Step 1: Failing tests** for `readLabels` (later wins), `unlabelled` (a label for a different
+- [x] **Step 1: Failing tests** for `readLabels` (later wins), `unlabelled` (a label for a different
 question does not count; `skip` counts as labelled), and `readShadow` (a bad line is skipped,
 legacy ids are derived). Use temp dirs as in the other plans.
-- [ ] **Step 2: Implement** the pure functions and the command. Register the command as
+- [x] **Step 2: Implement** the pure functions and the command. Register the command as
 `name: 'decisions-data'`, alias `dd`, group `decisions`, usage
 `'/decisions-data label | report | refit | gate'`. The existing `/decision` owns the name
 `decisions` as an alias, and the registry test (WS-A Task 2) forbids the clash.
-- [ ] **Step 3: Commit** — `feat(decisions): /decisions-data label, a blind labelling loop (T-220, T-260)`
+- [x] **Step 3: Commit** — `feat(decisions): /decisions-data label, a blind labelling loop (T-220, T-260)`
 
 **Operator step (not code):** label at least 50 records per question. The handoff recommends ~200.
 Record the count and date in `docs/04-PROGRESS.md`. Tasks 3–4 are code that works at any `n`; their

@@ -463,3 +463,17 @@
     That is plausibly better and should be settled by labels.
   - Every confidence is ≤ 0.76. That fits "near chance zero-shot" and is what the refit (T-222) is for.
 - Shadow log now: 14 records, 13 of them v2. **Next**: T-220 `/decisions-data label`.
+
+## 2026-09-26 — WS-E Task 2 done: `/decisions-data label` (T-220 / T-260)
+- `/decisions-data label [--question q] [--limit N]` (alias `/dd`) walks unlabelled shadow records
+  oldest first. By default it asks all three questions per record, so the task is read once.
+  It is blind: the rules' and the model's answers are shuffled and unmarked. Records logged under a
+  different option set (hash mismatch) are not offered. `/decisions-data` alone prints the status
+  table: labelled, skipped and unlabelled per question, against the gate's 50.
+- Input is read through readline's line iterator, not `rl.question()`. `question()` dropped lines
+  that arrived early (a paste) and never settled on EOF. Ctrl+C gets a SIGINT handler scoped to the
+  session, because nothing in the REPL handles SIGINT and it would otherwise kill the REPL.
+- Verified by driving the loop with piped input and a faked TTY (junk rejected; number, name, `s`,
+  `q`; resume at the first unlabelled question; EOF and SIGINT exit cleanly and remove the handler).
+  Those test labels were deleted. `npm test` 139/139.
+- **Next**: operator labelling (T-389, ≥ 50 per question), and in parallel Task 3 (metrics + refit, T-221/T-222).
