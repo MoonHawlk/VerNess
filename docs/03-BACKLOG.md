@@ -102,6 +102,62 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (logic is platform-agnostic but only Windows is measured so far)
 - [ ] T-116 Enforce persona `tools.allow`/`tools.deny` from the same config keys once M4 lands (today they are recorded only)
 
+## Command layer & quick-tools — ADR-0008, design in `docs/07-COMMAND-LAYER.md`
+Survey behind the choices: `docs/research/claude-code-capability-map.md`. Tiers: **L** = launcher-local
+(zero tokens), **S** = needs a substrate seam, **P** = persona/team concept.
+
+### Foundation (do these first, in order)
+- [ ] T-130 **`/btw <note>`** — the first command: append/show/clear/drop operator side notes, persisted to `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, hard character cap with a warning at 80% (L). Spec in `docs/07-COMMAND-LAYER.md`
+- [ ] T-131 Split mutable state into `verness.state.json` so commands never rewrite the commented `verness.config.json` (challenge #4 — decide before any config-writing command)
+- [ ] T-132 Command registry: `scripts/command.mjs` + auto-discovered `scripts/commands/*.mjs`, uniform `{name, summary, usage, group, run(ctx,args)}`, `ctx = {cfg, paths, state, sync, out, dsh}`; REPL dispatch for `/x`, `//` literal escape, unique-prefix match, "did you mean"
+- [ ] T-133 Session-log reader: resolve the concatenated-zstd problem (challenge #2) — prefer `@deepseek-ai/dsh-session-query` over parsing `session.v4.jsonl.zstd` ourselves. **Blocks T-136/T-137**
+- [ ] T-134 `/help` generated from the registry, grouped, with usage lines (L)
+- [ ] T-135 Registry conformance test: load every command file, assert shape, assert no duplicate names/prefixes
+
+### Tier L — local commands, zero token cost
+- [ ] T-136 `/cost` — tokens in/out and wall time for the session; `0` cost on a local route, never an estimated price (challenge #3)
+- [ ] T-137 `/usage` — tokens per route per day, aggregated across sessions
+- [ ] T-138 `/model [route|id]` — show or switch the active route, regenerate the patch, re-sync atomically
+- [ ] T-139 `/persona [id]` — show or switch persona, atomically (challenge #5)
+- [ ] T-140 `/agents` — list personas and teams with their declared tools/skills, labelled **declared, not enforced**
+- [ ] T-141 `/config` — print the resolved configuration and the file path that owns each value
+- [ ] T-142 `/doctor`, `/status` — wrap the existing launcher verbs; `/status` merges doctor + engine stats
+- [ ] T-143 `/stats`, `/up`, `/down` — expose the model lifecycle verbs as commands
+- [ ] T-144 `/sessions`, `/resume <id>`, `/clear` — list from `$DSH_HOME/sessions`, reuse `dsh --session-id`
+- [ ] T-145 `/graph` — rebuild or query the Engram graph without leaving the REPL
+- [ ] T-146 `!<cmd>` shell prefix and `@path` file expansion in the REPL (Claude Code parity, still zero tokens)
+- [ ] T-147 `#<note>` — append to the persistent project/persona brief (the durable sibling of `/btw`)
+- [ ] T-148 `/exit` for symmetry with `/help`
+
+### Tier S — surface an existing substrate capability (do NOT reimplement)
+- [ ] T-150 `/todos` — render the `ctx.todo` projection
+- [ ] T-151 `/compact`, `/context` — expose `packages/compaction` and the assembled-prompt view
+- [ ] T-152 `/export` — reuse `dsh-session-log-export` (it already ships an `/export`)
+- [ ] T-153 `/mcp` — list MCP servers and their tool filters from `packages/mcp`
+- [ ] T-154 `/tools` — registered tools with per-persona allow/deny once M4 enforces it
+- [ ] T-155 `/permissions` — persona tool policy on `tools/pre-execute` (M4 work, surfaced here)
+- [ ] T-156 `/hooks` — read-only list of mounted Cordis listeners per event
+- [ ] T-157 `/goal` — drive the existing `ctx.goals` (aligns with M7)
+- [ ] T-158 `/rewind` — session replay/fork; needs a UX decision before any code
+- [ ] T-159 `/schedule`, `/jobs` — surface `ctx.schedule` and `ctx.jobs`
+- [ ] T-160 `/evaluate` — run an evaluator suite against the last result (M7)
+- [ ] T-161 Promote `/btw` notes to a durable `SessionEvent` contributed by a plugin, retiring the resend compromise
+
+### Personas as files (supersedes the inline config block)
+- [ ] T-162 `personas/<id>.yaml` schema: identity, prompt prefix/suffix, `models.requirements`, tools allow/deny/approval, skills, evaluators, exposed commands
+- [ ] T-163 Loader + validation with file/line diagnostics; `personas.active` resolves to a file
+- [ ] T-164 Author the real personas: `data-scientist`, `data-analyst`, `software-engineer`, `researcher`, `reviewer`
+- [ ] T-165 Persona-scoped commands: a persona may add its own commands (e.g. `/profile-data`), loaded from `personas/<id>/commands/*.mjs`
+- [ ] T-166 Every surface that prints policy marks it **declared** until M4/M5/M7 enforce it (challenge #6)
+
+### Teams & multiple tasks
+- [ ] T-167 `teams/<id>.yaml`: member personas + ordered task list + failure policy (stop | skip | retry-once — challenge #10)
+- [ ] T-168 `/team list|run|status` — v1 runs tasks sequentially, one `dsh` session per task per persona
+- [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`
+- [ ] T-170 Run artifacts: `.verness/runs/<timestamp>/` with per-task status, usage and outputs; `/team status` reads it
+- [ ] T-171 Measure before promising parallelism: two concurrent sessions contend for one local model
+- [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop
+
 ## Cost control (Engram) — ADR-0005
 - [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it)
 - [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet

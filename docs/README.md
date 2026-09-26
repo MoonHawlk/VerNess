@@ -15,6 +15,7 @@ Read in this order:
 | [04-PROGRESS.md](04-PROGRESS.md) | Append-only log: what was done, when, in which commit |
 | [05-CONVENTIONS.md](05-CONVENTIONS.md) | Repo/commit/doc/test conventions and how to resume work |
 | [06-SETUP-AND-LAUNCHER.md](06-SETUP-AND-LAUNCHER.md) | The setup file and the cross-platform launcher (start here to run it) |
+| [07-COMMAND-LAYER.md](07-COMMAND-LAYER.md) | Planned command layer, personas-as-files and teams (design only) |
 | [RUNBOOK.md](RUNBOOK.md) | Manual commands behind the launcher, and every gotcha we hit |
 | [adr/](adr/) | Architecture Decision Records (one file per irreversible choice) |
 | [research/](research/) | Read-only digests of upstream repos (source of truth for seam names) |

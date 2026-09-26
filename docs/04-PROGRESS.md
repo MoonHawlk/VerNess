@@ -138,3 +138,29 @@
 - Documented three exits in `docs/06-SETUP-AND-LAUNCHER.md`, least-commitment first: `.\turn_on.cmd`
   (works from PowerShell too), `npm start`, or `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
   `turn_on.cmd` is therefore the recommended Windows entry point, not the `.ps1`.
+
+## 2026-09-26 — command layer planned (design only, nothing implemented)
+- Wrote `docs/research/claude-code-capability-map.md`: every user-facing Claude Code capability that
+  could be enumerated — slash commands, CLI flags, input prefixes, memory, settings, hooks, tools,
+  subagents, skills, MCP, plan/permission modes, context management, sessions, cost/usage, IDE, SDK,
+  scheduling — each mapped to launcher-local (**L**), substrate seam (**S**), persona/team (**P**) or
+  not-applicable (**N**). Compiled from the assistant's own knowledge plus this session's surfaced
+  listings, and flagged as intent rather than contract: re-check each name against `claude --help`
+  when it is implemented.
+- Wrote `docs/07-COMMAND-LAYER.md` (design) and ADR-0008 (the decision): commands are one file each
+  under `scripts/commands/`, auto-discovered, zero-token by default; personas become files under
+  `personas/`; teams get `teams/<id>.yaml` plus a sequential v1 runner.
+- Backlog gained T-130..T-172 in five ordered groups (foundation, tier L, tier S, personas-as-files,
+  teams). **T-130 is `/btw`** — the operator side-note command — specified in full.
+- Three findings that shape the plan:
+  - `/agents`, `/permissions`, `/output-style` and `/review` all collapse into the **persona**
+    concept, which argues for finishing M4 before widening the command surface.
+  - Most substrate-backed commands (`/compact`, `/export`, `/todos`, `/mcp`, `/rewind`) already exist
+    upstream and need *surfacing*, not building — rebuilding one is the cheapest way to waste a week.
+  - **Open blocker for `/cost` and `/usage` (T-133):** session logs are `session.v4.jsonl.zstd`,
+    concatenated zstd frames. `zstdDecompressSync` decodes only the first frame (a 15 KB log read as
+    a single event) and a stream attempt aborted. Prefer `@deepseek-ai/dsh-session-query` over
+    hand-parsing that format.
+- Process note: the task asked for a subagent to compile the capability list; the fork executing it
+  cannot spawn subagents, so the list was compiled inline. It is a single-source survey and deserves a
+  second pass before T-134 onward.
