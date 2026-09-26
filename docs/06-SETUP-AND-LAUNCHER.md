@@ -22,7 +22,13 @@ shell on Windows and quotes every argument itself).
 ./turn_on.sh sync           # regenerate the profile patch from the config
 ./turn_on.sh graph          # rebuild the Engram knowledge graph (no LLM calls)
 ./turn_on.sh help
+
+./turn_on.sh models add <hf url | org/repo[:quant]> --use   # install a local model and switch to it
+./turn_on.sh api use <provider> <model>                     # run the agent on a hosted model (key in .env)
+./turn_on.sh api local                                      # back to the local model
+./turn_on.sh access workspace                               # how far shell/file tools reach
 ```
+Models and hosted routes are covered in full in [`11-MODELS-AND-API.md`](11-MODELS-AND-API.md).
 Windows: `.\turn_on.cmd <same commands>` works everywhere, including from PowerShell.
 `.\turn_on.ps1` is equivalent but **PowerShell blocks unsigned scripts by default**:
 
@@ -51,8 +57,8 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
 | `substrate` | pinned `dsh` and pnpm versions (keep in lockstep with the submodule tag — ADR-0002) |
 | `profile` | profile name and the template it is created from (`headless`, `web`, `acp`, `sdk`) |
 | `model` | the local/OpenAI-compatible route: model id, base URL, context window, auto-serve, auto-pull |
-| `extraRoutes` | additional named routes (paid providers); keys are route names |
-| `activeRoute` | which route the agent uses; empty means the `model` route |
+| `extraRoutes` | additional named routes; with `api` + `baseURL` a hand-declared gateway, without them a catalog provider (key = the adapter's provider id) |
+| `activeRoute` | the default route; empty means the `model` route. `/api use` overrides it in state without editing this file |
 | `personas` | `active` plus `definitions`: identity `prefix`/`suffix`, and forward-declared `tools`/`skills` |
 | `tips` | standing guidance appended to the persona; every line costs tokens on every turn |
 | `settings.toolsMode` | `native` (default), `ptc`, or `both` |

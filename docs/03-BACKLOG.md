@@ -278,6 +278,26 @@ Autonomous task loop (`/loop-task`, research: `docs/research/task-loop-machinery
 - [ ] T-327 Per-round wall-clock budget — the research found no per-turn timeout in the harness, only token and round limits
 - [ ] T-328 Surface loop runs in `/dashboard`; they are already recorded in `.verness/loops/*.jsonl`
 
+## Models & API routes — ADR-0010, guide in `docs/11-MODELS-AND-API.md`
+Goal: installing a new model, or moving the agent onto a hosted API model that can act on the
+environment, is one command — no config edit, no guessing quants, no frozen route.
+- [x] T-350 One route resolver (`scripts/lib/routes.mjs#effectiveRoute`) used by the patch, the run loop, `/doctor`, `/model` and the prompt; precedence `/api`/`/model` state -> persona -> `activeRoute` -> local, and a model choice is bound to its route (no local id ever sent to a provider)
+- [x] T-351 Catalog routes: providers, models and key variables read from the installed adapter (no vendor named in our code); the patch declares only `apiKeyEnv` for them. Verified: `dsh --dump-config` composes it, and a task with an invalid key reaches the provider (`401 authentication_error`)
+- [x] T-352 `/api` — list providers with key status, `models <provider>`, `use <provider> <model>` (catalog-validated), `key <provider>`, `local`
+- [x] T-353 `.env` loading (gitignored, shell wins) + `.env.example`; a missing key refuses the task with the exact line to add, before the substrate runs
+- [x] T-354 `/models` — `add <HF url | org/repo[:quant] | registry-name> [--use]` validates the quant against the repo's published GGUF files and picks one when omitted; `search`, `list`, `rm [--purge]`
+- [x] T-355 The local route declares every registered model, and `modelUp` brings up the model actually chosen — `/model <id>` no longer fails with `UNKNOWN_MODEL`, and its "pulled on the next run" message is now true
+- [x] T-356 `/access read-only | workspace | full --yes` sets the substrate sandbox mode for launched runs; the REPL re-resolves route, key and access every turn. Verified in the session log (`sandbox/mode`); a write under read-only was denied
+- [ ] T-357 **First run with a real key**: one API turn that forces a tool call (e.g. list `docs/` and write a file under the workspace), recorded in `04-PROGRESS.md`. Nothing above proves a successful hosted turn yet
+- [ ] T-358 `/api test [provider]` — a one-token probe that confirms key + model before a long task; must say it costs tokens and ask first (command-layer cost rule)
+- [ ] T-359 Setup wizard: `./turn_on.sh setup --api` asks for a provider, writes the key to `.env` with hidden input, and runs `/api use` — first-run to working hosted agent in one step
+- [ ] T-360 `/models add` on hardware: warn when the chosen GGUF will not fit free RAM/VRAM (sizes are already read from the repo), and suggest a smaller quant
+- [ ] T-361 Model presets per persona: `persona.model = { route, id }` for hosted routes, surfaced in `/agents`, so a reviewer persona can run on a stronger model than the worker
+- [ ] T-362 Per-route price table for `/cost` (operator-written, never guessed — challenge #3 in `07-COMMAND-LAYER.md`)
+- [ ] T-363 `/workspace <dir>` — point the agent's working directory (and so the `workspace` sandbox root) at another project instead of this repo
+- [ ] T-364 Stop reading the adapter's `env-api-keys.js` by file path once the substrate exposes provider key names through a public seam (ADR-0010 consequence)
+- [ ] T-365 Tests: `parseRef`, `effectiveRoute` precedence, catalog-route patch rendering, `.env` parsing — plain node scripts under `scripts/test/`
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
