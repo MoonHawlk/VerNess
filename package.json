@@ -10,8 +10,12 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
+    "start": "node scripts/verness.mjs",
+    "setup": "node scripts/verness.mjs setup",
+    "doctor": "node scripts/verness.mjs doctor",
+    "sync": "node scripts/verness.mjs sync",
+    "graph": "node scripts/verness.mjs graph",
     "typecheck": "tsc -b tsconfig.json",
-    "test": "vitest run",
-    "profile:sync": "node scripts/profile-sync.mjs"
+    "test": "vitest run"
   }
 }

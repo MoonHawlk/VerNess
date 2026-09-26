@@ -1,0 +1,100 @@
+// VerNess setup file — the one place for day-to-day adjustments.
+// JSON with // comments and trailing commas allowed. Every field is optional:
+// anything omitted falls back to the defaults in scripts/verness.mjs.
+//
+//   ./turn_on.sh            (macOS/Linux)      .\turn_on.ps1        (Windows)
+//   ./turn_on.sh setup      first-time install / repair
+//   ./turn_on.sh doctor     what is installed, what is missing
+//   ./turn_on.sh "task"     one-shot task
+//
+// After changing this file, `./turn_on.sh sync` regenerates
+// profiles/<name>/cordis.patch.yml. `start` and `run` sync automatically.
+{
+  // ---------------------------------------------------------------- substrate
+  "substrate": {
+    // Pinned dsh version. Must match the upstream submodule tag (ADR-0002).
+    "version": "0.1.7-rc.2",
+    "pnpmVersion": "11.7.0",
+  },
+
+  // ------------------------------------------------------------------ profile
+  "profile": {
+    "name": "verness",
+    // Template the profile is created from: headless (one-shot tasks, the
+    // default) | web (browser UI) | acp | sdk. Changing this needs a re-run of
+    // `setup`; an existing profile is never recreated.
+    "template": "headless",
+  },
+
+  // -------------------------------------------------------------------- model
+  // A hand-declared OpenAI-compatible route. Ollama needs no adapter of ours.
+  // Swap `id` for any model you have pulled; `autoPull` fetches it if missing.
+  "model": {
+    "route": "ollama-local",
+    "displayName": "Ollama (local)",
+    "id": "qwen3:0.6b",
+    "baseURL": "http://127.0.0.1:11434/v1",
+    "apiKeyEnv": "OLLAMA_API_KEY",
+    // Any non-empty value: Ollama ignores bearer auth, but pi-ai demands a key.
+    "apiKeyValue": "ollama-local-no-auth",
+    "contextWindow": 32768,
+    "maxTokens": 4096,
+    // Set true only for models that expose thinking levels.
+    "reasoning": false,
+    "autoServe": true,
+    "autoPull": true,
+  },
+
+  // Extra routes for paid providers. Keys are route names; each takes the same
+  // fields as `model` plus `api`. Only `apiKeyEnv` references are stored here —
+  // never a key itself. Switch with "activeRoute" below.
+  "extraRoutes": {},
+
+  // Route the agent actually uses. Empty string = the `model` route above.
+  "activeRoute": "",
+
+  // ----------------------------------------------------------------- personas
+  // Until the persona subsystem lands (M4), a persona is its identity text:
+  // it is injected through the existing system-prompt seam. `tools` and
+  // `skills` are recorded now and enforced from M4 on — they do nothing yet.
+  "personas": {
+    "active": "generalist",
+    "definitions": {
+      "generalist": {
+        "prefix": "You are a careful engineering assistant working inside the VerNess harness.",
+        "suffix": "State what you verified and what you assumed. Never claim a command succeeded unless you ran it.",
+        "tools": { "allow": [], "deny": [] },
+        "skills": [],
+      },
+      "data-analyst": {
+        "prefix": "You are a data analyst. Reduce every question to the cheapest reliable computation before reasoning about it.",
+        "suffix": "Prefer SQL or a deterministic script over prose estimation. Always show the query you ran and attach its result as evidence.",
+        "tools": { "allow": [], "deny": ["shell.execute"] },
+        "skills": ["statistics", "sql"],
+      },
+    },
+  },
+
+  // --------------------------------------------------------------------- tips
+  // Short standing guidance appended to the active persona's suffix. Keep them
+  // few and concrete — every line costs tokens on every single turn.
+  "tips": [
+    "Working directory is the VerNess repo; upstream/ is a read-only submodule.",
+    "Prefer small, verifiable steps over long plans.",
+  ],
+
+  // ----------------------------------------------------------------- settings
+  "settings": {
+    // Tool presentation: native (default) | ptc | both.
+    "toolsMode": "native",
+    // Extra plugin rows are generated from this list. `path` is a local package
+    // installed into the profile; omit it for a published package.
+    "plugins": [
+      { "id": "verness-spike", "package": "@verness/spike", "path": "packages/spike", "enabled": true },
+    ],
+    // Substrate packages our plugins import. These are LINKED to the running
+    // runtime's own copy, never installed as a second copy — two copies break
+    // every tool call (see docs/RUNBOOK.md, module-identity fault).
+    "linkedSubstratePackages": ["@deepseek-ai/dsh-tools"],
+  },
+}

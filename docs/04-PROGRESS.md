@@ -92,3 +92,22 @@
   we currently navigate by grep — that graph must be built outside the submodule (ADR-0002), tracked
   as T-102.
 - `.engram/` is gitignored for now (T-103 revisits committing `graph.json` once we have real code).
+
+## 2026-09-25 — one setup file, one cross-platform launcher (ADR-0006)
+- `verness.config.json` is now the only file to edit for day-to-day work: substrate pins, profile,
+  model routes, active route, personas, tips, plugins, tools mode. JSON with `//` comments.
+- `scripts/verness.mjs` (plain Node, no dependencies) does setup/start/run/sync/doctor/graph;
+  `turn_on.sh`, `turn_on.ps1` and `turn_on.cmd` are thin wrappers, so Windows/macOS/Linux share one
+  implementation. `profiles/<name>/cordis.patch.yml` is now GENERATED from the config and still
+  committed for reviewability. `scripts/profile-sync.mjs` removed. (T-110..T-113)
+- Verified on this machine: `doctor` (all green), `sync` (block-scalar persona text), `setup` (clean
+  and idempotent on re-run), and a one-shot task that called `verness_ping` through the launcher.
+- Two platform lessons now encoded in the launcher:
+  - **Windows `.cmd` shims**: Node refuses to spawn `pnpm`/`dsh`/`engram` without a shell (EINVAL
+    since 20.12). The launcher opts into the shell on Windows and quotes every argument itself,
+    assembling the command line to avoid DEP0190. (T-114)
+  - **pnpm exit codes lie**: `ERR_PNPM_IGNORED_BUILDS` (@google/genai, protobufjs) and peer warnings
+    make `pnpm add` exit 1 after a successful install, which produced false "could not add" errors.
+    Setup now verifies the outcome by reading the profile's `package.json`. (T-115)
+- Personas are honest about scope: the identity text is really injected (via `system-prompt`), while
+  `tools`/`skills` in the config are recorded and NOT yet enforced — that is M4 (T-116).

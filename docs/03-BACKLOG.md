@@ -88,6 +88,15 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [ ] T-093 PII policy on `fs/*-intent` and tool arguments
 - [ ] T-094 `ctx.invariants` registrations for our own subsystems
 
+## Developer experience — ADR-0006
+- [x] T-110 `verness.config.json` setup file (JSONC): substrate pins, profile, model routes, personas, tips, plugins, settings
+- [x] T-111 `scripts/verness.mjs` launcher: `setup | start | run | sync | doctor | graph`, all platform differences isolated
+- [x] T-112 `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd` wrappers + npm script aliases
+- [x] T-113 Profile patch generated from the config (committed for reviewability); `scripts/profile-sync.mjs` removed
+- [x] T-114 Windows `.cmd` shim handling (Node refuses `.cmd` without a shell) with own argument quoting
+- [x] T-115 pnpm exit codes are not trusted — setup verifies outcomes by reading the profile `package.json`
+- [ ] T-116 Enforce persona `tools.allow`/`tools.deny` from the same config keys once M4 lands (today they are recorded only)
+
 ## Cost control (Engram) — ADR-0005
 - [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it)
 - [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet
