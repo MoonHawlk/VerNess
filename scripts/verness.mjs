@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { loadCommands, runCommand } from './lib/commands.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
+import { listSessions } from './lib/sessions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
@@ -348,15 +349,47 @@ function resolveRoute(cfg) {
 }
 
 /**
+ * @param {string} identity - a session identity.
+ * @returns {string} the short form used in output.
+ */
+const shortSession = identity => String(identity).replace(/^session-/, '').slice(0, 8)
+
+/**
+ * One substrate session, reused across turns.
+ *
+ * Without this every REPL line was a fresh session, so the model started blind each time - it could
+ * not remember the previous answer, let alone build on it. `--session-id` only *adopts* an existing
+ * session ("does not exist; omit --session-id to start a new Session"), so the first turn runs
+ * without it and we then identify the session it created by diffing the session list. The durable
+ * session log stays the single source of truth for context; we only hold its id.
+ * @param {string} workspaceKey - the workspace filter for session discovery.
+ * @returns {{id: () => string|undefined, adopt: (id: string) => void, reset: () => void, capture: (before: Set<string>) => void, snapshot: () => Set<string>}} the handle.
+ */
+function conversation(workspaceKey) {
+  let id = readState().session
+  return {
+    id: () => id,
+    adopt: next => { id = next; writeState({ session: next }) },
+    reset: () => { id = undefined; writeState({ session: undefined }) },
+    snapshot: () => new Set(listSessions({ workspace: workspaceKey, limit: 60 }).map(x => x.identity)),
+    capture: before => {
+      const fresh = listSessions({ workspace: workspaceKey, limit: 60 }).find(x => !before.has(x.identity))
+      if (fresh !== undefined) { id = fresh.identity; writeState({ session: fresh.identity }) }
+    },
+  }
+}
+
+/**
  * Build the context every quick-tool receives. Commands run in this process: no model call and no
  * tokens, which is the whole reason they live outside the agent loop.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @param {Map<string, object>} commands - the loaded registry.
  * @returns {object} the command context.
  */
-function makeCtx(cfg, commands) {
+function makeCtx(cfg, commands, convo) {
   const { env } = resolveRoute(cfg)
   return {
+    conversation: convo,
     cfg,
     commands,
     sh,
@@ -551,12 +584,25 @@ async function cmdRun(cfg, task) {
   }
 
   const args = ['--profile', cfg.profile.name]
-  if (task.length > 0) { dsh([...args, task.join(' ')], { env }); return }
+  const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+
+  if (task.length > 0) {
+    // `--continue` (or `-c`) carries the previous conversation into a one-shot run.
+    const wants = task[0] === '--continue' || task[0] === '-c'
+    const text = (wants ? task.slice(1) : task).join(' ')
+    const prior = wants ? convo.id() : undefined
+    if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
+    const before = prior === undefined ? convo.snapshot() : undefined
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env })
+    if (before !== undefined) convo.capture(before)
+    return
+  }
   if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env }); return }
 
   const commands = await loadCommands()
   step(`ready - persona "${activePersonaId(cfg)}", model ${r.id} via ${route}`)
   info(`type a task, or /help for ${new Set([...commands.values()]).size} quick-tools; empty line or ctrl+c exits`)
+  if (convo.id() !== undefined) info(`continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   for (;;) {
     const line = (await rl.question(paint(C.cyan, '\nverness> '))).trim()
@@ -565,11 +611,19 @@ async function cmdRun(cfg, task) {
     // be swallowed by the registry.
     if (line.startsWith('/')) {
       // Re-read the config: an earlier command may have switched persona or model.
-      const { handled } = await runCommand(line, makeCtx(loadConfig(), commands))
+      const { handled } = await runCommand(line, makeCtx(loadConfig(), commands, convo))
       if (!handled) warn(`no such command: ${line.split(/\s+/)[0]} - try /help`)
       continue
     }
-    dsh([...args, line], { env })
+    // Every turn after the first adopts the session the first one created, so the model keeps its
+    // own history instead of meeting each question cold.
+    const prior = convo.id()
+    const before = prior === undefined ? convo.snapshot() : undefined
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), line], { env })
+    if (before !== undefined) {
+      convo.capture(before)
+      if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)
+    }
   }
   rl.close()
 }
@@ -617,7 +671,8 @@ async function dispatch(first, rest, cfg) {
   // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
   const commands = await loadCommands()
   if (first !== undefined && (first.startsWith('/') || (!first.includes(' ') && commands.has(first.toLowerCase())))) {
-    const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands))
+    const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+    const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands, convo))
     if (handled) { process.exitCode = code; return }
   }
 switch (first) {
