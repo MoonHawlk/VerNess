@@ -4,7 +4,7 @@
  * @module scripts/lib/util
  */
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -88,6 +88,58 @@ export function sh(cmd, args, opts = {}) {
     ? spawnSync([cmd, ...args.map(winQuote)].join(' '), { ...base, shell: true })
     : spawnSync(cmd, args, base)
   return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
+}
+
+/**
+ * Spawn a process without blocking the event loop, so several can run at once. Mirrors `spawnSync`'s
+ * contract: stdin is closed (a child reading a non-TTY stdin would otherwise wait forever), a spawn
+ * failure resolves with code 1 instead of rejecting, and the promise settles on `close`, after the
+ * output streams are drained.
+ * @param {string} file - executable (or a whole command line when `opts.shell` is set).
+ * @param {string[]} args - arguments.
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, shell?: boolean}} [opts] - options.
+ * @returns {Promise<{code: number, out: string}>} exit status and captured output.
+ */
+export function spawnAsync(file, args, opts = {}) {
+  return new Promise(res => {
+    const chunks = []
+    let settled = false
+    const done = code => {
+      if (settled) return
+      settled = true
+      res({ code, out: Buffer.concat(chunks).toString('utf8').trim() })
+    }
+    let child
+    try {
+      child = spawn(file, args, {
+        cwd: opts.cwd ?? REPO,
+        env: { ...process.env, ...opts.env },
+        stdio: opts.capture === true ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
+        shell: opts.shell === true,
+      })
+    } catch (e) {
+      chunks.push(Buffer.from(String(e.message)))
+      done(1)
+      return
+    }
+    child.stdout?.on('data', c => chunks.push(c))
+    child.stderr?.on('data', c => chunks.push(c))
+    child.on('error', e => { chunks.push(Buffer.from(String(e.message))); done(1) })
+    child.on('close', code => done(code ?? 1))
+  })
+}
+
+/**
+ * The asynchronous `sh`: same quoting, same shell rule on Windows, but it does not block.
+ * @param {string} cmd - executable name.
+ * @param {string[]} args - arguments.
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string}} [opts] - options.
+ * @returns {Promise<{code: number, out: string}>} exit status and captured output.
+ */
+export function shAsync(cmd, args, opts = {}) {
+  return WIN
+    ? spawnAsync([cmd, ...args.map(winQuote)].join(' '), [], { ...opts, shell: true })
+    : spawnAsync(cmd, args, opts)
 }
 
 /**

@@ -140,7 +140,8 @@ export async function runTeam(team, ctx, opts = {}) {
    */
   const execute = async t => {
     const persona = personaFor(team, t, personas, ctx.activePersonaId)
-    const overlay = writePersonaOverlay(persona, ctx.cfg)
+    // One overlay per task, kept beside its transcript: concurrent tasks must not share the file.
+    const overlay = writePersonaOverlay(persona, ctx.cfg, join(dir, `${t.id}.patch.yml`))
     const context = t.dependsOn
       .map(d => done.get(d))
       .filter(r => r !== undefined && r.output !== '')
@@ -149,9 +150,11 @@ export async function runTeam(team, ctx, opts = {}) {
     const prompt = context === '' ? t.prompt : `${t.prompt}\n\n--- context from upstream tasks ---\n${context}`
     const t0 = Date.now()
     // ctx.dsh spawns the substrate's JS entry directly: a prompt carrying newlines or several
-    // kilobytes of upstream context would be truncated by cmd.exe otherwise.
-    const run = ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
-    const r = run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env: ctx.routeEnv })
+    // kilobytes of upstream context would be truncated by cmd.exe otherwise. The async variant is
+    // what makes concurrency real: a synchronous spawn blocks the event loop, so Promise.race below
+    // would only ever see one task at a time (T-144).
+    const run = ctx.dshAsync ?? ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
+    const r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env: ctx.routeEnv })
     const seconds = (Date.now() - t0) / 1000
     const rec = { id: t.id, persona: persona.id, code: r.code, seconds, output: r.out, file: join(dir, `${t.id}.md`) }
     writeFileSync(rec.file, [

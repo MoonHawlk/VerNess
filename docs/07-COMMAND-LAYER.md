@@ -92,7 +92,8 @@ M4–M7 land. Any command that displays them must label them as declared, or the
 
 ## Teams and multiple tasks (T-150..T-154)
 
-A team is a named set of personas plus a task list: `teams/<id>.yaml`. v1 runs tasks **sequentially**,
+A team is a named set of personas plus a task list: `teams/<id>.yaml`. v1 runs tasks **sequentially**
+by default (`--parallel N` overlaps independent tasks since T-144),
 each in its own `dsh` session under its own persona, collecting per-task status, artifacts and usage
 into `.verness/runs/<timestamp>/`. That is a launcher loop, and it will be labelled as one — the real
 implementation belongs on `ctx.subagents` and `ctx.jobs` (T-154), which already exist upstream.

@@ -33,9 +33,10 @@ tasks can wear different personas without interfering.
 
 ## Before you trust a fan-out
 
-`--parallel` is **not yet real**: the runner calls a synchronous spawn, so tasks execute one at a
-time whatever the number says (T-144). Concurrency also has to respect the decision sidecar's
-`LAYA_MAX_CONCURRENT` (default 16, excess returns 503) once routing is wired.
+`--parallel N` runs up to N independent tasks at once (T-144); dependencies still order the work.
+Measure before relying on it: one local model serving several sessions contends for the same
+weights, so parallel can be slower than sequential on one machine. Concurrency also has to respect
+the decision sidecar's `LAYA_MAX_CONCURRENT` (default 16, excess returns 503) once routing is wired.
 
 Each task is a *fresh* session with no shared history — only what `dependsOn` passes forward. That
 is deliberate (it is the Hermes `delegate_task` contract: a subagent gets the goal and its context,
