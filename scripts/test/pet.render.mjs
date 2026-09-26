@@ -48,15 +48,23 @@ assert.equal(moodOf(remote).mood, 'happy', 'a remote route is never "down" just 
 // Art: fixed width per mood, so the side-by-side panel stays aligned.
 for (const m of ['happy', 'sleepy', 'worried']) {
   const a = petArt(m)
-  assert.equal(a.length, 6)
-  assert.ok(a.every(l => l.length === 12), `${m} art is 12 columns wide`)
+  assert.equal(a.length, 10)
+  assert.ok(a.every(l => l.length === 18), `${m} art is 18 columns wide`)
+  assert.equal(a[1].trim(), '/\\', `${m} has an apex`)
+  assert.equal(a[9], `/${'_'.repeat(16)}\\`, `${m} has a closed base`)
+  for (const [i, l] of a.slice(1).entries()) {
+    assert.equal(l.indexOf('/'), 8 - i, `${m} row ${i} left side is straight`)
+    assert.equal(l.lastIndexOf('\\'), 9 + i, `${m} row ${i} right side is straight`)
+  }
 }
 assert.match(petArt('sleepy')[0], /z Z/)
+assert.ok(petArt('happy').join('\n').includes("'-..-'"), 'happy smiles')
+assert.ok(petArt('worried').join('\n').includes('(O)  (O)'), 'worried stares')
 
 // Wide terminal: art beside the panel, every line within the width.
 const wide = renderPet(base(), { columns: 100 })
 assert.ok(!wide.some(l => ANSI.test(l)), 'stdout is not a TTY here, so no escape codes')
-assert.ok(wide.some(l => l.includes('/\\_____/\\') && l.includes('versions')), 'side by side')
+assert.ok(wide.some(l => l.includes('/  \\') && l.includes('versions')), 'side by side')
 assert.ok(wide.every(l => l.length < 100), 'fits 100 columns, leaving the last one free')
 const text = wide.join('\n')
 for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 0.32.13', 'up - qwen3:0.6b warm 800 MiB',
@@ -66,7 +74,7 @@ for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 
 
 // Narrow terminal and pipes (columns undefined): stacked, and still within the width when known.
 const narrow = renderPet(base(), { columns: 50 })
-assert.ok(!narrow.some(l => l.includes('/\\_____/\\') && l.includes('versions')), 'stacked under 64 columns')
+assert.ok(!narrow.some(l => l.includes('/  \\') && l.includes('versions')), 'stacked under 64 columns')
 assert.ok(narrow.every(l => l.length < 50), 'fits 50 columns, leaving the last one free')
 assert.ok(narrow.some(l => l.includes('~')), 'long lines are cut, visibly')
 const piped = renderPet(base(), {})

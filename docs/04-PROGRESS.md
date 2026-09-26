@@ -304,4 +304,8 @@
 - It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
   `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
   before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.
+- Redesigned on request: Ness is now a **triangle with a face in it** (brows, pupils, a two-row curved
+  smile; closed eyes and `z Z` when sleepy; raised brows, a frown and `!` when worried). The triangle
+  is generated from the face rows, so its sides stay straight whatever the mood draws inside, and
+  the panel is bottom-aligned so Ness speaks beside its base.
 

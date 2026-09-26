@@ -178,27 +178,38 @@ export function moodOf(v) {
   return { mood: 'happy', says: 'all workers awake. what are we building?' }
 }
 
-/** The face per mood: eyes, mouth, and what floats above the ears. ASCII only - legacy consoles mangle the rest. */
+/**
+ * The face per mood, row by row inside the triangle (row k has 2k columns inside the sides), plus
+ * what floats beside the apex. ASCII only - legacy consoles mangle the rest.
+ */
 const FACES = {
-  happy: { top: '            ', eyes: '^   ^', mouth: '=w=' },
-  sleepy: { top: '       z Z  ', eyes: '-   -', mouth: '=o=' },
-  worried: { top: '        !   ', eyes: 'o   o', mouth: '=~=' },
+  happy: { top: '', rows: { 4: '_    _', 5: '(o)  (o)', 6: "'.    .'", 7: "'-..-'" } },
+  sleepy: { top: 'z Z', rows: { 5: '(-)  (-)', 6: '.--.' } },
+  worried: { top: '!', rows: { 4: '/    \\', 5: '(O)  (O)', 6: '.--.', 7: "'    '" } },
 }
+/** Rows from apex to base; the base is row TRI - 1. */
+const TRI = 9
 
 /**
+ * Ness is a triangle with a face in it. Built from the face rows rather than drawn by hand, so the
+ * sides stay symmetric whatever the mood puts inside.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} six lines, each exactly 12 columns wide.
+ * @returns {string[]} ten lines (mood marks, then the triangle), each exactly 18 columns wide.
  */
 export function petArt(mood) {
   const f = FACES[mood] ?? FACES.happy
-  return [
-    f.top,
-    ' /\\_____/\\  ',
-    `(  ${f.eyes}  ) `,
-    `(   ${f.mouth}   ) `,
-    ' )       (  ',
-    '(__)---(__) ',
-  ]
+  const width = 2 * TRI
+  const center = (s, n) => {
+    const left = Math.floor((n - s.length) / 2)
+    return ' '.repeat(left) + s + ' '.repeat(n - s.length - left)
+  }
+  const rows = []
+  for (let k = 0; k < TRI; k++) {
+    const inner = k === TRI - 1 ? '_'.repeat(2 * k) : center(f.rows[k] ?? '', 2 * k)
+    const pad = ' '.repeat(TRI - 1 - k)
+    rows.push(`${pad}/${inner}\\${pad}`)
+  }
+  return [`${' '.repeat(TRI + 2)}${f.top}`.padEnd(width), ...rows]
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -278,7 +289,7 @@ export function renderPet(v, opts = {}) {
   const cols = opts.columns
   const side = cols !== undefined && cols >= 64
   // One column of slack: a line that fills the last column makes conhost wrap an empty line.
-  const room = side ? cols - art[0].length - 4 : (cols ?? Infinity) - 3
+  const room = side ? cols - art[0].length - 6 : (cols ?? Infinity) - 3
 
   const draw = ([l, parts]) => {
     let left = room - (parts === title ? 0 : label + 2)
@@ -292,15 +303,19 @@ export function renderPet(v, opts = {}) {
   const panel = rows.map(draw)
   const speech = `${paint('cyan', `${v.name}:`)} ${fit(says, room - v.name.length - 2)}`
 
-  if (!side) return [...art.map(a => `  ${paint('cyan', a)}`.trimEnd()), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
-  // Side by side: the art's first line (mood marks above the ears) sits beside the title.
+  // The mood-mark line above the apex is only worth a row when it carries a mark.
+  const shown = art[0].trim() === '' ? art.slice(1) : art
+  if (!side) return [...shown.map(a => `  ${paint('cyan', a)}`.trimEnd()), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
+  // Side by side, bottom-aligned: the title sits near the apex and Ness speaks beside the base.
+  const beside = [...panel, '', speech]
+  const height = Math.max(shown.length, beside.length)
+  const artAt = height - shown.length
+  const textAt = height - beside.length
   const out = []
-  const height = Math.max(art.length, panel.length)
   for (let i = 0; i < height; i++) {
-    const a = art[i] ?? ' '.repeat(art[0].length)
-    out.push(`  ${paint('cyan', a)} ${panel[i] ?? ''}`.trimEnd())
+    const a = shown[i - artAt] ?? ' '.repeat(art[0].length)
+    out.push(`  ${paint('cyan', a)}   ${beside[i - textAt] ?? ''}`.trimEnd())
   }
-  out.push(`  ${' '.repeat(art[0].length)} ${speech}`)
   return out
 }
 
