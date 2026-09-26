@@ -194,6 +194,8 @@ First real uses
 - [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids
 - [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice (a small option space is Laya's strong regime)
 - [ ] T-232 Decision accounting in `/cost`: count decision calls separately and report LLM calls avoided
+- [ ] T-233 Tool-risk gate on `tools/pre-execute`, modelled on the in-tree precedent `packages/experimental/auto-review` (classifier -> allow/deny/ask, integrates with permission presets); swap its LLM call for one `POST /v1/systemone`. Blocked on T-223
+- [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin — the primitive both MCP tool filtering and the M4 persona tool policy need (`packages/core/tools/src/index.ts:701-711`)
 
 Deferred / investigate
 - [ ] T-240 MCP path (`laya[mcp]`): expose Laya to the MODEL as a tool — complementary to, not a replacement for, harness-side control flow

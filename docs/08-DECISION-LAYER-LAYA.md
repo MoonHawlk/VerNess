@@ -58,10 +58,24 @@ Three, in order of effort. The chosen path is (A); (B) is the fallback and (C) i
 same adapter works against Jev. Managed by the launcher exactly like the model engine
 (`up`/`stats`/`down`, ADR-0007), as a second engine class.
 
-**B. MCP server** — `laya[mcp]`. The substrate has first-class MCP support, so this could expose
-Laya to the *model* as a tool with no adapter code at all. Different purpose though: MCP makes Laya
-something the LLM can *call*; path (A) makes Laya something the *harness* consults before, around
-and instead of the LLM. We want (A) for control flow and may add (B) for model-facing use.
+**B. MCP server** — `laya[mcp]`. Verified against the substrate
+(`docs/research/dsh-mcp-and-http-seams.md`): an MCP server is registered as a plain loader row in our
+profile patch, its tools arrive as `mcp__<server>__<tool>`, and they pass through the *identical*
+`tools/pre-execute` → guards → approval → `tools/execute` pipeline as native tools — no bypass. With
+`failOnStartupError: false` (the default) a dead server degrades instead of breaking the session.
+So path B costs almost no code.
+
+It answers a different question, though. **MCP makes Laya something the model can call; path (A)
+makes Laya something the harness consults before, around and instead of the model.** Only (A) can
+veto a tool call or end a turn. They are complementary and a hybrid is cheap, so the plan is (A) for
+control flow, (B) as an optional model-facing extra (T-240).
+
+The precedent to imitate for (A) is already in the tree: `packages/experimental/auto-review` prepends
+a classifier to `tools/pre-execute`, snapshots the pending call plus history, calls out, and parses a
+strict allow/deny/ask protocol with the permission presets and approval flow. Our version swaps its
+LLM call for one `POST /v1/systemone`. One notable gap: `mcp-client` has **no config-level allow/deny
+for tools** — filtering needs a companion plugin calling `ctx.tools.restrict({allow, deny})`, which
+is also the primitive the persona tool policy (M4) will need.
 
 **C. ONNX, no Python at all** — `laya[onnx]` suggests an export path; if the decision head survives
 export, a Node ONNX runtime would remove the sidecar entirely. Unverified, and gated on (A) working.
