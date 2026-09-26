@@ -24,3 +24,14 @@ Later tasks in this milestone each add one paragraph here per contract they intr
   (`ModelCapabilities` / `CapabilityRequirements`), plus `levelRank`, `capabilityGaps` (what a
   model falls short of), `mergeRequirements` (combine requirements, keeping the stricter value
   per key), and `validateCapabilities`.
+- **Persona** (`src/persona.ts`, `src/validate-persona.ts`) — the v2 persona file shape
+  (`PersonaFile`, with `PERSONA_FIELDS` listing every allowed top-level field) and the normalised
+  `Persona` every consumer reads (identity, prompt, model/decision/tool/memory/evaluation/security
+  policies, tips, commands). `validatePersonaFile(v, { expectedId })` checks a parsed
+  `personas/<id>.json` — unknown fields with "did you mean", string and string-array types,
+  `tools.allow`/`tools.deny` overlap, approval modes, `models.requirements` via
+  `validateCapabilities`, command names — collecting every issue, and fills in the defaults
+  (`version '1'`, `name` falls back to `id`, `memory.scope 'session'`, empty prompt parts, arrays
+  and records). `personaToFile` turns a `Persona` back into a file that re-validates to the same
+  value. v1 files (`id`, `name`, `description`, `prompt`, `tools`, `skills`, `evaluators`, `tips`)
+  are valid v2 files unchanged.
