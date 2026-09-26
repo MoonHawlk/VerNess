@@ -147,7 +147,7 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 | Browser UI (dsh-web-ui) | ✅ | `./turn_on.sh web` |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
-| Persona system | 🔄 M4 | identity = skills + tools + model policy |
+| Persona system | 🔄 M4 | identity = skills + tools + model policy; persona files validated (M2) |
 | Skills | 🔄 M5 | procedural knowledge, trigger-based |
 | Decision model | 🔄 M3 | rules → small model → LLM escalation |
 | Model routing | 🔄 M6 | capability-based selection |
@@ -315,8 +315,8 @@ Engram: install with `npm i -g @sentropic/engram`, then `engram install` to give
 |-----------|------|--------|
 | M0 | Foundation & plan | ✅ done |
 | M1 | Load-bearing spike (`@verness/spike`) | ✅ done |
-| M2 | Contracts (`@verness/contracts`) | 🔜 next |
-| M3 | Decisions (`@verness/decisions`) | 📋 todo |
+| M2 | Contracts (`@verness/contracts`) | ✅ done |
+| M3 | Decisions (`@verness/decisions`) | 🔜 next |
 | M4 | Personas (`@verness/personas`) | 📋 todo |
 | M5 | Skills (`@verness/skills`) | 📋 todo |
 | M6 | Routing (`@verness/routing`) | 📋 todo |

@@ -81,7 +81,7 @@ VerNess/
 │   ├── contracts/  decisions/  personas/  skills/  routing/
 │   ├── supervisor/ evaluation/ governance/ data/
 ├── profiles/verness/              # cordis.patch.yml + package.json (the composed profile)
-├── personas/                      # persona YAML definitions
+├── personas/                      # persona JSON/JSONC definitions (+ <id>/commands/*.mjs)
 ├── skills/                        # SKILL.md trees
 └── docs/                          # this plan
 ```

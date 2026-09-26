@@ -70,9 +70,23 @@ file, or a measured number).
 - [x] T-145L `/graph`: delegating built-in
 
 ## Personas as files
-- [x] T-162 (base) Persona files: built as **JSON** (`personas/<id>.json`, JSONC allowed), not YAML. Fields: `id, name, description, prompt.prefix/suffix, model, tools.allow/deny, skills, evaluators, tips`. *The missing fields (`models.requirements`, `tools.approval`, `commands`) remain open under T-162 in the backlog.*
-- [x] T-163 (base) Loader: `loadPersonas` merges config definitions and files (files win) and reports a broken file without crashing. *File/line diagnostics remain open under T-163.*
+- [x] T-162 Persona files: **JSON** (`personas/<id>.json`, JSONC allowed), not YAML. Fields: `id, name, description, prompt.prefix/suffix, model, models.requirements, tools.allow/deny/approval, skills, evaluators, tips, commands`. Shape and validator in `@verness/contracts` (`persona.ts`, `validate-persona.ts`).
+- [x] T-163 Loader validates each persona file (`validatePersonaFile`) and reports issues with line:column (`locate()` maps a JSON path to its JSONC source position). A broken file — including one whose JSON is `null` — is listed as broken, never crashes the launcher. `/persona check` (`node scripts/verness.mjs persona check`) prints `personas/x.json:L:C path: message` and exits non-zero on errors. 6 files (`data-analyst`, `data-engineer`, `data-scientist`, `researcher`, `reviewer`, `software-engineer`) + the inline `generalist` = 7 personas, all ok.
+- [x] T-164 Personas `data-analyst` and `reviewer` as files
+- [x] T-165 Persona-scoped commands: `commands: ["hypotheses"]` in a persona file loads `personas/<id>/commands/<name>.mjs` after the globals. Globals win; a collision warns and names the owner. Ids and names must match `^[a-z][a-z0-9-]*$` (also guarded in `loadCommands`). Example: `/hypotheses <question>` (data-scientist) prints a checklist, zero tokens.
 - [x] T-166 Surfaces that print policy mark it: `describePersona` labels tools/skills/evaluators `[recorded — enforced from M4/M5/M7]`
+
+## M2 — Contracts (`@verness/contracts@0.0.1`)
+Erasable-only TypeScript, no `dependencies`, hand-written validators returning `Result<T>` / `Issue[]`.
+Verified: `pnpm typecheck` clean, `pnpm test` 125/125 (on Node 26; Node 22.19 not yet verified, T-382).
+- [x] T-020 `packages/contracts` scaffold: strict `tsconfig`, `src/index.ts`, `issue.ts` (`Issue`, `Result`, `formatPath`, `closest`); root `pnpm test` also runs `packages/*/test/*.test.ts` via type stripping; `pnpm typecheck` = `tsc -p packages/contracts`
+- [x] T-021 `decision.ts`: `DecisionModel`, `DecisionRequest`, `DecisionResult`, `ReasonCode`
+- [x] T-022 `persona.ts`: `PersonaFile` / `Persona` and their policies (tools, approval, models, decisions)
+- [x] T-023 `skill.ts`: `Skill`, `SkillContext`, `SkillActivation`, `SkillRef`, `SkillMetadata`
+- [x] T-024 `task.ts`: `Task`, `TaskState`, `Step`, `Plan`, `TaskBudget`, `TaskConstraints`, `TaskMetrics`
+- [x] T-025 `evaluation.ts`: `Evaluator`, `EvaluationResult`, `Artifact`, `ArtifactRef`, `Evidence`
+- [x] T-026 `capabilities.ts`: `CapabilityLevel`, `ModelCapabilities`, `CapabilityRequirements`, `meets()`, `validateCapabilities()`
+- [x] T-027 `validate-persona.ts` / `validate-skill.ts` (+ `locate.ts`): every real persona file round-trips (validate → `personaToFile` → JSON → validate) idempotently
 
 ## Teams
 - [x] T-167 (base) `teams/<id>.json`: members (role → persona), tasks with `member` and `dependsOn`, `concurrency`. *The failure policy remains open under T-167.*

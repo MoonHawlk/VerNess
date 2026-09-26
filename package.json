@@ -16,10 +16,14 @@
     "doctor": "node scripts/verness.mjs doctor",
     "sync": "node scripts/verness.mjs sync",
     "graph": "node scripts/verness.mjs graph",
-    "typecheck": "tsc -b tsconfig.json",
-    "test": "vitest run",
+    "test": "node --test \"scripts/test/*.test.mjs\" \"packages/*/test/*.test.ts\"",
+    "typecheck": "tsc -p packages/contracts",
     "model:up": "node scripts/model.mjs up",
     "model:stats": "node scripts/model.mjs stats",
     "model:down": "node scripts/model.mjs down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3"
   }
 }

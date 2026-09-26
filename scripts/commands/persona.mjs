@@ -13,7 +13,7 @@ export default {
   aliases: ['p'],
   group: 'personas',
   summary: 'show, describe or switch the active persona',
-  usage: '/persona [<id> | show <id> | list]',
+  usage: '/persona [<id> | show <id> | list | check]',
   /**
    * @param {object} ctx - command context.
    * @param {string[]} args - subcommand and arguments.
@@ -30,6 +30,18 @@ export default {
       }
       info('switch with /persona <id>, inspect with /persona show <id>')
       return 0
+    }
+
+    if (args[0] === 'check') {
+      head('persona check')
+      let allOk = true
+      for (const p of personas.values()) {
+        if (p.broken === undefined) { ok(`${p.id}: ok`); continue }
+        allOk = false
+        warn(`${p.id}:`)
+        for (const issue of p.issues ?? [p.broken]) console.log(`  ${issue}`)
+      }
+      return allOk ? 0 : 1
     }
 
     if (args[0] === 'show') {
