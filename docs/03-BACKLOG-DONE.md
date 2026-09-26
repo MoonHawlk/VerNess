@@ -78,10 +78,11 @@ file, or a measured number).
 - [x] T-167 (base) `teams/<id>.json`: members (role → persona), tasks with `member` and `dependsOn`, `concurrency`. *The failure policy remains open under T-167.*
 - [x] T-168 `/team list | show | run [--only] [--dry-run]`: each task is its own substrate run with a `--patch` persona overlay
 - [x] T-170 (base) Run artifacts: `.verness/runs/<team>/<stamp>/<task>.md` + `summary.md`; the dashboard reads them. *`/team status` remains open under T-170.*
+- [x] T-144 `--parallel` is real: the runner awaits `ctx.dshAsync` (an async `spawn` of the same shell-free dsh entry, stdin closed, spawn errors resolve as exit 1), and each task writes its persona overlay beside its own transcript so concurrent tasks never share the file. **Verified** by `node scripts/test/teams.parallel.mjs`: two independent tasks start 1 ms apart and a two-level team takes ~2 task-lengths instead of 3; the old synchronous runner took 914 ms for two 400 ms tasks at `--parallel 2`. Default concurrency stays 1; ADR-0008 amended. Was: `execute()` calls `sh()` which is `spawnSync`, so it blocks the event loop and `Promise.race` never overlaps
 
 ## Cost control (Engram) — ADR-0005
-- [x] T-100 `@sentropic/engram@0.19.0` installed
-- [x] T-101 Code-only project graph built (`engram update .`, zero LLM calls)
+- [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it). Re-installed on macOS 2026-09-26; `engram install` also put the `/engram` Claude Code skill in `~/.claude/skills/engram/`
+- [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet. Rebuilt 2026-09-26 (`./turn_on.sh graph`): 315 nodes / 974 edges / 13 communities in ~4 s, into the gitignored `.engram/`
 
 ## Decision layer — Laya / SystemOne (ADR-0009)
 - [x] T-200 SystemOne wire contract confirmed against the live server
@@ -122,3 +123,19 @@ file, or a measured number).
 - [x] T-332 Pet replaces the boot banner on a TTY; `/pet` (aliases `/ness`, `/status`); `pet.enabled`, `VERNESS_NO_PET=1`
 - [x] T-333 Render test `scripts/test/pet.render.mjs`
 - [x] T-337 Ness is a cube (a little TV) built from its geometry; the render test checks every corner and edge
+
+## Models & API routes — ADR-0010, guide in `docs/11-MODELS-AND-API.md`
+Goal: installing a new model, or moving the agent onto a hosted API model that can act on the
+environment, is one command — no config edit, no guessing quants, no frozen route.
+- [x] T-350 One route resolver (`scripts/lib/routes.mjs#effectiveRoute`) used by the patch, the run loop, `/doctor`, `/model` and the prompt; precedence `/api`/`/model` state -> persona -> `activeRoute` -> local, and a model choice is bound to its route (no local id ever sent to a provider)
+- [x] T-351 Catalog routes: providers, models and key variables read from the installed adapter (no vendor named in our code); the patch declares only `apiKeyEnv` for them. Verified: `dsh --dump-config` composes it, and a task with an invalid key reaches the provider (`401 authentication_error`)
+- [x] T-352 `/api` — list providers with key status, `models <provider>`, `use <provider> <model>` (catalog-validated), `key <provider>`, `local`
+- [x] T-353 `.env` loading (gitignored, shell wins) + `.env.example`; a missing key refuses the task with the exact line to add, before the substrate runs
+- [x] T-354 `/models` — `add <HF url | org/repo[:quant] | registry-name> [--use]` validates the quant against the repo's published GGUF files and picks one when omitted; `search`, `list`, `rm [--purge]`
+- [x] T-355 The local route declares every registered model, and `modelUp` brings up the model actually chosen — `/model <id>` no longer fails with `UNKNOWN_MODEL`, and its "pulled on the next run" message is now true
+- [x] T-356 `/access read-only | workspace | full --yes` sets the substrate sandbox mode for launched runs; the REPL re-resolves route, key and access every turn. Verified in the session log: `sandbox/mode` follows `/access`, and under read-only `Set-Content` was refused by the OS (`PermissionDenied`). A permitted write under `workspace` is unproven — the 0.6B model never produced a valid call
+
+## Launcher & branch integration — 2026-09-26
+- [x] T-370 `./turn_on.sh off` (alias `stop`, `/off` in the REPL) stops the web UI (port 6173 listener, plus any process matching `profile <web profile>`), the decision sidecar and the local model; `--force` also stops servers VerNess did not start
+- [x] T-371 Integrate the feature branches into the new `epic` branch (`--no-ff`: fix-prompt-redraw, web-composer, models-and-api-routes, t144-parallel-team) and write the branch/version workflow into `05-CONVENTIONS.md`
+- [x] T-373 `README.md` was committed as UTF-16LE (11eeed4), so grep and GitHub treated it as binary; converted to UTF-8

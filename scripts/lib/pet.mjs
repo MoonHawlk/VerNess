@@ -226,6 +226,91 @@ export function petArt(mood) {
   return [`    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
 }
 
+/**
+ * The round Ness, kept for the boot animation (plan WS-C decides how it and the sheep fit together).
+ * Keyed by the sheep's moods so `moodOf` drives both: sleepy uses the round pet's curious frames,
+ * worried its sad ones. Every frame is 8 lines x 9 columns, so the animator overwrites in place.
+ */
+const W_FRAME = 9
+const FRAMES = {
+  happy: [
+    // quiet start
+    ['         ', '  o      ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+    // excited, first bounce
+    ['   o     ', ' o       ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(  \\u/  )', ' (     ) ', '  (   )  '],
+    // peak jump - floats up, big smile, bubbles everywhere
+    ['  o  o   ', '    o    ', '  (   )  ', ' ( ^_^ ) ', '(  \\u/  )', '(       )', ' (     ) ', '         '],
+    // settled, bubbles drifting (resting)
+    ['  o   o  ', '   o     ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+  ],
+  worried: [
+    // normal but sad
+    ['         ', '         ', '  (   )  ', ' (     ) ', '( -   - )', '(   ~   )', ' (     ) ', '  (   )  '],
+    // starts drooping
+    ['         ', '         ', '  (   )  ', ' ( _   _)', '(   ~   )', '(       )', ' ( , , ) ', '  (   )  '],
+    // fully wilting - shape deforms
+    ['         ', '         ', '   ( )   ', '  (- -  )', ' ( ~~~  )', '(       )', ' /     \\ ', '         '],
+    // resting sad state
+    ['         ', '         ', '  (   )  ', ' ( -   -)', '(   ~   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
+  sleepy: [
+    // round, curious look
+    ['         ', '         ', '  (   )  ', ' ( o . ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+    // squashed into a wide oval
+    ['         ', '         ', ' /-----\\ ', '/ o   o \\', '(   ??  )', '\\-------/', '         ', '         '],
+    // stretched into a tall oval
+    ['         ', '  (   )  ', ' (     ) ', '( o . o )', '(   ?   )', ' (     ) ', '  (   )  ', '         '],
+    // back to round, still curious (resting)
+    ['         ', '         ', '  (   )  ', ' ( o ? ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
+}
+
+/**
+ * All animation frames of the round Ness for a mood, each line padded to W_FRAME.
+ * @param {'happy'|'sleepy'|'worried'} mood - the mood.
+ * @returns {string[][]} the frames, in playback order.
+ */
+export function petAnimFrames(mood) {
+  return (FRAMES[mood] ?? FRAMES.happy).map(frame => frame.map(l => l.padEnd(W_FRAME)))
+}
+
+/** @param {number} ms @returns {Promise<void>} */
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Play the boot animation, then show the full status panel. Off a TTY it shows the static panel only.
+ * Not wired into the boot yet - `cmdRun` still prints `renderPet` directly.
+ * @param {object} v - vitals from `gatherVitals`.
+ * @param {{columns?: number}} [opts]
+ */
+export async function animatePet(v, opts = {}) {
+  const { mood } = moodOf(v)
+  if (!process.stdout.isTTY) {
+    console.log()
+    for (const l of renderPet(v, opts)) console.log(l)
+    console.log()
+    return
+  }
+  const frames = petAnimFrames(mood)
+  const FH = frames[0].length
+  const writeFrame = frame => {
+    for (const l of frame) process.stdout.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
+  }
+  writeFrame(frames[0])
+  for (let i = 1; i < frames.length; i++) {
+    await sleep(160)
+    process.stdout.write(`\x1b[${FH}A\r`)
+    writeFrame(frames[i])
+  }
+  // Erase the animation area, then draw the full panel.
+  process.stdout.write(`\x1b[${FH}A\r`)
+  for (let i = 0; i < FH; i++) process.stdout.write('\x1b[2K\n')
+  process.stdout.write(`\x1b[${FH}A\r`)
+  console.log()
+  for (const l of renderPet(v, opts)) console.log(l)
+  console.log()
+}
+
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
 export function ago(ms) {
   const s = Math.max(0, Math.round(ms / 1000))
