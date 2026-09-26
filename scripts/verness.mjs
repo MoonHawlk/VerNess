@@ -19,6 +19,7 @@ import { loadCommands, runCommand } from './lib/commands.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
+import { loadTeams } from './lib/teams.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
@@ -349,6 +350,66 @@ function resolveRoute(cfg) {
 }
 
 /**
+ * The command bar printed when the REPL opens: every quick-tool, grouped, so the options are
+ * visible without asking for them. Discoverability is the point — a command nobody can see is a
+ * command nobody uses.
+ * @param {Map<string, object>} commands - the loaded registry.
+ * @returns {string[]} the lines to print.
+ */
+function commandBar(commands) {
+  const groups = new Map()
+  for (const cmd of new Set(commands.values())) {
+    groups.set(cmd.group ?? 'other', [...(groups.get(cmd.group ?? 'other') ?? []), cmd.name])
+  }
+  const order = ['core', 'model', 'personas', 'teams', 'telemetry', 'other']
+  const width = Math.max(...[...groups.keys()].map(g => g.length))
+  return [...groups.keys()]
+    .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+    .map(g => `  ${paint(C.dim, g.padEnd(width))}  ${groups.get(g).sort().map(n => `/${n}`).join('  ')}`)
+}
+
+/**
+ * Tab completion for the REPL: command names after a slash, then that command's own arguments
+ * (persona ids, team ids, session ids, local model ids) so the options can be discovered by pressing
+ * tab rather than by reading documentation.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {Map<string, object>} commands - the loaded registry.
+ * @returns {(line: string) => [string[], string]} a readline completer.
+ */
+function makeCompleter(cfg, commands) {
+  return line => {
+    if (!line.startsWith('/')) return [[], line]
+    const parts = line.split(/\s+/)
+    const names = [...new Set([...commands.values()].map(c => c.name))].sort()
+    if (parts.length === 1) {
+      const hits = names.map(n => `/${n}`).filter(n => n.startsWith(parts[0]))
+      return [hits.length > 0 ? hits : names.map(n => `/${n}`), line]
+    }
+    const cmd = parts[0].replace(/^\//, '').toLowerCase()
+    const word = parts[parts.length - 1]
+    /** @param {string[]} options - candidate words. @returns {[string[], string]} the completion. */
+    const complete = options => {
+      const hits = options.filter(o => o.startsWith(word))
+      return [hits.length > 0 ? hits : options, word]
+    }
+    if (cmd === 'persona' || cmd === 'p') return complete(['list', 'show', ...loadPersonas(cfg).keys()])
+    if (cmd === 'team' || cmd === 'teams') return complete(['list', 'show', 'run', ...loadTeams().keys()])
+    if (cmd === 'resume' || cmd === 'continue') {
+      return complete(listSessions({ limit: 10 }).map(x => x.id.slice(0, 8)))
+    }
+    if (cmd === 'model') {
+      const list = sh('ollama', ['list'], { capture: true, allowFail: true })
+      const ids = list.code === 0
+        ? list.out.split('\n').slice(1).map(l => l.split(/\s\s+/)[0]).filter(x => x !== undefined && x.trim() !== '')
+        : []
+      return complete(['reset', ...ids])
+    }
+    if (cmd === 'help' || cmd === '?') return complete(names)
+    return [[], line]
+  }
+}
+
+/**
  * @param {string} identity - a session identity.
  * @returns {string} the short form used in output.
  */
@@ -600,19 +661,38 @@ async function cmdRun(cfg, task) {
   if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env }); return }
 
   const commands = await loadCommands()
-  step(`ready - persona "${activePersonaId(cfg)}", model ${r.id} via ${route}`)
-  info(`type a task, or /help for ${new Set([...commands.values()]).size} quick-tools; empty line or ctrl+c exits`)
-  if (convo.id() !== undefined) info(`continuing ${shortSession(convo.id())} - /new starts a fresh one`)
-  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  const count = new Set([...commands.values()]).size
+  step(`VerNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, r.id)} via ${route}`)
+  console.log(paint(C.dim, `  ${count} quick-tools (tab completes, /help <name> explains):`))
+  for (const l of commandBar(commands)) console.log(l)
+  info(convo.id() === undefined
+    ? 'a new conversation starts with your first task; it is kept for every later turn'
+    : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
+  info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    completer: makeCompleter(cfg, commands),
+  })
   for (;;) {
-    const line = (await rl.question(paint(C.cyan, '\nverness> '))).trim()
+    // The prompt carries the live state, so persona, model and conversation are never a guess.
+    const id = convo.id()
+    const status = [activePersonaId(loadConfig()), readState().model ?? r.id, id === undefined ? 'new' : shortSession(id)].join(' · ')
+    const line = (await rl.question(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'verness> ')}`)).trim()
     if (line === '') break
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
     // be swallowed by the registry.
     if (line.startsWith('/')) {
       // Re-read the config: an earlier command may have switched persona or model.
       const { handled } = await runCommand(line, makeCtx(loadConfig(), commands, convo))
-      if (!handled) warn(`no such command: ${line.split(/\s+/)[0]} - try /help`)
+      if (!handled) {
+        const typed = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
+        const near = [...new Set([...commands.values()].map(c => c.name))]
+          .filter(n => n.startsWith(typed.slice(0, 2)) || n.includes(typed))
+          .slice(0, 4)
+        warn(`no such command: /${typed}${near.length > 0 ? ` - did you mean ${near.map(n => `/${n}`).join(', ')}?` : ''}`)
+        if (near.length === 0) info('press tab on an empty slash to list every command, or run /help')
+      }
       continue
     }
     // Every turn after the first adopts the session the first one created, so the model keeps its
