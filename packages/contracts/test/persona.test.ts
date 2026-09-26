@@ -40,6 +40,19 @@ function ok(r: Result<Persona>): Persona {
   return r.value
 }
 
+/**
+ * Validate `input` and return the `Persona`, checking on the way that the same `Persona` comes back
+ * from the input after a JSON round-trip, and from `personaToFile` of it (also after a JSON round-trip).
+ */
+function valid(input: unknown, opts?: { expectedId?: string }): Persona {
+  const value = ok(validatePersonaFile(input, opts))
+  const json = (x: unknown): unknown => JSON.parse(JSON.stringify(x))
+  assert.deepEqual(ok(validatePersonaFile(json(input), opts)), value, 'input after a JSON round-trip')
+  assert.deepEqual(ok(validatePersonaFile(personaToFile(value), opts)), value, 'personaToFile')
+  assert.deepEqual(ok(validatePersonaFile(json(personaToFile(value)), opts)), value, 'personaToFile after a JSON round-trip')
+  return value
+}
+
 function errors(r: Result<Persona>): Issue[] {
   if (r.ok) assert.fail('expected errors, got ok')
   return r.errors
@@ -61,8 +74,7 @@ test('every real persona file validates unchanged', () => {
   assert.ok(files.length >= 4, `expected persona files in ${PERSONAS_DIR}`)
   for (const f of files) {
     const raw = parseJsonc(readFileSync(join(PERSONAS_DIR, f), 'utf8'))
-    const r = validatePersonaFile(raw, { expectedId: f.slice(0, -'.json'.length) })
-    assert.ok(r.ok, `${f}: ${JSON.stringify(r.ok ? [] : r.errors)}`)
+    valid(raw, { expectedId: f.slice(0, -'.json'.length) })
   }
 })
 
@@ -76,14 +88,14 @@ test('id is required and must match the id pattern', () => {
   assert.match(issueAt(validatePersonaFile({}), ['id']).message, /required/)
   assert.match(issueAt(validatePersonaFile({ id: 'Data_Eng' }), ['id']).message, /\^\[a-z\]\[a-z0-9-\]\*\$/)
   assert.match(issueAt(validatePersonaFile({ id: 7 }), ['id']).message, /string/)
-  ok(validatePersonaFile({ id: 'a1-b' }))
+  valid({ id: 'a1-b' })
 })
 
 test('expectedId mismatch is an issue at id', () => {
   const m = issueAt(validatePersonaFile({ id: 'foo' }, { expectedId: 'bar' }), ['id']).message
   assert.match(m, /"foo"/)
   assert.match(m, /"bar"/)
-  ok(validatePersonaFile({ id: 'foo' }, { expectedId: 'foo' }))
+  valid({ id: 'foo' }, { expectedId: 'foo' })
 })
 
 test('unknown top-level field suggests the closest known one', () => {
@@ -166,7 +178,7 @@ test('models.requirements is checked by validateCapabilities with the full path'
   assert.equal(issueAt(r, ['models', 'requirements', 'reasonng']).message, 'unknown capability "reasonng" — did you mean "reasoning"?')
   assert.match(issueAt(r, ['models', 'requirements', 'code']).message, /expected one of/)
   assert.equal(issueAt(validatePersonaFile({ id: 'x', models: { requirements: 1 } }), ['models', 'requirements']).message, 'expected an object')
-  const p = ok(validatePersonaFile({ id: 'x', models: { requirements: { code: 'medium', context: 32000 } } }))
+  const p = valid({ id: 'x', models: { requirements: { code: 'medium', context: 32000 } } })
   assert.deepEqual(p.modelPolicy.requirements, { code: 'medium', context: 32000 })
 })
 
@@ -179,14 +191,14 @@ test('commands match the id pattern; a leading slash names the fix', () => {
 
 test('memory.scope is none, session or project', () => {
   assert.equal(issueAt(validatePersonaFile({ id: 'x', memory: { scope: 'forever' } }), ['memory', 'scope']).message, 'expected one of "none", "session", "project"')
-  assert.equal(ok(validatePersonaFile({ id: 'x', memory: { scope: 'project' } })).memory.scope, 'project')
+  assert.equal(valid({ id: 'x', memory: { scope: 'project' } }).memory.scope, 'project')
 })
 
 test('decisions.apply is an object of booleans', () => {
   const r = validatePersonaFile({ id: 'x', decisions: { apply: { lint: true, format: 'yes' } } })
   assert.deepEqual(errors(r), [{ path: ['decisions', 'apply', 'format'], message: 'expected a boolean' }])
   assert.equal(issueAt(validatePersonaFile({ id: 'x', decisions: { apply: [] } }), ['decisions', 'apply']).message, 'expected an object')
-  const p = ok(validatePersonaFile({ id: 'x', decisions: { provider: 'auto', apply: { lint: true } } }))
+  const p = valid({ id: 'x', decisions: { provider: 'auto', apply: { lint: true } } })
   assert.deepEqual(p.decisionPolicy, { provider: 'auto', apply: { lint: true } })
 })
 
@@ -196,7 +208,7 @@ test('all issues are collected, not just the first', () => {
 })
 
 test('defaults for a minimal persona', () => {
-  const p = ok(validatePersonaFile({ id: 'min' }))
+  const p = valid({ id: 'min' })
   assert.deepEqual(p, {
     id: 'min',
     version: '1',
@@ -235,7 +247,7 @@ const FULL = {
 }
 
 test('a full v2 persona normalises field by field', () => {
-  const p = ok(validatePersonaFile(FULL, { expectedId: 'full' }))
+  const p = valid(FULL, { expectedId: 'full' })
   assert.deepEqual(p, {
     id: 'full',
     version: '2',
@@ -254,13 +266,13 @@ test('a full v2 persona normalises field by field', () => {
 })
 
 test('modelPolicy.preferred carries only the parts given', () => {
-  assert.deepEqual(ok(validatePersonaFile({ id: 'x', model: { route: 'local' } })).modelPolicy, { preferred: { route: 'local' }, requirements: {} })
-  assert.equal('preferred' in ok(validatePersonaFile({ id: 'x', model: {} })).modelPolicy, false)
+  assert.deepEqual(valid({ id: 'x', model: { route: 'local' } }).modelPolicy, { preferred: { route: 'local' }, requirements: {} })
+  assert.equal('preferred' in valid({ id: 'x', model: {} }).modelPolicy, false)
 })
 
 test('the normalised persona does not alias the input', () => {
   const input = structuredClone(FULL)
-  const p = ok(validatePersonaFile(input))
+  const p = valid(input)
   assert.notEqual(p.tools.allow, input.tools.allow)
   assert.notEqual(p.tools.deny, input.tools.deny)
   assert.notEqual(p.security.deny, p.tools.deny)
@@ -279,8 +291,6 @@ test('normalising is idempotent through personaToFile', () => {
     inputs.push(parseJsonc(readFileSync(join(PERSONAS_DIR, f), 'utf8')))
   }
   for (const input of inputs) {
-    const first = ok(validatePersonaFile(input))
-    const again = ok(validatePersonaFile(personaToFile(first)))
-    assert.deepEqual(again, first)
+    valid(input)
   }
 })
