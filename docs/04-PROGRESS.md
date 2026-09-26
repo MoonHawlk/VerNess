@@ -438,3 +438,7 @@
 - **Engram graph** rebuilt after M2: 513 nodes / 1592 edges / 19 communities (was 315 / 974 / 13);
   it now covers `packages/contracts/src/*`.
 - **Next**: M3 / T-030 — the decisions plugin.
+
+## 2026-09-26 — priority change: WS-E (Laya decision layer) first
+- The owner moved WS-E ahead of M3/T-030. **Next**: WS-E Task 1 (shadow records gain `id`, `v: 2`,
+  per-question `probabilities` and option-set `hash`), then T-220 labelling.
