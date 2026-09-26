@@ -165,6 +165,42 @@ Survey behind the choices: `docs/research/claude-code-capability-map.md`. Tiers:
 - [ ] T-103 Re-evaluate committing `.engram/graph.json` + `GRAPH_REPORT.md` once `packages/*` holds real TypeScript
 - [ ] T-104 Optional: semantic extraction over `docs/` via the local route (`engram extract --backend ollama`) — only worth it with a stronger local model
 
+## Decision layer — Laya / SystemOne protocol (ADR-0009, design in `docs/08-DECISION-LAYER-LAYA.md`)
+
+Protocol and provider
+- [ ] T-200 Type the SystemOne wire contract (request `state` + `questions`, response `answers` with per-question payload + `confidence`) from the live server, not from the card
+- [ ] T-201 `LayaDecisionProvider`: `decide()` -> one `POST /v1/systemone`, bearer auth when `LAYA_API_KEY` is set
+- [ ] T-202 Adapter rules that hide two known model bugs: emit yes/no as a two-option `choice` (never `noul`, issue #156); map confidence from `confidence` (never `act_probability`, issue #185)
+- [ ] T-203 `RuleDecisionProvider` (declarative, no network) — the baseline every model provider must beat
+- [ ] T-204 `CompositeDecisionModel`: rules -> decision model -> LLM, with confidence thresholds and cost accounting
+- [ ] T-205 `JevProvider` proven by construction: same adapter, different base URL (no new code — if it needs code, the abstraction is wrong)
+- [ ] T-206 `/decide` quick-tool: ask a typed question from the REPL, print answer + confidence + provider, zero LLM tokens
+
+Lifecycle (mirrors the model engine, ADR-0007)
+- [ ] T-210 Detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
+- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state
+- [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question
+- [ ] T-213 `decision down`: stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
+- [ ] T-214 Config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
+
+Calibration and evaluation — the gate before any policy use
+- [ ] T-220 Collect a held-out set of OUR decisions (task routing, retry/stop) with human labels
+- [ ] T-221 Measure zero-shot accuracy, ECE and AUROC on that set; publish the numbers in `docs/research/`
+- [ ] T-222 Refit one temperature per (question type, option count) and re-measure (the card reports mean ECE 0.466 -> 0.081 from exactly this)
+- [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE beats the rule baseline it replaces. Until then every provider is opt-in
+- [ ] T-224 Measure CPU-only latency on a developer laptop — every published figure is a T4 GPU, and the cheap-decision premise depends on this
+
+First real uses
+- [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids
+- [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice (a small option space is Laya's strong regime)
+- [ ] T-232 Decision accounting in `/cost`: count decision calls separately and report LLM calls avoided
+
+Deferred / investigate
+- [ ] T-240 MCP path (`laya[mcp]`): expose Laya to the MODEL as a tool — complementary to, not a replacement for, harness-side control flow
+- [ ] T-241 ONNX path (`laya[onnx]`): if the decision head survives export, a Node runtime removes the sidecar entirely
+- [ ] T-242 Fine-tune on our own decisions once T-220 has a labelled set (the card's own advice: 0.362 -> 0.766 on its benchmark)
+- [ ] T-243 Guardrail/moderation question on inbound tasks — one extra question in an existing call is nearly free
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters

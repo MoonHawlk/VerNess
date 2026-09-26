@@ -164,3 +164,28 @@
 - Process note: the task asked for a subagent to compile the capability list; the fork executing it
   cannot spawn subagents, so the list was compiled inline. It is a single-source survey and deserves a
   second pass before T-134 onward.
+
+## 2026-09-26 — the decision layer finds its provider (planning only)
+- Investigated `convaiinnovations/laya` (Hugging Face, Apache-2.0, 3.7k likes, published 2026-09-18).
+  It is **not** another generative model: it is a non-autoregressive System-1 decision model — typed
+  questions in, typed answers with calibrated probabilities out, every question in a call answered in
+  one forward pass, ~33-40 ms on a T4. It never generates text.
+- **The finding that shaped the design**: `laya-serve` implements the *same* `POST /v1/systemone`
+  request/response shape as TypeSafe Jev. So we do not integrate a model, we integrate the
+  **SystemOne wire protocol**, and Laya / Jev / a fine-tuned Laya become swappable providers behind
+  the existing `DecisionModel` contract. ADR-0003 (vendors only in adapters) pays for itself here.
+- **The finding that constrained it**: the model card's *Honest Limits* are candid and disqualifying
+  for zero-shot policy use — base checkpoints score 0.362 on typed decisions against a 0.461
+  majority-class baseline (the quoted 0.766 is a checkpoint fine-tuned on that benchmark's own
+  training split); it ships over-confident (mean ECE 0.466, falling to 0.081 only after refitting
+  temperatures on your own data); `noul` can follow its option labels instead of the input (#156);
+  and `action.act_probability` carries no usable signal (#185). Two of these are now adapter-level
+  workarounds (T-202) so the contract stays clean.
+- Written: `docs/08-DECISION-LAYER-LAYA.md` (design, three integration paths, nine proposed features),
+  ADR-0009 (the protocol is the substrate; Python lives in a sidecar, never in our runtime), and
+  backlog **T-200..T-243** in four gated groups — protocol/provider, lifecycle, calibration, first uses.
+- **Explicit gate recorded (T-223)**: no decision path ships enabled by default until its measured ECE
+  beats the rule baseline it replaces. Structural unblocking of M3 is not behavioural unblocking, and
+  conflating them is how a system ends up routing real work on a coin flip.
+- Two subagents were dispatched for the details we should not guess at: the exact `laya-serve` /
+  `laya[mcp]` interfaces, and the substrate's MCP and HTTP seams.
