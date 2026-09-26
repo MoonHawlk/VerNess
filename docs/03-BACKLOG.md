@@ -178,8 +178,8 @@ Known defects in the WIP command layer (commit 1515661) — fix before wiring an
 
 Protocol and provider
 - [ ] T-200 Type the SystemOne wire contract (request `state` + `questions`, response `answers` with per-question payload + `confidence`) from the live server, not from the card
-- [ ] T-201 `LayaDecisionProvider`: `decide()` -> one `POST /v1/systemone`, bearer auth when `LAYA_API_KEY` is set
-- [ ] T-202 Adapter rules that hide two known model bugs: emit yes/no as a two-option `choice` (never `noul`, issue #156); map confidence from `confidence` (never `act_probability`, issue #185)
+- [ ] T-201 `LayaDecisionProvider`: `decide()` -> one `POST /v1/systemone`, bearer auth when `LAYA_API_KEY` is set, readiness via `GET /health`, 503 handled as backpressure with retry
+- [ ] T-202 Adapter rules that hide two known model bugs: emit yes/no as a two-option `choice` (never `noul`, issue #156); map `DecisionResult.confidence` from **`answer_confidence`** — the temperature-calibrated field ECE is fitted against — never from `confidence` (raw entropy) and never from `act_probability` (issue #185)
 - [ ] T-203 `RuleDecisionProvider` (declarative, no network) — the baseline every model provider must beat
 - [ ] T-204 `CompositeDecisionModel`: rules -> decision model -> LLM, with confidence thresholds and cost accounting
 - [ ] T-205 `JevProvider` proven by construction: same adapter, different base URL (no new code — if it needs code, the abstraction is wrong)
@@ -188,7 +188,7 @@ Protocol and provider
 Lifecycle (mirrors the model engine, ADR-0007)
 - [ ] T-210 Detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
 - [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — set `LAYA_HOST=127.0.0.1` (and `LAYA_PORT`), and set a generated `LAYA_API_KEY` as well. Never start it open on a LAN
-- [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question
+- [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question, and the `LAYA_MAX_CONCURRENT` headroom (default 16; excess requests get `503 server busy`, so every fan-out path must bound concurrency and treat 503 as backpressure)
 - [ ] T-213 `decision down`: stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
 - [ ] T-214 Config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
 
@@ -207,7 +207,7 @@ First real uses
 - [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin — the primitive both MCP tool filtering and the M4 persona tool policy need (`packages/core/tools/src/index.ts:701-711`)
 
 Deferred / investigate
-- [ ] T-240 MCP path (`laya[mcp]`): expose Laya to the MODEL as a tool — complementary to, not a replacement for, harness-side control flow
+- [ ] T-240 MCP path (`laya[mcp]`): `laya-mcp-server` is **stdio-only** (no HTTP/SSE) and exposes 5 tools (`laya_status`, `laya_route`, `laya_predict`, `laya_shortlist`, `laya_preset`). The substrate registers stdio MCP servers as a loader row, so this is near-zero code — but it exposes Laya to the MODEL as a callable tool, which is complementary to, not a replacement for, harness-side control flow
 - [ ] T-241 **`laya-ts` path — the intended end state**: the upstream repo ships a TypeScript reimplementation over a split ONNX export (`encoder.onnx` + `head.onnx`, export verified to 1e-4), so a decision provider can run inside a Cordis plugin with no sidecar and no Python at run time. Blockers: `laya-ts` is not on npm (404 — must be vendored or built from the monorepo) and the export needs a one-time Python run
 - [ ] T-242 Fine-tune on our own decisions once T-220 has a labelled set (the card's own advice: 0.362 -> 0.766 on its benchmark)
 - [ ] T-243 Guardrail/moderation question on inbound tasks — one extra question in an existing call is nearly free

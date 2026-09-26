@@ -92,12 +92,18 @@ TypeScript reimplementation for Node and the browser, driven by a split ONNX exp
 ports `decide()`, the shortlist and per-language calibration, with `onnxruntime-node` as an optional
 peer dependency.
 
-This is the end state we actually want — a decision provider running *inside* a Cordis plugin, no
-sidecar, no HTTP hop, no Python at run time. Two real blockers keep it out of phase 1: **`laya-ts` is
-not published on npm** (checked: `registry.npmjs.org/laya-ts` returns 404), so it must be vendored or
-built from the monorepo; and the ONNX export itself still requires a one-time Python run. Tracked as
-T-241, and the `DecisionModel` contract is what makes swapping A for C a provider change rather than
-a rewrite.
+This is the end state we *want* — a decision provider inside a Cordis plugin, no sidecar, no HTTP
+hop, no Python at run time. It is not a plan yet, and the reasons are specific: `laya-ts` is
+**not published on npm** (checked: 404), it is **version 0.1.0**, its README was committed the same
+week we looked and **self-flags CJS/browser packaging as untested**, and the ONNX export still needs
+a one-time Python run. Vendoring an unreleased 0.1.0 into the decision path of a harness is a worse
+risk than supervising a sidecar.
+
+So the honest summary of all three paths: **there is no mature, npm-installable, Python-free option
+today.** (A) keeps a Python process we must supervise; (B) also does; (C) trades that for an
+unvetted 0.1.0 dependency. We take (A) because its failure mode is the best understood, and revisit
+(C) when `laya-ts` is actually released. Tracked as T-241 — and the `DecisionModel` contract is what
+keeps that a provider swap rather than a rewrite.
 
 ## Task block
 
@@ -140,10 +146,18 @@ settles anything still ambiguous, T-200):
 - **Per-option probabilities: yes.** A `choice` answer carries a `probabilities` map
   (`{"billing": 0.94, "technical": 0.05, ...}`) alongside `confidence` and `answer_confidence`, so
   the confidence bands feature 4 needs are available. `confidence` for choice/score is
-  `1 − normalised entropy` over that distribution; `answer_confidence` is the Jev-portable field, so
-  our adapter thresholds on it.
+  `1 − normalised entropy` over that distribution, while **`answer_confidence` is the calibrated
+  quantity that temperature-scaling fits and ECE measures** (`agent.py:776-781`), reported uniformly
+  for all three question types. That is the one our adapter thresholds on — not `confidence`, and
+  never `act_probability`.
 - **Binding is configurable**: `LAYA_HOST` (default `0.0.0.0`) and `LAYA_PORT` (default `8000`).
   T-211 therefore sets `LAYA_HOST=127.0.0.1` — loopback by construction, not by hope.
+- **The server is two routes, not a framework**: `GET /health` (our readiness probe) and
+  `POST /v1/systemone`. It is Jev-shaped, *not* OpenAI-compatible — so unlike the generative engine,
+  it cannot ride the existing `pi-ai` route and needs our own adapter.
+- **There is a concurrency ceiling**: `LAYA_MAX_CONCURRENT` defaults to 16 and excess requests get
+  `503 server busy`. Anything that fans out decisions (the team runner, progressive reduction over
+  100k candidates) must bound its own concurrency and handle 503 as backpressure, not as failure.
 - **CPU latency is 193–464 ms per request**, against 32.8 ms on a T4. This matters: the ~33 ms figure
   everyone quotes is a GPU figure. On a developer laptop a decision costs a few hundred milliseconds
   — still one to two orders cheaper than an LLM turn, but not free, and batching is what recovers it
