@@ -15,6 +15,8 @@ Built on the **DeepSeek Harness (dsh)** / Cordis substrate. VerNess adds the sev
 - [Architecture](#architecture)
 - [Dependencies](#dependencies)
 - [Roadmap](#roadmap)
+- [Releases](#releases)
+- [Development](#development)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 
@@ -121,6 +123,20 @@ Opens the `verness-web` profile — a full browser interface powered by **dsh-we
 
 `off` (alias `stop`, `/off` in the REPL) stops all three in one go. Add `--force` to also stop servers VerNess did not start.
 
+### Task dashboard
+
+```sh
+verness> /dashboard           # alias /dash, inside the REPL
+node scripts/dashboard.mjs    # same, from a plain shell
+```
+
+Builds a static HTML page at `.verness/dashboard.html` (no server, no network) and opens it:
+- **Backlog** — every open task in `docs/03-BACKLOG.md`, with a P0–P3 priority picker (kept in your browser), filters, sort, and *copy as markdown*; the backlog file itself is rendered below.
+- **Sessions** — turns, tool calls, tokens and wall time; click a row for its full timeline.
+- **Decisions and teams** — shadow decisions (model vs. rules agreement, latency) and per-task team outcomes.
+
+Add `--no-open` to only write the file, `--limit N` to cap the session list.
+
 ### Configuration
 
 All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh sync` to push changes to both profiles without a full re-setup.
@@ -147,6 +163,12 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 | Browser UI (dsh-web-ui) | ✅ | `./turn_on.sh web` |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
+| Slash commands | ✅ | one file per command in `scripts/commands/`; `/help` lists them |
+| Task dashboard + backlog | ✅ | `/dashboard`: prioritise open tasks, inspect sessions and costs |
+| Teams / `/loop-task` | ✅ | several tasks under different personas; `teams/*.json` |
+| Contracts (`@verness/contracts`) | ✅ M2 | types only, zero dependencies |
+| Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands |
+| Decisions (shadow mode) | 🔄 M3 | Laya sidecar logs model-vs-rules; not yet authoritative |
 | Persona system | 🔄 M4 | identity = skills + tools + model policy; persona files validated (M2) |
 | Skills | 🔄 M5 | procedural knowledge, trigger-based |
 | Decision model | 🔄 M3 | rules → small model → LLM escalation |
@@ -328,6 +350,29 @@ Each milestone is independently runnable. See `docs/02-ROADMAP.md` for exit crit
 
 ---
 
+## Releases
+
+| Tag | Contents |
+|-----|----------|
+| `v0.2.0` | M2: `@verness/contracts`, persona files validated at load (`/persona check`), `data-analyst` and `reviewer` personas, persona-scoped commands |
+| `v0.1.0` | M0/M1: launcher, local model lifecycle, web UI, load-bearing spike plugin |
+
+Open work (not yet released) lives on `epic`; the prioritised list is in `docs/03-BACKLOG.md` and on the dashboard.
+
+---
+
+## Development
+
+```sh
+pnpm install      # dev tooling only (TypeScript); runtime deps come from ./turn_on.sh setup
+pnpm test         # node --test: scripts/test/*.test.mjs + packages/*/test/*.test.ts
+pnpm typecheck    # tsc -p packages/contracts
+```
+
+Adding a slash command means adding one file in `scripts/commands/` (see `docs/07-COMMAND-LAYER.md`).
+
+---
+
 ## Project Structure
 
 ```
@@ -337,13 +382,18 @@ VerNess/
 ├── scripts/
 │   ├── verness.mjs                          # launcher entry point
 │   ├── model.mjs                            # model lifecycle (up/down/stats)
-│   └── lib/                                 # REPL, personas, decisions, pet…
+│   ├── dashboard.mjs                        # builds .verness/dashboard.html
+│   ├── commands/                            # one file per slash command
+│   ├── lib/                                 # REPL, personas, decisions, backlog, pet…
+│   └── test/                                # node:test suites (pnpm test)
 ├── packages/
+│   ├── contracts/                           # @verness/contracts (M2, types only)
 │   └── spike/                               # @verness/spike (M1 proof-of-concept)
 ├── profiles/
 │   └── verness/cordis.patch.yml             # generated — do not edit by hand
-├── personas/                                # persona JSON definitions
+├── personas/                                # persona JSON files (+ <id>/commands/*.mjs)
 ├── teams/                                   # multi-agent team configs
+├── .claude/skills/terse/                     # agent skill: terse, low-token replies
 ├── upstream/
 │   └── deepseek-harness/                    # git submodule, READ-ONLY
 └── docs/                                    # architecture, roadmap, backlog, ADRs
@@ -362,3 +412,4 @@ VerNess/
 
 - Feature and fix branches start from `epic` and merge back into it; `main` only receives tagged releases (`vX.Y.Z`). See "Branches and versions" in `docs/05-CONVENTIONS.md`.
 - Commits carry no co-author or tool trailers; the rest of the commit rules are in the same file.
+- Agents working in this repo can load the `terse` skill (`.claude/skills/terse/SKILL.md`) to keep replies short and cut token cost.

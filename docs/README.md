@@ -11,7 +11,7 @@ Read in this order:
 | [00-OVERVIEW.md](00-OVERVIEW.md) | Vision, scope, non-goals, the 5 project laws |
 | [01-ARCHITECTURE.md](01-ARCHITECTURE.md) | Layers, contracts, and the exact `dsh` seam each one uses |
 | [02-ROADMAP.md](02-ROADMAP.md) | Milestones M0–M9, exit criteria, risks |
-| [03-BACKLOG.md](03-BACKLOG.md) | Open work only, grouped by workstream (stable task IDs) |
+| [03-BACKLOG.md](03-BACKLOG.md) | Open work only, grouped by workstream (stable task IDs); prioritise it on `/dashboard` |
 | [03-BACKLOG-DONE.md](03-BACKLOG-DONE.md) | Archive of completed tasks, with evidence |
 | [superpowers/plans/](superpowers/plans/) | **Implementation plans** per workstream; start with `2026-09-26-00-master-plan.md` |
 | [04-PROGRESS.md](04-PROGRESS.md) | Append-only log: what was done, when, in which commit |
@@ -29,3 +29,6 @@ Read in this order:
 **How to resume work at any time:** read `superpowers/plans/2026-09-26-00-master-plan.md` (order and
 rules), pick the first open task of a workstream in `03-BACKLOG.md`, open that workstream's plan, and
 follow `05-CONVENTIONS.md`. Move finished tasks to `03-BACKLOG-DONE.md`.
+
+**Agents:** load `.claude/skills/terse/SKILL.md` for short, low-token replies (code, paths and errors
+stay exact). **Releases:** `main` carries tags `v0.1.0`, `v0.2.0`; development continues on `epic`.

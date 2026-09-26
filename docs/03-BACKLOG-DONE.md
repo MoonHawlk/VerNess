@@ -153,3 +153,9 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [x] T-370 `./turn_on.sh off` (alias `stop`, `/off` in the REPL) stops the web UI (port 6173 listener, plus any process matching `profile <web profile>`), the decision sidecar and the local model; `--force` also stops servers VerNess did not start
 - [x] T-371 Integrate the feature branches into the new `epic` branch (`--no-ff`: fix-prompt-redraw, web-composer, models-and-api-routes, t144-parallel-team) and write the branch/version workflow into `05-CONVENTIONS.md`
 - [x] T-373 `README.md` was committed as UTF-16LE (11eeed4), so grep and GitHub treated it as binary; converted to UTF-8
+- [x] T-183 `pnpm test` is real: `node --test` over `scripts/test/*.test.mjs` and `packages/*/test/*.test.ts`; the dead `vitest run` / `tsc -b` scripts removed (3c51652)
+
+## Dashboard backlog — v0.2.0 follow-up
+- [x] T-389 `/dashboard` Backlog section: every open task in `03-BACKLOG.md` with a P0–P3 picker saved in the browser, text/group/priority filters, sort by priority, copy as Markdown, and the whole file rendered below (`scripts/lib/backlog.mjs`, `scripts/test/backlog.test.mjs`)
+- [x] T-390 Dashboard wall time was measured from epoch 0 when the first event had no timestamp; now from the first timed event
+- [x] T-391 `terse` skill (`.claude/skills/terse/SKILL.md`): agents cut tokens with short, direct phrasing

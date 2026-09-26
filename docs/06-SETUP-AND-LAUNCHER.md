@@ -24,6 +24,7 @@ shell on Windows and quotes every argument itself).
 ./turn_on.sh sync           # regenerate the profile patch from the config
 ./turn_on.sh graph          # rebuild the Engram knowledge graph (no LLM calls)
 ./turn_on.sh help
+node scripts/dashboard.mjs  # task dashboard: prioritise the backlog, inspect sessions (also /dashboard)
 
 ./turn_on.sh models add <hf url | org/repo[:quant]> --use   # install a local model and switch to it
 ./turn_on.sh api use <provider> <model>                     # run the agent on a hosted model (key in .env)
