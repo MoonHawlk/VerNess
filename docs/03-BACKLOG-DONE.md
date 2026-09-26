@@ -164,3 +164,6 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [x] T-389 `/dashboard` Backlog section: every open task in `03-BACKLOG.md` with a P0–P3 picker saved in the browser, text/group/priority filters, sort by priority, copy as Markdown, and the whole file rendered below (`scripts/lib/backlog.mjs`, `scripts/test/backlog.test.mjs`)
 - [x] T-390 Dashboard wall time was measured from epoch 0 when the first event had no timestamp; now from the first timed event
 - [x] T-391 `terse` skill (`.claude/skills/terse/SKILL.md`): agents cut tokens with short, direct phrasing
+
+## Persona catalog (WS-I)
+- [x] T-393 `scripts/test/personas.catalog.test.mjs`: every real `personas/*.json` loads with zero issues and is named after its id; every listed command file exists, exports its own name, clashes with no global command or alias, and runs with an empty context (no model) returning 0 with output; every `personas/<id>/commands/` file is listed. Verified to fail on a probe file with a mismatched id
