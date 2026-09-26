@@ -127,30 +127,6 @@ Catalog-wide (do T-393 first)
 - [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
 - [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)
 
-Engineering personas
-- [ ] T-400 `personas/qa-engineer.json`: test strategy, cases, regression, bug reports; allow read/write/edit/grep/glob/bash, deny `production.write`. Done: `/persona check` ok and `/agents` lists it
-- [ ] T-401 qa-engineer `/testplan <feature>`: prints a fixed test-plan checklist, zero tokens, only while qa-engineer is active
-- [ ] T-402 `personas/csharp-developer.json`: a .NET specialisation of software-engineer (same tool policy; C#/dotnet prompt and skills). Done: `/persona check` ok
-- [ ] T-403 csharp-developer `/dotnet-check`: prints the restore/build/test/format/vulnerable-package sequence and runs nothing
-- [ ] T-404 `personas/devops-engineer.json`: CI/CD, containers, IaC, release; deny `pipeline.deploy` and `production.write`, `bash` approval `ask`. Done: `/persona check` ok and `/agents` shows the approval as recorded
-- [ ] T-405 devops-engineer `/release-check`: prints a fixed pre-release and rollback checklist, zero tokens
-- [ ] T-406 `personas/security-engineer.json`: a read-only security specialisation of reviewer (deny write/edit; `web.fetch` for advisories). Done: `/persona check` ok
-- [ ] T-407 security-engineer `/threats <component>`: prints a STRIDE plus secrets/dependency checklist, zero tokens
-- [ ] T-408 `personas/frontend-developer.json`: web UI, components, accessibility. Done: `/persona check` ok and `/agents` lists it
-- [ ] T-409 frontend-developer `/a11y`: prints a WCAG AA quick checklist, zero tokens
-
-Business personas
-- [ ] T-420 `personas/hr-specialist.json`: JDs, interview plans, policies, onboarding; the prompt forbids decisions about real individuals, `write` is `ask`, shell and SQL are denied. Done: `/persona check` ok
-- [ ] T-421 hr-specialist `/jd-check`: prints a static job-description checklist, zero tokens
-- [ ] T-422 `personas/product-manager.json`: requirements, PRDs, user stories, prioritisation. Done: `/persona check` ok
-- [ ] T-423 product-manager `/prd [title]`: prints a PRD skeleton, zero tokens
-- [ ] T-424 `personas/technical-writer.json`: docs, READMEs, release notes, API docs; `bash` is `ask` (it only runs examples). Done: `/persona check` ok
-- [ ] T-425 technical-writer `/release-notes`: prints the Added/Changed/Fixed/Deprecated/Breaking/Upgrade template, each line naming its task ID
-- [ ] T-426 `personas/project-manager.json`: plans, milestones, status reports, risk registers. Done: `/persona check` ok
-- [ ] T-427 project-manager `/raid`: prints an empty RAID register, zero tokens
-- [ ] T-428 `personas/customer-support.json`: triage, reply drafts, known-issue summaries; drafts only (no edit, no production, no send). Done: `/persona check` ok
-- [ ] T-429 customer-support `/triage`: prints the S1–S4 severity rubric and escalation rules, zero tokens
-
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions
 - [ ] T-030 `packages/decisions/`; `ctx.decisions` Service + `declare module` augmentation
