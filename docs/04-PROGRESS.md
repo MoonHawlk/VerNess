@@ -54,3 +54,26 @@
 - Only blocker for a live end-to-end run: `DEEPSEEK_API_KEY` (owner-supplied). Everything up to the
   model request already succeeds.
 - **Next: M2 / T-020** — `packages/contracts` (types + schemas only).
+
+## 2026-09-25 — local-model baseline (ADR-0004) and a real integration bug
+- Ollama was already installed (client 0.32.13) with its server up on `:11434` and **no models**;
+  pulled `qwen3:0.6b` (522 MB). (T-017)
+- No adapter of ours was needed: `@deepseek-ai/dsh-llm-pi-ai` already serves OpenAI-compatible
+  self-hosted gateways, so Ollama is a hand-declared route in
+  `profiles/verness/cordis.patch.yml` (`api: openai-completions`, `baseURL: http://localhost:11434/v1`,
+  explicit `models` list) plus an `agent-default-model` override. A keyless route is refused
+  (`PI_AI_ERROR: No API key`), so it declares `apiKeyEnv: OLLAMA_API_KEY` with any non-empty value.
+- **End-to-end verified** (T-018): `dsh --profile verness "Call verness_ping with note=hello..."`
+  returns `VerNess layer verness-spike is mounted: hello`. Local model -> agent loop -> our
+  out-of-tree tool -> rendered result, at zero API cost.
+- **Bug found and fixed (T-019) — worth remembering, it would have cost days later.** Installing
+  `@deepseek-ai/dsh-tools` into the profile (needed for `defineTool`) made every tool call fail with
+  `dsh: UNKNOWN: Cannot read properties of undefined (reading 'prepare')`, including built-in tools.
+  Cause: `TOOL_RUNTIME_SCHEDULER` is a module-local `Symbol(...)`
+  (`packages/core/tools/src/index.ts:480`). The profile copy and the runtime's own copy are two ESM
+  module instances, so `ctx.tools[TOOL_RUNTIME_SCHEDULER]` read by `dsh-agent-loop` was `undefined`.
+  Fix: `pnpm remove` the copy and `pnpm add "link:<global dsh>/node_modules/@deepseek-ai/dsh-tools"`
+  so both resolve to one realpath. **Rule: substrate packages are linked, never added; only our own
+  packages are added.** Documented in `docs/RUNBOOK.md`.
+- Also noted: `pnpm` may abort with `ERR_PNPM_IGNORED_BUILDS` (`@google/genai`, `protobufjs`) while
+  still recording and installing the dependency.

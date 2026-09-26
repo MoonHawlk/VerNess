@@ -21,6 +21,9 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [x] T-014 Row appears in `--dump-config`; a boot writes `mounted`/`disposed` markers and registers the tool with no activation warning. Calling it in a live session still needs `DEEPSEEK_API_KEY` (owner-supplied)
 - [x] T-015 Peer gate passes with exact pins (`@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/dsh-tools@0.1.7-rc.2`); no `compatibility.json` exemption needed
 - [x] T-016 `docs/RUNBOOK.md` rewritten as a verified recipe. **Spike succeeded — ADR-0002 confirmed, no fallback needed.**
+- [x] T-017 Local-model baseline (ADR-0004): Ollama `qwen3:0.6b` wired as the hand-declared pi-ai route `ollama-local`; `agent-default-model` repointed at it
+- [x] T-018 End-to-end verified on the local model: the agent calls `verness_ping` and renders its output — no API cost, no credentials
+- [x] T-019 Fixed the duplicate-substrate-copy fault (`Cannot read properties of undefined (reading 'prepare')`): substrate packages must be `link:`ed to the runtime's own copy, never `add`ed as a second copy
 
 ## M2 — Contracts
 - [ ] T-020 `packages/contracts/` package skeleton (type-only, `@deepseek-ai/cordis` peer)

@@ -73,3 +73,48 @@ dsh --profile verness "call verness_ping and report the result"
 ## Never
 - Edit anything under `upstream/` (ADR-0002).
 - Mix a WSL checkout with Windows-installed dependencies (upstream `docs/development.md:16-22`).
+
+---
+
+## Local-model testing (zero API cost) — see ADR-0004
+
+```powershell
+ollama --version                      # verified: 0.32.13 (server already running on :11434)
+ollama pull qwen3:0.6b                # 522 MB
+dsh plugin --profile verness add @deepseek-ai/dsh-llm-pi-ai@0.1.7-rc.2
+npm run profile:sync
+$env:OLLAMA_API_KEY = "x"             # any non-empty value; Ollama ignores bearer auth
+dsh --profile verness "Call verness_ping with note=hello. Then reply with only the tool output text."
+# -> VerNess layer verness-spike is mounted: hello
+```
+The route and the default-model override live in `profiles/verness/cordis.patch.yml`
+(`providers.ollama-local` + the `agent-default-model` row). Switch back to a paid route by editing
+that one row.
+
+### CRITICAL: never install a dsh runtime package into the profile as a copy
+A plugin of ours that imports from a `@deepseek-ai/dsh-*` package must resolve **the exact same
+files the running runtime uses**. `dsh plugin add @deepseek-ai/dsh-tools@<v>` installs a second
+copy; the loader then resolves the profile's `tools` row to that copy while `dsh-agent-loop` keeps
+its own, and because `TOOL_RUNTIME_SCHEDULER` is a module-local `Symbol(...)`
+(`packages/core/tools/src/index.ts:480`), the two disagree. Every tool call then dies with:
+
+```
+dsh: UNKNOWN: Cannot read properties of undefined (reading 'prepare')
+```
+
+Fix — link the runtime's own copy so both resolve to one realpath (ESM identity is per resolved
+file URL, and a symlink resolves to its target):
+
+```powershell
+cd "$env:USERPROFILE\.dsh\profiles\verness"
+pnpm remove @deepseek-ai/dsh-tools
+pnpm add "link:$env:APPDATA\npm\node_modules\@deepseek-ai\dsh\node_modules\@deepseek-ai\dsh-tools"
+```
+Rule of thumb: **substrate packages are linked, never added; only our own packages are added.**
+
+### Other notes
+- `pnpm` may abort with `ERR_PNPM_IGNORED_BUILDS` (`@google/genai`, `protobufjs`). The dependency is
+  still recorded and installed; run `pnpm approve-builds` in the profile dir only if something
+  actually needs those native builds.
+- `qwen3:0.6b` leaks its reasoning and echoes the system prompt. That is expected; it is a plumbing
+  instrument, not a quality instrument (ADR-0004).

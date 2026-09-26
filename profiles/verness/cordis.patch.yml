@@ -1,5 +1,5 @@
-# VerNess profile patch layer — the single place where our out-of-tree plugins enter the
-# composed dsh tree. Applied after every bundle layer (dsh-base, dsh-headless).
+# VerNess profile patch layer — the single place where our out-of-tree plugins and local-model
+# routes enter the composed dsh tree. Applied after every bundle layer (dsh-base, dsh-headless).
 # Source of truth lives here in the repo; `npm run profile:sync` copies it into
 # $DSH_HOME/profiles/verness/. See docs/RUNBOOK.md.
 
@@ -8,3 +8,32 @@
     # so its position in this list does not matter.
     - id: verness-spike
       name: '@verness/spike'
+
+    # Local-model route for zero-cost testing: Ollama speaks OpenAI Chat Completions on
+    # http://localhost:11434/v1, so it needs no adapter of ours — only a hand-declared pi-ai route
+    # (`api` + `baseURL` + a non-empty `models` list, per that package's README). No API key: the
+    # route needs a key reference anyway (pi-ai refuses a keyless route with PI_AI_ERROR), so we
+    # point it at OLLAMA_API_KEY and give it any non-empty value — Ollama ignores bearer auth.
+    - id: llm-pi-ai
+      name: '@deepseek-ai/dsh-llm-pi-ai'
+      config:
+        providers:
+          ollama-local:
+            displayName: Ollama (local)
+            apiKeyEnv: OLLAMA_API_KEY
+            api: openai-completions
+            baseURL: http://localhost:11434/v1
+            defaultContextWindow: 32768
+            defaultMaxTokens: 4096
+            models:
+              - id: qwen3:0.6b
+                name: Qwen3 0.6B (local)
+                contextWindow: 32768
+                reasoningEfforts: false
+
+# Point the agent at the local route instead of deepseek-official. A patch replaces the targeted
+# row's whole config, so both fields are restated.
+- id: agent-default-model
+  config:
+    provider: ollama-local
+    model: qwen3:0.6b
