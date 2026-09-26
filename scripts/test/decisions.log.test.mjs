@@ -4,8 +4,11 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-import { ROUTING_QUESTIONS, modelAnswers, optionHash, readAnswer } from '../lib/decisions.mjs'
+import { ROUTING_QUESTIONS, logShadowDecision, modelAnswers, optionHash, readAnswer } from '../lib/decisions.mjs'
 
 test('option hash is stable and order-independent', () => {
   const a = optionHash({ criteria: { x: '1', y: '2' } })
@@ -41,4 +44,17 @@ test('modelAnswers builds one entry per routing question with its hash', () => {
   assert.equal(m.level.hash, optionHash(ROUTING_QUESTIONS.level))
   assert.deepEqual(m.level.probabilities, { simple: 0.5 })
   assert.equal(m.tier.answer, undefined)
+})
+
+test('logShadowDecision writes a v2 record with a 12-hex id', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'verness-decisions-'))
+  try {
+    const id = logShadowDecision({ source: 'test', task: 't' }, dir)
+    assert.match(id, /^[0-9a-f]{12}$/)
+    const [file] = readdirSync(dir)
+    const rec = JSON.parse(readFileSync(join(dir, file), 'utf8').trim())
+    assert.equal(rec.v, 2)
+    assert.equal(rec.id, id)
+    assert.equal(rec.source, 'test')
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })

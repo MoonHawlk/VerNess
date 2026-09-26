@@ -199,12 +199,18 @@ export function ruleRoute(text) {
 
 /**
  * Record one shadow-mode decision: what the rules chose (and ran), what the model would have chosen,
- * and how confident it was. This file is the labelled set T-260 will score.
+ * and how confident it was. This file is the labelled set T-220 will score.
+ *
+ * Records are `v: 2` with a random `id` (the label key). Older records have neither and no
+ * probabilities; the labeller derives an id for them.
  * @param {object} record - the decision record.
+ * @param {string} [dir] - where to write; defaults to `decisionsDir()`.
+ * @returns {string} the record id.
  */
-export function logShadowDecision(record) {
-  const dir = decisionsDir()
+export function logShadowDecision(record, dir = decisionsDir()) {
   mkdirSync(dir, { recursive: true })
   const day = new Date().toISOString().slice(0, 10)
-  appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`, 'utf8')
+  const id = randomBytes(6).toString('hex')
+  appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ v: 2, id, at: new Date().toISOString(), ...record })}\n`, 'utf8')
+  return id
 }
