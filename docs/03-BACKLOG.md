@@ -267,6 +267,17 @@ Repo hygiene
 - [ ] T-311 Add the clean-clone check to a pre-push hook or CI so an untracked source directory fails loudly instead of silently
 - [ ] T-312 Assert at startup that every `./lib/*.mjs` the launcher imports is tracked by git, and warn if not
 
+Autonomous task loop (`/loop-task`, research: `docs/research/task-loop-machinery.md`)
+- [x] T-320 Loop primitives in `scripts/lib/loop.mjs`: `observeSession`, `detectStall`, `renderDigest`, `roundPrompt`, `classifyRound` — all read from the durable log, never from the model's account of itself
+- [x] T-321 Driver `scripts/loop-task.mjs` + `/loop-task [--rounds N] [--no-verify] [--here] <objective>`; each round is its own substrate run on one session
+- [x] T-322 Round output parsed from the `--json` event stream (`session`, `final`, `status.usage`, `turn_end`), so classification never sees the model's reasoning and tokens are counted per round
+- [x] T-323 Four anti-repetition defences: a per-round digest naming tools already run; identical-call detection (hard stop); tool-churn detection (same tool, varied arguments); and a no-tool-call-for-two-rounds stall rule
+- [x] T-324 Fresh-context verification before `DONE` is believed — generator is never the evaluator (law 4)
+- [ ] T-325 Port `packages/guard/repeat-tool-reminder` from the substrate in place of our own identical-call check, escalated to a hard block
+- [ ] T-326 Let the decision model give the round verdict (continue/retry/complete/escalate) once calibration clears T-223; today it is rules plus the model's own DONE/BLOCKED line
+- [ ] T-327 Per-round wall-clock budget — the research found no per-turn timeout in the harness, only token and round limits
+- [ ] T-328 Surface loop runs in `/dashboard`; they are already recorded in `.verness/loops/*.jsonl`
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters

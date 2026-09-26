@@ -265,3 +265,23 @@
 - Convention added to `docs/05-CONVENTIONS.md`: verify from a clean clone before claiming a feature
   ships, and check `git ls-files` when a new source directory appears - an ignored file is invisible
   to both `git add` and `git status`.
+
+## 2026-09-26 — /loop-task: the small model finishes a task on its own
+- `/loop-task <objective>` runs bounded rounds until DONE, BLOCKED, repetition, stall or the limit.
+  Each round is a **separate substrate invocation on one session**, so accumulated state lives in the
+  durable log instead of inside the small model's context.
+- **Measured on a real objective** ("count the .json files in personas/"): round 1 ran the tool,
+  round 2 claimed DONE and verification rejected it, round 3 claimed DONE and verification passed.
+  Final answer 4, which is correct. 22,055 input / 983 output tokens across three rounds.
+- Two bugs the first run exposed, both fixed by reading the substrate's **`--json` event stream**
+  instead of the printed transcript:
+  - classification was reading the last printed line, which is usually reasoning, so a round that
+    merely *mentioned* "DONE:" while thinking out loud was misread. `final` carries only the
+    committed answer.
+  - the stall rule also required no new text, so four rounds of pure rambling never tripped it. In a
+    task loop prose is not progress: **two consecutive rounds with no tool call now stop the run**.
+- The stream also reports the session identity directly (no more directory diffing) and per-step
+  token usage, so every round reports its own cost.
+- Verification runs with no `--session-id`, so the checker has never seen the work and cannot be
+  convinced by its own earlier reasoning. When the checker ignores the reply format the driver now
+  says exactly that, instead of reporting an empty rejection.

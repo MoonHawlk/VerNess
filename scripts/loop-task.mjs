@@ -94,7 +94,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
       const check = await verifyRound(ctx, objective, verdict.detail, run, profile)
       if (check.pass) { outcome = 'done'; detail = verdict.detail; ok(`verified: ${check.detail.slice(0, 120)}`); break }
       warn(`verification rejected the claim: ${check.detail.slice(0, 160)}`)
-      constraints.push(`A previous round claimed completion and an independent check rejected it: ${check.detail.slice(0, 200)}`)
+      if (check.detail !== '') constraints.push(`A previous round claimed completion and an independent check rejected it: ${check.detail.slice(0, 200)}`)
       continue
     }
 
@@ -152,6 +152,16 @@ async function verifyRound(ctx, objective, claim, run, profile) {
   const text = parseRound(r.out).answer
   const pass = /^\s*PASS\b/im.test(text)
   const m = /^\s*(?:PASS|NEEDS_WORK):\s*(.+)$/im.exec(text)
+  if (m === null && !pass) {
+    // A small model often ignores the reply format. Say so plainly rather than reporting an empty
+    // rejection: "the checker did not answer" is a different fact from "the work is wrong".
+    return {
+      pass: false,
+      detail: text.trim() === ''
+        ? 'the checker returned nothing'
+        : `the checker did not answer in the required format: ${text.slice(0, 140)}`,
+    }
+  }
   return { pass, detail: m?.[1]?.trim() ?? text.slice(0, 200) }
 }
 
