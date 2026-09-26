@@ -1,0 +1,24 @@
+# Reference clones (research only, never committed) — see docs/04-PROGRESS.md for clone commands
+.refs/
+
+# Dependencies & build output
+node_modules/
+lib/
+dist/
+*.tsbuildinfo
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs & temp
+*.log
+.tmp/
