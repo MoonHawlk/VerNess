@@ -77,3 +77,18 @@
   packages are added.** Documented in `docs/RUNBOOK.md`.
 - Also noted: `pnpm` may abort with `ERR_PNPM_IGNORED_BUILDS` (`@google/genai`, `protobufjs`) while
   still recording and installing the dependency.
+
+## 2026-09-25 — Engram installed as the cost-control layer (ADR-0005)
+- `graphifyy` is a **deprecated forwarding shim**: `graphifyy@0.10.0` -> `@sentropic/graphify@0.19.0`
+  -> `@sentropic/engram@0.19.0` (MIT, github.com/rhanka/engram, published 2026-09-24). Installed
+  engram directly rather than a shim. (T-100)
+- `engram install` writes **user-level** files only — `~/.claude/skills/engram/SKILL.md` and
+  `~/.claude/CLAUDE.md`. It modified nothing in this repo.
+- `engram update .` built the project graph with **zero LLM calls** (AST only): 14 nodes, 20 edges,
+  3 communities, `Token cost: 0 input · 0 output`. (T-101)
+- **Honest verdict:** engram's own report says `Corpus is ~15.673 words - fits in a single context
+  window. You may not need a graph.` So the graph buys us nothing on this repo *today*. It is kept
+  because it is free to maintain, and because the real target is the 13,850-file upstream substrate
+  we currently navigate by grep — that graph must be built outside the submodule (ADR-0002), tracked
+  as T-102.
+- `.engram/` is gitignored for now (T-103 revisits committing `graph.json` once we have real code).

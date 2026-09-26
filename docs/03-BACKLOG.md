@@ -88,6 +88,13 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 - [ ] T-093 PII policy on `fs/*-intent` and tool arguments
 - [ ] T-094 `ctx.invariants` registrations for our own subsystems
 
+## Cost control (Engram) — ADR-0005
+- [x] T-100 Install the knowledge-graph layer: `@sentropic/engram@0.19.0` global CLI (`graphifyy` and `@sentropic/graphify` are deprecated forwarding shims to it)
+- [x] T-101 Build the project graph code-only (`engram update .`, no LLM calls): 14 nodes / 20 edges / 3 communities. Engram itself reports the corpus is too small to benefit yet
+- [ ] T-102 **Where the payoff is**: build a code-only graph of `deepseek-harness` OUTSIDE the submodule (`engram clone`), so upstream navigation becomes graph queries instead of greps. Time-box it; measure tokens-per-question before/after
+- [ ] T-103 Re-evaluate committing `.engram/graph.json` + `GRAPH_REPORT.md` once `packages/*` holds real TypeScript
+- [ ] T-104 Optional: semantic extraction over `docs/` via the local route (`engram extract --backend ollama`) — only worth it with a stronger local model
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters

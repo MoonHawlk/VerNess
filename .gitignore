@@ -23,3 +23,6 @@ Thumbs.db
 *.log
 .tmp/
 verness-spike.log
+
+# Engram generated artifacts (see docs/adr/0005-engram-knowledge-graph.md)
+.engram/

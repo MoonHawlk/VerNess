@@ -118,3 +118,22 @@ Rule of thumb: **substrate packages are linked, never added; only our own packag
   actually needs those native builds.
 - `qwen3:0.6b` leaks its reasoning and echoes the system prompt. That is expected; it is a plumbing
   instrument, not a quality instrument (ADR-0004).
+
+---
+
+## Knowledge graph / cost control (Engram) — see ADR-0005
+
+```powershell
+npm i -g @sentropic/engram        # NOT graphifyy / @sentropic/graphify — both are deprecated shims
+engram install                   # writes ~/.claude/skills/engram/ + ~/.claude/CLAUDE.md (user-level)
+engram scope inspect .           # what would be analyzed (git-committed files; ignores .gitignore)
+engram update .                  # code-only rebuild, AST, ZERO LLM calls -> .engram/graph.json
+engram summary                   # compact orientation
+engram query "what connects the profile patch to the spike plugin?"
+```
+- `.engram/` is gitignored while the corpus is small (engram itself reports there is nothing to
+  compress yet).
+- Semantic extraction over docs needs a model; keep it free with
+  `engram extract --backend ollama` + `OLLAMA_BASE_URL=http://localhost:11434`.
+- `engram update` may ask for assistant-written descriptions/labels under
+  `.engram/*-instructions/`. Optional; it costs session tokens.
