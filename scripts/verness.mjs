@@ -592,10 +592,16 @@ function cmdModel(cfg, args) {
  */
 function syncPatch(cfg) {
   const src = writePatch(cfg)
+  const patchContent = readFileSync(src, 'utf8')
   const dir = profileDir(cfg.profile.name)
   if (!existsSync(dir)) die(`profile "${cfg.profile.name}" does not exist yet`, 'run: ./turn_on.sh setup')
-  writeFileSync(join(dir, 'cordis.patch.yml'), readFileSync(src, 'utf8'), 'utf8')
+  writeFileSync(join(dir, 'cordis.patch.yml'), patchContent, 'utf8')
   ok(`patch synced -> ${join(dir, 'cordis.patch.yml')}`)
+  const webDir = profileDir(`${cfg.profile.name}-web`)
+  if (existsSync(webDir)) {
+    writeFileSync(join(webDir, 'cordis.patch.yml'), patchContent, 'utf8')
+    ok(`patch synced -> ${join(webDir, 'cordis.patch.yml')}`)
+  }
 }
 
 // ---------------------------------------------------------------------- commands
@@ -672,9 +678,44 @@ async function cmdSetup(cfg) {
   }
 
   syncPatch(cfg)
+
+  // Create the companion web profile so `./turn_on.sh web` opens the browser UI.
+  const webName = `${name}-web`
+  const webDir = profileDir(webName)
+  if (!existsSync(join(webDir, 'package.json'))) {
+    step(`creating web profile "${webName}"`)
+    if (dsh(['--profile', webName, '--from-default-profile', 'web', '--dump-config'], { capture: true }).code !== 0) {
+      warn(`could not create web profile "${webName}" — ./turn_on.sh web will not work until setup succeeds`)
+    }
+  }
+  if (existsSync(join(webDir, 'package.json'))) {
+    ok(`web profile ${webDir}`)
+    sh('pnpm', ['add', `${piai}@${want}`], { cwd: webDir, capture: true, allowFail: true })
+    for (const pkg of cfg.settings.linkedSubstratePackages ?? []) {
+      if (root === undefined) { warn(`cannot resolve npm root -g; skipped linking ${pkg} in web profile`); break }
+      const target = join(root, '@deepseek-ai', 'dsh', 'node_modules', ...pkg.split('/'))
+      if (!existsSync(target)) continue
+      if (profileDeps(webDir)[pkg]?.startsWith('link:') !== true) {
+        sh('pnpm', ['remove', pkg], { cwd: webDir, capture: true, allowFail: true })
+        sh('pnpm', ['add', `link:${target}`], { cwd: webDir, capture: true, allowFail: true })
+      }
+      if (profileDeps(webDir)[pkg]?.startsWith('link:') === true) ok(`linked ${pkg} -> runtime copy (web profile)`)
+    }
+    for (const p of cfg.settings.plugins ?? []) {
+      if (p.path === undefined) {
+        sh('pnpm', ['add', p.package], { cwd: webDir, capture: true, allowFail: true })
+        if (profileDeps(webDir)[p.package] !== undefined) ok(`plugin ${p.package} (web profile)`)
+      } else {
+        const abs = resolve(REPO, p.path)
+        if (existsSync(abs)) sh('pnpm', ['add', `file:${abs}`], { cwd: webDir, capture: true, allowFail: true })
+      }
+    }
+  }
+
   await modelUp(cfg)
   step('setup complete')
   info(WIN ? 'next: .\\turn_on.ps1' : 'next: ./turn_on.sh')
+  info(WIN ? 'web UI: .\\turn_on.ps1 web' : 'web UI: ./turn_on.sh web')
 }
 
 /**
@@ -698,6 +739,7 @@ async function cmdDoctor(cfg) {
     ['engine', version(cfg.model.engine ?? 'ollama') ?? '-', (await engineAnswers(cfg.model.baseURL)) ? 'serving' : 'not serving'],
     ['engram', version('engram') ?? '-', version('engram') === undefined ? 'optional' : 'ok'],
     ['profile', profileDir(cfg.profile.name), existsSync(profileDir(cfg.profile.name)) ? 'ok' : 'run setup'],
+    ['web profile', profileDir(`${cfg.profile.name}-web`), existsSync(profileDir(`${cfg.profile.name}-web`)) ? 'ok' : 'run setup'],
     ['submodule', 'upstream/deepseek-harness', existsSync(join(REPO, 'upstream/deepseek-harness/package.json')) ? 'ok' : 'run setup'],
     ['persona', activePersonaId(cfg), `${(cfg.tips ?? []).length} tip(s)`],
     ['model', readState().model ?? cfg.model.id, cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute],
@@ -811,6 +853,23 @@ async function cmdRun(cfg, task) {
   rl?.close()
 }
 
+/**
+ * Boot the web surface profile. The model engine is shared with the headless profile; the
+ * cordis.patch.yml is kept in sync by `syncPatch` so model/persona config is always current.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ */
+async function cmdRunWeb(cfg) {
+  const webName = `${cfg.profile.name}-web`
+  const webDir = profileDir(webName)
+  if (!existsSync(join(webDir, 'package.json'))) die(`profile "${webName}" does not exist`, 'run: ./turn_on.sh setup')
+  syncPatch(cfg)
+  const { route, r, env } = resolveRoute(cfg)
+  if (r.engine !== undefined && !(await modelUp(cfg))) die('the local model is not ready')
+  step('booting the web surface')
+  info('open http://localhost:6173 in your browser once the server is ready')
+  dsh(['--profile', webName], { env })
+}
+
 /** Rebuild the local knowledge graph (AST only, no LLM calls). */
 function cmdGraph() {
   if (version('engram') === undefined) die('engram is not installed', 'run: npm i -g @sentropic/engram')
@@ -822,9 +881,10 @@ const HELP = `VerNess launcher
   ./turn_on.sh [command]      macOS/Linux        .\\turn_on.ps1 [command]   Windows
 
 commands
-  (none)        boot the harness; headless profiles prompt for tasks in a loop
-  "<task>"      run one task and exit
-  setup         install/repair pnpm, dsh, the profile, its deps and the local model
+  (none)        boot the harness; headless profile prompts for tasks in a loop (CLI)
+  web           open the browser UI (dsh-web-ui); requires ./turn_on.sh setup first
+  "<task>"      run one task and exit (one-shot, works in both CLI and web profiles)
+  setup         install/repair pnpm, dsh, both profiles (CLI + web), deps and local model
   up            start the local model: engine, weights (Hugging Face GGUF), warm-up
   stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
   down          unload the model, free its memory and stop the engine we started
@@ -865,6 +925,7 @@ switch (first) {
   case 'setup': await cmdSetup(cfg); break
   case 'doctor': await cmdDoctor(cfg); break
   case 'sync': syncPatch(cfg); break
+  case 'web': await cmdRunWeb(cfg); break
   case 'graph': cmdGraph(); break
   case 'help': case '--help': case '-h': console.log(HELP); break
   case 'run': await cmdRun(cfg, rest); break

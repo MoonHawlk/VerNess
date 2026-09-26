@@ -133,6 +133,7 @@
     // installed into the profile; omit it for a published package.
     "plugins": [
       { "id": "verness-spike", "package": "@verness/spike", "path": "packages/spike", "enabled": true },
+      { "id": "dsh-web-ui", "package": "@linxin666/dsh-web-all", "enabled": true },
     ],
     // Substrate packages our plugins import. These are LINKED to the running
     // runtime's own copy, never installed as a second copy — two copies break
