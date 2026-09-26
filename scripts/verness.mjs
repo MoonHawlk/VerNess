@@ -111,13 +111,24 @@ function loadConfig() {
 export const loadConfigForCli = () => loadConfig()
 
 /**
+ * Load the command registry with the active persona's own commands layered on top, so `/help` and
+ * dispatch both see them exactly while that persona is active.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {Promise<Map<string, object>>} commands by name, including aliases.
+ */
+async function loadActiveCommands(cfg) {
+  const persona = loadPersonas(cfg).get(activePersonaId(cfg))
+  return loadCommands({ persona, root: REPO })
+}
+
+/**
  * Build a command context for a standalone script entry point (loop-task, dashboard and friends),
  * so those tools get the same `dsh` runner, route environment and conversation the REPL uses.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @returns {Promise<object>} the context.
  */
 export async function makeCliContext(cfg) {
-  const commands = await loadCommands()
+  const commands = await loadActiveCommands(cfg)
   const convo = conversation(REPO.replace(/[\/:]+/g, '-').replace(/^-+|-+$/g, ''))
   return makeCtx(cfg, commands, convo)
 }
@@ -896,7 +907,7 @@ async function cmdRun(cfg, task) {
   }
   if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env }); return }
 
-  const commands = await loadCommands()
+  const commands = await loadActiveCommands(cfg)
   const count = new Set([...commands.values()]).size
   const boot = effectiveRoute(cfg)
   if (petEnabled(cfg)) {
@@ -940,7 +951,17 @@ async function cmdRun(cfg, task) {
     // be swallowed by the registry.
     if (line.startsWith('/')) {
       // Re-read the config: an earlier command may have switched persona or model.
-      const { handled } = await runCommand(line, makeCtx(loadConfig(), commands, convo))
+      const cfgNow = loadConfig()
+      const { handled } = await runCommand(line, makeCtx(cfgNow, commands, convo))
+      const typedWord = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
+      if (handled && (typedWord === 'persona' || typedWord === 'p')) {
+        // A persona switch may add or drop commands; reload in place so `makeSuggester` and
+        // `makeCompleter` (which both hold this same Map) see the new registry with no further
+        // plumbing - reassigning `commands` here would leave their closures pointed at the old one.
+        const fresh = await loadActiveCommands(cfgNow)
+        commands.clear()
+        for (const [k, v] of fresh) commands.set(k, v)
+      }
       if (!handled) {
         const typed = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
         const near = [...new Set([...commands.values()].map(c => c.name))]
@@ -1049,7 +1070,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
 async function dispatch(first, rest, cfg) {
   // A bare word that names a quick-tool runs it; a quoted sentence never does, so
   // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
-  const commands = await loadCommands()
+  const commands = await loadActiveCommands(cfg)
   if (first !== undefined && (first.startsWith('/') || (!first.includes(' ') && commands.has(first.toLowerCase())))) {
     const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
     const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands, convo))
