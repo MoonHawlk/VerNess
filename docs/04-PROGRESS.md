@@ -519,3 +519,18 @@
   equal to the live `laya-serve.exe`. `npm test` 142/142 (quoting tests in `util.background.test.mjs`).
 - Also: boot ran `dsh --version` twice in a row; it now reuses the first result.
 - Not ours: `docker.exe context ls` processes seen during boot come from Docker Desktop.
+
+## 2026-09-26 — epic updated; WS-I persona catalog planned (T-393..T-397, T-400..T-409, T-420..T-429)
+- `main` merged into `epic` and pushed (`06c3c18`). The labelling operator step moved from T-389 to
+  **T-392**, because epic had already used T-389 for the dashboard backlog. Also fixed: the dashboard
+  counted `labels.jsonl` lines as decisions (80 instead of 20).
+- New branch `persona-tasks-and-calibration` from epic.
+- **WS-I planned**: ten personas drafted by two parallel subagents with disjoint scopes and ID ranges
+  (engineering: qa, csharp, devops, security, frontend; business: hr, product, technical-writer,
+  project, customer-support), merged and checked here. Every tool name they use already exists in a
+  shipped persona file, and none of the ten command names clashes with a global command. Each
+  persona states its boundary against the existing six. Full specs are in
+  `docs/superpowers/plans/2026-09-26-09-persona-catalog.md`.
+- Found while planning: the catalog would reach 17 personas, which breaks the 8-option limit
+  (T-385) that T-230's single-choice persona router assumes. T-396 (two-stage routing) fixes the
+  design, and the T-230 line now points to it.
