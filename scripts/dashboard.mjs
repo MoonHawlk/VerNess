@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
 import { listSessions, readSessionEvents } from './lib/sessions.mjs'
 import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
 
@@ -44,13 +45,13 @@ function dur(ms) {
  */
 function detail(summary) {
   const events = readSessionEvents(join(summary.dir, 'session.v4.jsonl.zstd'))
-  const t0 = events[0]?.time ?? 0
+  const t0 = events.find(e => typeof e.time === 'number')?.time ?? 0
   const timeline = []
   const tools = []
   let prompt
   let answer
   for (const e of events) {
-    const at = Number(e.time ?? 0) - t0
+    const at = Math.max(0, Number(e.time ?? t0) - t0)
     switch (e.type) {
       case 'user/message': {
         const text = (e.data?.message?.content ?? []).map(c => c.text ?? '').join(' ').trim()
@@ -151,13 +152,21 @@ function readTeamRuns() {
   return runs.sort((a, b) => b.at - a.at)
 }
 
+/** @returns {{tasks: object[], html: string}} open backlog tasks and the rendered backlog file. */
+export function readBacklog() {
+  const file = join(REPO, 'docs', '03-BACKLOG.md')
+  if (!existsSync(file)) return { tasks: [], html: '' }
+  const md = readFileSync(file, 'utf8')
+  return { tasks: parseBacklog(md).map(t => ({ ...t, html: inline(t.text) })), html: markdownToHtml(md) }
+}
+
 /**
  * Render the page. Minimal CSS, no external assets, both colour schemes.
  * @param {object} data - everything the page shows.
  * @returns {string} the HTML document.
  */
 function render(data) {
-  const { sessions, decisions, teamRuns, totals, generated } = data
+  const { sessions, decisions, teamRuns, totals, generated, backlog = { tasks: [], html: '' } } = data
   const agreeRate = decisions.length === 0
     ? '-'
     : `${Math.round((decisions.reduce((a, d) => a + (d.agreement ?? 0), 0) / (decisions.length * 3)) * 100)}%`
@@ -228,6 +237,17 @@ tr:last-child td{border-bottom:none}
 .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:11px;margin:1px 0}
 .detail{display:none;background:var(--card);border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;padding:14px}
 .detail.open{display:block}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;font-size:12px}
+.bar select,.bar input,.bar button,td select{font:inherit;font-size:12px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.bar button{cursor:pointer}.bar input{flex:1 1 180px}
+.bl td.grp{color:var(--dim);font-size:12px;max-width:200px}
+.bl tr.subtask td.mono{padding-left:22px}
+.p0{color:var(--bad);font-weight:600}.p1{color:var(--accent);font-weight:600}
+.md{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 18px;margin-top:8px}
+.md h2{font-size:15px}.md h3{font-size:14px}.md h4{font-size:13px}.md ul{padding-left:20px;margin:4px 0}.md li{margin:2px 0}
+.md blockquote{margin:6px 0;padding:2px 10px;border-left:3px solid var(--line);color:var(--dim)}
+.md code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--bg);border-radius:4px;padding:0 3px}
+.md .cont{margin-left:22px;color:var(--dim)}.md a{color:var(--accent)}
 .tl{display:grid;grid-template-columns:70px 90px 1fr;gap:2px 10px;font-size:12px}
 .tl .t{color:var(--dim);font-variant-numeric:tabular-nums;text-align:right}
 .tl .k{color:var(--dim)}
@@ -250,6 +270,19 @@ ${card('model time', dur(totals.wall), 'sum of session wall time')}
 ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree with rules`)}
 </div>
 
+<h2>Backlog <span class="dim">(${esc(backlog.tasks.length)} open · docs/03-BACKLOG.md · priorities stay in this browser)</span></h2>
+<div class="bar">
+  <input id="bl-q" placeholder="filter by id or text">
+  <select id="bl-g"><option value="">all groups</option>${[...new Set(backlog.tasks.map(t => t.group))].map(g => `<option>${esc(g)}</option>`).join('')}</select>
+  <select id="bl-p"><option value="">any priority</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option><option value="-">unset</option></select>
+  <label><input type="checkbox" id="bl-sort"> sort by priority</label>
+  <button id="bl-copy">copy prioritized list</button>
+  <span id="bl-msg" class="dim"></span>
+</div>
+<table class="bl"><thead><tr><th>priority</th><th>id</th><th>task</th><th>group</th></tr></thead>
+<tbody id="bl-body">${backlog.tasks.length === 0 ? '<tr><td colspan="4" class="dim">no open tasks found in docs/03-BACKLOG.md</td></tr>' : ''}</tbody></table>
+<details><summary>full backlog file (rendered)</summary><div class="md">${backlog.html}</div></details>
+
 <h2>Sessions</h2>
 <table><thead><tr><th>id</th><th>when</th><th>title</th><th class="n">turns</th><th class="n">tools</th><th class="n">in</th><th class="n">out</th><th class="n">wall</th><th>route</th></tr></thead>
 <tbody>${sessionRows || '<tr><td colspan="9" class="dim">no sessions yet</td></tr>'}</tbody></table>
@@ -263,9 +296,50 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <table><thead><tr><th>team</th><th>when</th><th class="n">tasks</th><th>outcome</th><th>transcripts</th></tr></thead>
 <tbody>${teamRows || '<tr><td colspan="5" class="dim">no team runs yet — /team run &lt;id&gt;</td></tr>'}</tbody></table>
 
-<footer>Read from the substrate's durable session logs, <span class="mono">.verness/decisions/*.jsonl</span> and <span class="mono">.verness/runs/</span>. Static file, no server, no network.</footer>
+<footer>Backlog from <span class="mono">docs/03-BACKLOG.md</span>. Read from the substrate's durable session logs, <span class="mono">.verness/decisions/*.jsonl</span> and <span class="mono">.verness/runs/</span>. Static file, no server, no network.</footer>
 
 <script>
+const BACKLOG = ${JSON.stringify(backlog.tasks).replaceAll('<', '\\u003c')};
+(() => {
+  const KEY = 'verness.backlog.priority';
+  let prio = {};
+  try { prio = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { prio = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prio)); } catch { /* storage blocked */ } };
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const rank = id => ({ P0: 0, P1: 1, P2: 2, P3: 3 }[prio[id]] ?? 4);
+  const $ = id => document.getElementById(id);
+  const visible = () => {
+    const q = $('bl-q').value.toLowerCase(), g = $('bl-g').value, p = $('bl-p').value;
+    let rows = BACKLOG.filter(t => (g === '' || t.group === g)
+      && (p === '' || (p === '-' ? !prio[t.id] : prio[t.id] === p))
+      && (q === '' || (t.id + ' ' + t.text).toLowerCase().includes(q)));
+    if ($('bl-sort').checked) rows = rows.map((t, i) => [t, i]).sort((a, b) => rank(a[0].id) - rank(b[0].id) || a[1] - b[1]).map(x => x[0]);
+    return rows;
+  };
+  const draw = () => {
+    if (BACKLOG.length === 0) return;
+    $('bl-body').innerHTML = visible().map(t => '<tr class="' + (t.parent ? 'subtask' : '') + '">'
+      + '<td><select data-id="' + esc(t.id) + '" class="' + (prio[t.id] || '').toLowerCase() + '">'
+      + ['', 'P0', 'P1', 'P2', 'P3'].map(v => '<option' + (prio[t.id] === v || (!prio[t.id] && v === '') ? ' selected' : '') + ' value="' + v + '">' + (v || '—') + '</option>').join('')
+      + '</select></td><td class="mono">' + esc(t.id) + '</td><td>' + t.html + '</td>'
+      + '<td class="grp">' + esc(t.group) + (t.sub ? ' · ' + esc(t.sub) : '') + '</td></tr>').join('')
+      || '<tr><td colspan="4" class="dim">nothing matches</td></tr>';
+  };
+  $('bl-body').addEventListener('change', e => {
+    const id = e.target.dataset.id; if (!id) return;
+    if (e.target.value === '') delete prio[id]; else prio[id] = e.target.value;
+    save(); draw();
+  });
+  ['bl-q', 'bl-g', 'bl-p', 'bl-sort'].forEach(id => $(id).addEventListener('input', draw));
+  $('bl-copy').addEventListener('click', () => {
+    const rows = BACKLOG.filter(t => prio[t.id]).sort((a, b) => rank(a.id) - rank(b.id));
+    const md = rows.map(t => '- [ ] **' + prio[t.id] + '** ' + t.id + ' ' + t.text).join('\\n');
+    const done = n => { $('bl-msg').textContent = n; setTimeout(() => { $('bl-msg').textContent = ''; }, 2500); };
+    if (rows.length === 0) return done('set a priority first');
+    (navigator.clipboard ? navigator.clipboard.writeText(md) : Promise.reject()).then(() => done(rows.length + ' copied'), () => { window.prompt('copy:', md); });
+  });
+  draw();
+})();
 const DATA = ${JSON.stringify(sessions).replaceAll('<', '\\u003c')};
 const panel = document.getElementById('detail');
 let open = null;
@@ -315,12 +389,13 @@ export function buildDashboard(cfg, opts = {}) {
     outputTokens: sessions.reduce((a, s) => a + s.outputTokens, 0),
     wall: sessions.reduce((a, s) => a + s.wall, 0),
   }
-  const html = render({ sessions, decisions, teamRuns, totals, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
+  const backlog = readBacklog()
+  const html = render({ sessions, decisions, teamRuns, totals, backlog, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
   const out = join(REPO, '.verness', 'dashboard.html')
   mkdirSync(join(REPO, '.verness'), { recursive: true })
   writeFileSync(out, html, 'utf8')
   ok(`dashboard written (${human(Buffer.byteLength(html))}): ${out}`)
-  info(`${totals.sessions} sessions · ${decisions.length} decisions · ${teamRuns.length} team runs`)
+  info(`${totals.sessions} sessions · ${decisions.length} decisions · ${teamRuns.length} team runs · ${backlog.tasks.length} open tasks`)
   if (opts.open !== false) {
     const cmd = WIN ? 'explorer' : process.platform === 'darwin' ? 'open' : 'xdg-open'
     spawn(cmd, [out], { detached: true, stdio: 'ignore', shell: WIN }).on('error', () => info('open it manually')).unref()
