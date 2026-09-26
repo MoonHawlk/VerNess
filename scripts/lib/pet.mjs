@@ -179,52 +179,136 @@ export function moodOf(v) {
 }
 
 /**
- * The face on the cube's front (its screen), per mood: eyes and mouth, plus a mark floating above.
- * Odd-width pieces on an odd-width face, so everything centres exactly. ASCII only - legacy
- * consoles mangle the rest.
+ * Ness is a baby sheep, drawn in blocks: every pixel of the original sprite is one half-cell, so a
+ * terminal cell (about twice as tall as wide) holds two pixels stacked and the proportions survive.
+ * The shades are her wool (`░`), cheeks and mouth (`▒`) and nose (`▓`).
  */
-const FACES = {
-  happy: { mark: '', eyes: 'o   o', mouth: 'u' },
-  sleepy: { mark: 'z', eyes: '-   -', mouth: '.' },
-  worried: { mark: '!', eyes: 'o   o', mouth: '~' },
+const SHEEP = [
+  '      ▄▀▀▀▀▀▀▀▀▀▄',
+  '    ▄▀           ▀▄   ▄▄▄▄   ▄▄▄▓▄',
+  '   ▄▀ ▄▀▀▀▀▀▀▀▄    ▀▀▀    ▀▀▀     ▀▀▄',
+  ' ▄▀▀▄▀░░▄░░▄░░░█ ▄▀▄▒                ▀▄',
+  '  ▀▀█░░░▀░░▀░░░█ ▀▄▄▓▀                 ▀▄',
+  '   █░░░░░░░░░░░█                        █',
+  '  █░▓▓▓▓░░░░░▄▀                         █',
+  '  ▀▄░▓▓░▒░▒▄▀░ ░░ ░ ░░   ░    ░ ░       █',
+  '   ▀▄▄▄▄▄▓▓▀░░ ░  ░ ░  ░░░ ░    ░░      █',
+  '         █▓░                            █',
+  '           █░              ░          ░▄▀',
+  '          ░▀▄░░░░░░░░░  ░░░░░░    ░░▄▄▄▀',
+  '             ▀▄▀▄▄▄▀▓▄▄▄▀▀▀▀▀▄▄▄▓█▀█░█',
+  '              █░█ █░▒█        █▒▒█ █░█',
+  '              █░█ █░░█        █░▒█ █░█',
+  '              █▀█ █▀▀█        █▀▓█ █▀█',
+  '          ░░ ░  ░░▒░░░  ░ ░░░░░░',
+]
+/** Her eyes are two pixels tall, split over rows 3 (lower half) and 4 (upper half), columns 8 and 11. */
+const EYES = { rows: [3, 4], cols: [8, 11] }
+/** Per mood: the mark floating above her head, and whether her eyes are open. */
+const MOODS = {
+  happy: { mark: '', open: true },
+  sleepy: { mark: 'z', open: false },
+  worried: { mark: '!', open: true },
 }
-/**
- * Cube geometry, oblique projection. The front face is 13 x 6 cells, which reads as square because a
- * terminal cell is about twice as tall as it is wide; the depth recedes 3 rows, one column per row,
- * so every receding edge is a single clean `/`.
- */
-const CUBE = { w: 13, h: 6, d: 3 }
+/** Every line of the art is padded to this width, so the panel beside it stays aligned. */
+const ART_W = Math.max(...SHEEP.map(l => l.length))
 
 /**
- * Ness is a cube - a little TV with a face on its screen. Built from the geometry rather than drawn
- * by hand, so the edges stay parallel and the corners meet whatever the face shows.
+ * The sheep for a mood. Only the face changes - closed eyes keep just the lower lid - so her
+ * outline stays put.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} ten lines (the mood mark, then the cube), each exactly 16 columns wide.
+ * @returns {string[]} eighteen lines (the mood mark, then the sheep), each exactly 41 columns wide.
  */
 export function petArt(mood) {
-  const f = FACES[mood] ?? FACES.happy
-  const { w, h, d } = CUBE
-  const inner = w - 2
-  const center = s => {
-    const left = Math.floor((inner - s.length) / 2)
-    return ' '.repeat(left) + s + ' '.repeat(inner - s.length - left)
+  const m = MOODS[mood] ?? MOODS.happy
+  const rows = SHEEP.map(l => [...l])
+  if (!m.open) for (const c of EYES.cols) rows[EYES.rows[0]][c] = '░'
+  return [`    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
+}
+
+/**
+ * The round Ness, kept for the boot animation (plan WS-C decides how it and the sheep fit together).
+ * Keyed by the sheep's moods so `moodOf` drives both: sleepy uses the round pet's curious frames,
+ * worried its sad ones. Every frame is 8 lines x 9 columns, so the animator overwrites in place.
+ */
+const W_FRAME = 9
+const FRAMES = {
+  happy: [
+    // quiet start
+    ['         ', '  o      ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+    // excited, first bounce
+    ['   o     ', ' o       ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(  \\u/  )', ' (     ) ', '  (   )  '],
+    // peak jump - floats up, big smile, bubbles everywhere
+    ['  o  o   ', '    o    ', '  (   )  ', ' ( ^_^ ) ', '(  \\u/  )', '(       )', ' (     ) ', '         '],
+    // settled, bubbles drifting (resting)
+    ['  o   o  ', '   o     ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+  ],
+  worried: [
+    // normal but sad
+    ['         ', '         ', '  (   )  ', ' (     ) ', '( -   - )', '(   ~   )', ' (     ) ', '  (   )  '],
+    // starts drooping
+    ['         ', '         ', '  (   )  ', ' ( _   _)', '(   ~   )', '(       )', ' ( , , ) ', '  (   )  '],
+    // fully wilting - shape deforms
+    ['         ', '         ', '   ( )   ', '  (- -  )', ' ( ~~~  )', '(       )', ' /     \\ ', '         '],
+    // resting sad state
+    ['         ', '         ', '  (   )  ', ' ( -   -)', '(   ~   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
+  sleepy: [
+    // round, curious look
+    ['         ', '         ', '  (   )  ', ' ( o . ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+    // squashed into a wide oval
+    ['         ', '         ', ' /-----\\ ', '/ o   o \\', '(   ??  )', '\\-------/', '         ', '         '],
+    // stretched into a tall oval
+    ['         ', '  (   )  ', ' (     ) ', '( o . o )', '(   ?   )', ' (     ) ', '  (   )  ', '         '],
+    // back to round, still curious (resting)
+    ['         ', '         ', '  (   )  ', ' ( o ? ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
+}
+
+/**
+ * All animation frames of the round Ness for a mood, each line padded to W_FRAME.
+ * @param {'happy'|'sleepy'|'worried'} mood - the mood.
+ * @returns {string[][]} the frames, in playback order.
+ */
+export function petAnimFrames(mood) {
+  return (FRAMES[mood] ?? FRAMES.happy).map(frame => frame.map(l => l.padEnd(W_FRAME)))
+}
+
+/** @param {number} ms @returns {Promise<void>} */
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Play the boot animation, then show the full status panel. Off a TTY it shows the static panel only.
+ * Not wired into the boot yet - `cmdRun` still prints `renderPet` directly.
+ * @param {object} v - vitals from `gatherVitals`.
+ * @param {{columns?: number}} [opts]
+ */
+export async function animatePet(v, opts = {}) {
+  const { mood } = moodOf(v)
+  if (!process.stdout.isTTY) {
+    console.log()
+    for (const l of renderPet(v, opts)) console.log(l)
+    console.log()
+    return
   }
-  const edge = `+${'-'.repeat(inner)}+`
-  const face = { 1: f.eyes, 2: f.mouth }
-  const rows = []
-  for (let r = 0; r < d + h; r++) {
-    if (r === 0) rows.push(`${' '.repeat(d)}${edge}`)
-    else if (r < d) rows.push(`${' '.repeat(d - r)}/${' '.repeat(inner)}/${' '.repeat(r - 1)}|`)
-    else if (r === d) rows.push(`${edge}${' '.repeat(d - 1)}|`)
-    else if (r === d + h - 1) rows.push(edge)
-    else {
-      // The back-right edge drops to the back face's bottom corner, then recedes to the front one.
-      const back = r < h - 1 ? '|' : r === h - 1 ? '+' : '/'
-      const gap = r <= h - 1 ? d - 1 : d - 1 - (r - (h - 1))
-      rows.push(`|${center(face[r - d - 1] ?? '')}|${' '.repeat(gap)}${back}`)
-    }
+  const frames = petAnimFrames(mood)
+  const FH = frames[0].length
+  const writeFrame = frame => {
+    for (const l of frame) process.stdout.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
   }
-  return [`${' '.repeat(w + 1)}${f.mark}`, ...rows].map(l => l.padEnd(w + d))
+  writeFrame(frames[0])
+  for (let i = 1; i < frames.length; i++) {
+    await sleep(160)
+    process.stdout.write(`\x1b[${FH}A\r`)
+    writeFrame(frames[i])
+  }
+  // Erase the animation area, then draw the full panel.
+  process.stdout.write(`\x1b[${FH}A\r`)
+  for (let i = 0; i < FH; i++) process.stdout.write('\x1b[2K\n')
+  process.stdout.write(`\x1b[${FH}A\r`)
+  console.log()
+  for (const l of renderPet(v, opts)) console.log(l)
+  console.log()
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -302,7 +386,8 @@ export function renderPet(v, opts = {}) {
   const rows = [['', title], ...panelRows(v)]
   const label = Math.max(...rows.map(([l]) => l.length))
   const cols = opts.columns
-  const side = cols !== undefined && cols >= 64
+  // Beside the panel only when the panel still gets a readable 50 columns next to the sheep.
+  const side = cols !== undefined && cols >= art[0].length + 56
   // One column of slack: a line that fills the last column makes conhost wrap an empty line.
   const room = side ? cols - art[0].length - 6 : (cols ?? Infinity) - 3
 
@@ -318,10 +403,14 @@ export function renderPet(v, opts = {}) {
   const panel = rows.map(draw)
   const speech = `${paint('cyan', `${v.name}:`)} ${fit(says, room - v.name.length - 2)}`
 
-  // The mood-mark line above the cube is only worth a row when it carries a mark.
+  // The mood-mark line above the sheep is only worth a row when it carries a mark.
   const shown = art[0].trim() === '' ? art.slice(1) : art
-  if (!side) return [...shown.map(a => `  ${paint('cyan', a)}`.trimEnd()), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
-  // Side by side, bottom-aligned: the title sits by the top of the cube and Ness speaks beside its bottom edge.
+  if (!side) {
+    // Too narrow even for the sheep alone: a wrapped sprite is noise, so the panel goes on without her.
+    const fits = cols === undefined || cols > art[0].length + 2
+    return [...(fits ? shown.map(a => `  ${paint('cyan', a)}`.trimEnd()) : []), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
+  }
+  // Side by side, bottom-aligned: the title sits by her head and Ness speaks beside her hooves.
   const beside = [...panel, '', speech]
   const height = Math.max(shown.length, beside.length)
   const artAt = height - shown.length

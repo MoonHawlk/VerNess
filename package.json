@@ -1,6 +1,6 @@
 {
   "name": "verness",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "VerNess — a model-agnostic, plugin-native AI execution harness built on the DeepSeek Harness (dsh) / Cordis substrate.",
   "license": "MIT",
@@ -11,6 +11,7 @@
   },
   "scripts": {
     "start": "node scripts/verness.mjs",
+    "web": "node scripts/verness.mjs web",
     "setup": "node scripts/verness.mjs setup",
     "doctor": "node scripts/verness.mjs doctor",
     "sync": "node scripts/verness.mjs sync",

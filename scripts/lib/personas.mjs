@@ -14,7 +14,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { parseJsonc, REPO, RUN_DIR } from './util.mjs'
 
@@ -134,9 +134,12 @@ export function describePersona(p) {
  * Used by the team runner so concurrent tasks can wear different personas.
  * @param {object} persona - a normalized persona.
  * @param {object} cfg - the VerNess configuration.
+ * @param {string} [file] - where to write it. Concurrent runs must each pass their own: rewriting the
+ *   shared per-persona file while another run's dsh is still reading it could hand that run a
+ *   truncated overlay.
  * @returns {string} the overlay path, to pass as `dsh --patch <path>`.
  */
-export function writePersonaOverlay(persona, cfg) {
+export function writePersonaOverlay(persona, cfg, file = join(RUN_DIR, `persona-${persona.id}.patch.yml`)) {
   const { prefix, suffix } = personaPrompt(persona, cfg.tips ?? [])
   const q = s => `'${String(s).replaceAll("'", "''")}'`
   const block = (key, text, pad) => (text.includes('\n')
@@ -151,11 +154,11 @@ export function writePersonaOverlay(persona, cfg) {
   ]
   if (persona.model.id !== undefined) {
     L.push('- id: agent-default-model', '  config:',
-      `    provider: ${persona.model.route ?? (cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute)}`,
+      // A persona model without a route is a local model preference (see lib/routes.mjs).
+      `    provider: ${persona.model.route ?? cfg.model.route}`,
       `    model: ${q(persona.model.id)}`)
   }
-  mkdirSync(RUN_DIR, { recursive: true })
-  const file = join(RUN_DIR, `persona-${persona.id}.patch.yml`)
+  mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, `${L.join('\n')}\n`, 'utf8')
   return file
 }

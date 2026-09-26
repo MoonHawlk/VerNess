@@ -69,6 +69,11 @@ dsh --profile verness "call verness_ping and report the result"
   `compatibility.json` exemption (verified 2026-09-25).
 - **`MISSING_CREDENTIAL: llm-deepseek`** — expected until `DEEPSEEK_API_KEY` is set; everything
   before the model request has already succeeded by then.
+- **`npm i -g @sentropic/engram` warns that install scripts were not run** — npm 11+ skips install
+  scripts of global packages by default, so the tree-sitter parsers' scripts did not run. The graph
+  built fine without them (macOS, 2026-09-26). Only if a language fails to parse, reinstall with
+  the list the warning prints:
+  `npm install -g --allow-scripts=@sentropic/engram,tree-sitter-<lang>,... @sentropic/engram@0.19.0`.
 
 ## Never
 - Edit anything under `upstream/` (ADR-0002).
@@ -124,10 +129,10 @@ Rule of thumb: **substrate packages are linked, never added; only our own packag
 ## Knowledge graph / cost control (Engram) — see ADR-0005
 
 ```powershell
-npm i -g @sentropic/engram        # NOT graphifyy / @sentropic/graphify — both are deprecated shims
+npm i -g @sentropic/engram@0.19.0 # NOT graphifyy / @sentropic/graphify — both are deprecated shims
 engram install                   # writes ~/.claude/skills/engram/ + ~/.claude/CLAUDE.md (user-level)
 engram scope inspect .           # what would be analyzed (git-committed files; ignores .gitignore)
-engram update .                  # code-only rebuild, AST, ZERO LLM calls -> .engram/graph.json
+engram update .                  # = ./turn_on.sh graph: AST only, ZERO LLM calls -> .engram/graph.json
 engram summary                   # compact orientation
 engram query "what connects the profile patch to the spike plugin?"
 ```
@@ -137,3 +142,6 @@ engram query "what connects the profile patch to the spike plugin?"
   `engram extract --backend ollama` + `OLLAMA_BASE_URL=http://localhost:11434`.
 - `engram update` may ask for assistant-written descriptions/labels under
   `.engram/*-instructions/`. Optional; it costs session tokens.
+- A new Claude Code session is needed before `/engram` (deprecated alias `/graphify`) appears.
+- Setup, current numbers and the optional `engram claude install` hook:
+  [`06-SETUP-AND-LAUNCHER.md`](06-SETUP-AND-LAUNCHER.md#knowledge-graph-graph--adr-0005).

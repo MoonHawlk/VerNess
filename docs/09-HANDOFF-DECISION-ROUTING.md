@@ -16,8 +16,8 @@ expensive intelligence is only invoked where cheap computation could not decide 
 |---|---|---|
 | Substrate + profile + launcher | working | `./turn_on.cmd`, `scripts/verness.mjs` |
 | Local generative model (Qwen3 0.6B, HF GGUF) | working, `up`/`stats`/`down` | `scripts/model.mjs`, ADR-0007 |
-| Personas as files, teams, quick-tool registry | **committed but unwired** — see T-140..T-146 | `scripts/commands/`, `scripts/lib/` |
-| Decision layer | **planned only** | `docs/08-DECISION-LAYER-LAYA.md`, ADR-0009 |
+| Personas as files, teams, quick-tool registry | working (wired 2026-09-26) | `scripts/commands/`, `scripts/lib/` |
+| Decision layer | sidecar + shadow logging working; calibration next (plan WS-E) | `scripts/lib/decisions.mjs`, `docs/superpowers/plans/2026-09-26-05-decision-calibration-routing.md` |
 | Session-log reader (usage/telemetry) | working | `scripts/lib/sessions.mjs` |
 
 **Order matters**: T-140 (REPL dispatch) and T-141 (`writePatch` honouring persona state) are
@@ -50,7 +50,7 @@ every question in a call shares a single forward pass.
    "local_large": "ordinary reasoning over a small amount of context",
    "frontier":    "hard reasoning, long context, or code that must be correct first time"}}
 ```
-The tier maps to a concrete model through the **capability router** (TODO.md §34): the persona
+The tier maps to a concrete model through the **capability router** (BRAINSTORM.md §34): the persona
 declares requirements, each model declares capabilities, the router picks. Laya narrows the search
 space; it does not name the winner.
 
@@ -150,5 +150,5 @@ Expect **193–464 ms per call on CPU** (32.8 ms is the T4 figure). Respect
 - pnpm exits non-zero after successful installs; verify outcomes, not exit codes.
 - `ollama pull` can print `Error:` and exit 0. Verify through `/api/tags`.
 - On Windows, `.\turn_on.cmd` — PowerShell blocks unsigned `.ps1` by default.
-- Team runner: `--parallel` is currently a no-op and `cmd.exe` truncates multi-line prompts
-  (T-144/T-145). Fix before trusting a fan-out.
+- Team runner: `--parallel` and multi-line prompts both work now (T-144/T-145). A fan-out on one
+  local model still contends for the same weights - measure before assuming it is faster.

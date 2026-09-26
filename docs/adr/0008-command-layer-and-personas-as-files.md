@@ -29,6 +29,9 @@ distinct classes, and conflating them is how such a surface rots:
 - **Teams** are `teams/<id>.yaml`: member personas, an ordered task list, and a failure policy. v1 is
   a sequential launcher loop, explicitly labelled as such, to be re-based on `ctx.subagents` and
   `ctx.jobs` (T-172).
+  *Amended 2026-09-26 (T-144):* the launcher loop now runs independent tasks concurrently when asked
+  (`--parallel N` or a team's `concurrency`); the default is still 1, i.e. sequential. The re-base on
+  `ctx.subagents`/`ctx.jobs` is unchanged.
 - **Mutable state leaves the config file**: commands write `verness.state.json`; the commented
   `verness.config.json` stays operator-owned so hand-written comments are never destroyed (T-131).
 

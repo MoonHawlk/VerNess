@@ -20,6 +20,33 @@ const OFF = `${ESC}[0m`
 const REV = `${ESC}[7m`
 const CYAN = `${ESC}[36m`
 
+/** Matches the ANSI escape sequences this editor and its callers emit. */
+const ANSI = /\u001b\[[0-9;]*[A-Za-z]/g
+
+/**
+ * @param {string} s - text that may carry ANSI escapes.
+ * @returns {number} how many columns it occupies.
+ */
+const visibleLength = s => s.replaceAll(ANSI, '').length
+
+/**
+ * Cut a line to at most `max` visible columns, keeping its escapes, so it can never wrap.
+ * @param {string} s - text that may carry ANSI escapes.
+ * @param {number} max - the column budget.
+ * @returns {string} the clipped text.
+ */
+const clip = (s, max) => {
+  let cols = 0
+  let res = ''
+  for (let i = 0; i < s.length;) {
+    const m = s.slice(i).match(/^\u001b\[[0-9;]*[A-Za-z]/)
+    if (m !== null) { res += m[0]; i += m[0].length; continue }
+    if (cols < max) { res += s[i]; cols++ }
+    i++
+  }
+  return res
+}
+
 /** How many candidates the dropdown shows at once. */
 const MAX_VISIBLE = 6
 
@@ -44,7 +71,8 @@ export function readLineWithSuggestions(opts) {
     let buffer = ''
     let cursor = 0
     let selected = 0
-    let drawnLines = 0
+    // Rows between the top of what this editor drew and the row the terminal cursor is on now.
+    let cursorRow = 0
     let histIndex = history.length
     let candidates = []
 
@@ -52,7 +80,7 @@ export function readLineWithSuggestions(opts) {
     const width = () => Math.max(40, out.columns ?? 80)
 
     /** @returns {string} the plain-text prompt, for width maths. */
-    const promptPlain = prompt.replaceAll(/\u001b\[[0-9;]*m/g, '')
+    const promptPlain = prompt.replaceAll(ANSI, '')
 
     /** Recompute candidates for the current buffer. */
     const refresh = () => {
@@ -77,18 +105,24 @@ export function readLineWithSuggestions(opts) {
 
     /** Erase everything this editor drew, leaving the cursor where the drawing began. */
     const erase = () => {
-      if (drawnLines > 0) out.write(`${ESC}[${drawnLines}A`)
+      // Climb only as far as the cursor sits below the top of the drawing: climbing further (as the
+      // old bottom-of-dropdown count did) wiped earlier terminal output on every keystroke.
+      if (cursorRow > 0) out.write(`${ESC}[${cursorRow}A`)
       out.write(`\r${ESC}[0J`)
-      drawnLines = 0
+      cursorRow = 0
     }
 
     /** Draw the status line, the input line with its ghost, and the dropdown. */
     const render = () => {
       erase()
+      const w = width()
       const g = ghost()
+      // Every line but the input is clipped one column short of the width, so each takes exactly
+      // one row; the input line may wrap, and its rows are counted below.
+      const above = []
+      if (status !== undefined) above.push(clip(`${DIM}${status}`, w - 1) + OFF)
+      const input = `${prompt}${buffer}${g === '' ? '' : `${DIM}${g}${OFF}`}`
       const lines = []
-      if (status !== undefined) lines.push(`${DIM}${status}${OFF}`)
-      lines.push(`${prompt}${buffer}${g === '' ? '' : `${DIM}${g}${OFF}`}`)
 
       // The dropdown only appears when there is something to choose between.
       const visible = candidates.slice(
@@ -99,23 +133,31 @@ export function readLineWithSuggestions(opts) {
       for (const c of visible) {
         const isSel = candidates[selected] === c
         const label = c.value.padEnd(hintCol)
-        const hint = c.hint === undefined ? '' : c.hint.slice(0, Math.max(0, width() - hintCol - 4))
-        lines.push(isSel
-          ? `${REV} ${label}${OFF}${DIM} ${hint}${OFF}`
-          : `${DIM} ${label} ${hint}${OFF}`)
+        const hint = c.hint ?? ''
+        lines.push(clip(isSel
+          ? `${REV} ${label}${OFF}${DIM} ${hint}`
+          : `${DIM} ${label} ${hint}`, w - 1) + OFF)
       }
       if (candidates.length > visible.length) {
         lines.push(`${DIM} … ${candidates.length - visible.length} more${OFF}`)
       }
 
-      out.write(lines.join('\n'))
-      drawnLines = lines.length - 1
+      // The input line may wrap. One that exactly fills its last row leaves the terminal cursor
+      // parked there; when nothing follows it, an explicit newline makes the next row real so the
+      // cursor maths below holds.
+      const inputLen = visibleLength(input)
+      const inputRows = Math.max(1, Math.ceil(inputLen / w))
+      const fullLast = lines.length === 0 && inputLen > 0 && inputLen % w === 0
+      out.write([...above, input, ...lines].join('\n') + (fullLast ? '\r\n' : ''))
+      const bottom = above.length + inputRows - 1 + lines.length + (fullLast ? 1 : 0)
 
-      // Put the cursor back on the input line, at the editing column.
-      const inputRow = status === undefined ? 0 : 1
-      const below = drawnLines - inputRow
-      if (below > 0) out.write(`${ESC}[${below}A`)
-      out.write(`\r${ESC}[${promptPlain.length + cursor}C`)
+      // Put the cursor back on the input line, at the editing column (maybe on a wrapped row).
+      const at = promptPlain.length + cursor
+      const target = above.length + Math.floor(at / w)
+      if (bottom > target) out.write(`${ESC}[${bottom - target}A`)
+      out.write('\r')
+      if (at % w > 0) out.write(`${ESC}[${at % w}C`) // CSI 0 C still moves one column
+      cursorRow = target
     }
 
     /** Accept the highlighted candidate into the buffer. */

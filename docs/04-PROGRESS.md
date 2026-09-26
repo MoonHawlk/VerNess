@@ -313,3 +313,99 @@
   odd-width screen so they centre exactly, and the test checks every corner and edge (T-337).
   Animations are planned, not built (T-335a..h).
 
+## 2026-09-26 — models in one command, and the agent on a hosted API (T-350..T-356)
+- **Why**: adding a model meant editing the config and guessing which quant a Hugging Face repo
+  publishes; `/model <id>` failed with `UNKNOWN_MODEL` because the patch declared one model per
+  route; a hosted model needed a hand-written route plus an edit to `activeRoute`, and the REPL froze
+  its route at boot anyway. Five places computed "the active route", and disagreed.
+- **What**: `scripts/lib/routes.mjs` is now the single resolver. `/api use <provider> <model>` puts
+  the agent on any provider the installed route adapter ships a catalog for — the patch declares only
+  the key *variable*; endpoint, protocol and models come from the adapter, so our code names no
+  vendor (ADR-0010). `/models add` validates the quant against the repo's actual GGUF files, pulls,
+  warms and registers; the local route now declares every registered model. `/access` chooses the
+  substrate sandbox mode. Keys live in the gitignored `.env`. Guide: `docs/11-MODELS-AND-API.md`.
+- **Verified**: `dsh --dump-config` composes the catalog route; a task with the key unset is refused
+  with the exact `.env` line; with a deliberately invalid key the request reached the provider and
+  returned `401 authentication_error`. `/models add` refused a missing quant (listing the real
+  ones), resolved a Hugging Face URL, and a turn then ran on a newly registered model. The session
+  log records `sandbox/mode` per `/access`; under `read-only` it shows `Set-Content` refused by the
+  OS (`PermissionDenied`). A permitted write under `workspace` is unproven: the 0.6B model never
+  produced a valid call.
+- **Not verified**: a successful hosted turn — no provider key exists on this machine (T-357). The
+  0.6B local model emitted a `pwsh` call but omitted a required argument; that is the capability gap
+  hosted models are meant to close, not a wiring fault.
+- **Found on the way**: headless has no approval answerer, so any sandbox escalation fails closed —
+  the chosen mode is the whole policy. On Windows the sandbox restricts writes only, and sandboxed
+  PowerShell runs in ConstrainedLanguage, so .NET type creation fails (T-366).
+- **Fixed after review**: `/model reset` on an API route left it with no model and exited the REPL;
+  `/api use` now records the model on the route, so reset falls back to it.
+- Task IDs start at T-350: another checkout took T-330..T-336 concurrently.
+
+## 2026-09-26 — `--parallel` stops lying (T-144); shadow decision logging switched on
+- The team runner advertised `--parallel N` and scheduled with `Promise.race`, but every task ran
+  through `spawnSync`, which blocks the event loop: the race only ever saw one task. Measured with
+  the old runner: two 400 ms tasks at `--parallel 2` took 914 ms.
+- Fixed by giving the command context an async sibling, `dshAsync` (same shell-free entry, same shim
+  fallback, built on `spawnAsync`/`shAsync` in `lib/util.mjs`). The synchronous `dsh` is untouched
+  for its other callers. A second bug only real concurrency would expose was closed at the same
+  time: persona overlays were one shared file per persona, rewritten per task; each task now writes
+  its own beside its transcript. Proof lives in `scripts/test/teams.parallel.mjs` (no tokens spent).
+- `decisions.enabled` is now `true`: every REPL task is shadow-routed and logged to
+  `.verness/decisions/` beside what the rules chose. Nothing is applied. Calibration (T-223) needs a
+  labelled set more than it needs code, so the set accumulates from normal use first. Each REPL turn
+  now waits on one decision call (~1 s at the measured CPU p50) when the sidecar is up, and prints a
+  one-line "unavailable" note and carries on when it is not.
+
+## 2026-09-26 — `off`: one command turns everything off (T-370)
+- **Why**: to stop the web UI the user tried `./turn_on.sh web down`, which booted it again (`web`
+  ignores trailing words), and `down` only handles the model. Nothing stopped all three servers.
+- **What**: `./turn_on.sh off` (alias `stop`, `/off` in the REPL) stops the web UI — whatever
+  listens on port 6173, plus any process matching `pgrep -f "profile <web profile>"`, so a UI
+  started with `--port` is found too — then the decision sidecar, then the local model. `--force`
+  also stops servers VerNess did not start. Commit 6bc91a6, follow-ups in merge 74cb2de.
+- **Verified**: `off` released 5.3 GiB (Qwen3-0.6B) and exited 0, leaving Ollama running because
+  VerNess had not started it. A decoy process `--profile verness-web --port 7000` was killed while
+  `--profile verness-website` was left alone.
+- **Not verified**: stopping a real running web UI server; the Windows PowerShell path (T-372).
+- **Found on the way**: on `main`, `/off` was not reachable in the REPL — the handler existed in
+  `ctx.builtins` but no quick-tool exposed it. Fixed in 74cb2de.
+
+## 2026-09-26 — the `epic` integration branch, and four branches merged into it (T-371)
+- **Why**: several worktrees had finished work in parallel, and `main` had started to diverge from
+  them (two independent `web` implementations). Integration now has one place to happen.
+- **What**: merged with `--no-ff` into `epic`: 0b86b6c (fix-prompt-redraw, clean), 74cb2de
+  (web-composer), 3fb2ea7 (models-and-api-routes), 6f18b51 (t144-parallel-team); then 3aeba67
+  wrote the workflow into `05-CONVENTIONS.md` "Branches and versions": feature branches merge
+  `--no-ff` into `epic`; `epic` reaches `main` only as a release with a version bump and a
+  `vX.Y.Z` tag. No release has been cut yet; `package.json` is still `0.0.1`.
+  - `main` and web-composer each implemented `web`. The branch's version was kept (`ensureProfile`,
+    `prepareBoot`, `webProfileName`, the `web`/`ui` quick-tool); main's `cmdRunWeb`, the inline
+    web-profile block in setup and the `web` switch case were removed.
+  - `prepareBoot` now calls `prepareRoute` (the models branch's resolver), so `web` gets the same
+    key/model/sandbox checks as the REPL.
+  - t144 turned on `decisions.enabled: true`: every REPL turn waits on one shadow decision call
+    (~1 s) when the sidecar is up.
+- **Verified**: all three `scripts/test/*.mjs` pass, `doctor` runs, and the clean-clone check from
+  `05-CONVENTIONS.md` passes on `epic`.
+- **Not verified**: a real REPL or web boot from the merged tree — skipped on purpose, because
+  booting from a second checkout overwrites the shared `~/.dsh` profile patch (T-336, T-372).
+- **Found on the way**: 74cb2de dropped `dshVersion` from `cmdRun` while the pet banner still read
+  it, which would crash the REPL at boot with the pet enabled; restored in 3fb2ea7. Separately,
+  `README.md` had been committed as UTF-16LE (11eeed4), so grep and GitHub treated it as binary;
+  converted to UTF-8 in this change (T-373).
+
+## 2026-09-26 — Engram graph rebuilt; web commands bridge designed, not built (T-100, T-101, T-374..T-379)
+- **What**: `@sentropic/engram@0.19.0` installed globally; `engram install` put the `/engram`
+  Claude Code skill in `~/.claude/skills/engram/`. `engram update .` (= `./turn_on.sh graph`)
+  built 315 nodes / 974 edges / 13 communities in ~4 s, into the gitignored `.engram/` (the first
+  build, T-101, had 14 nodes).
+- **Found on the way**: npm skipped the tree-sitter install scripts (warning only); the build
+  succeeded regardless.
+- **Not done**: the optional description batches and `engram claude install` (CLAUDE.md section +
+  PreToolUse hook) — T-379.
+- **Planned, not built**: a "web commands bridge" — a `@verness/commands` dsh plugin that registers
+  the launcher's quick-tools in the web UI's `/` menu (via dsh-commands) and runs them through
+  `node scripts/verness.mjs <name>`. The design spec lives on the separate branch `web-commands`
+  (`docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`), not yet in `epic`, and
+  awaits an implementation plan. Tasks T-374..T-378. Per-persona `tools.allow`/`deny` remain
+  unenforced (M4) and are out of that scope.

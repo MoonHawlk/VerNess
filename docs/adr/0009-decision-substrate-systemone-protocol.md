@@ -5,7 +5,7 @@
 
 ## Context
 
-`DecisionModel` is the project's central contract (TODO.md §11–13): classify, route, score, rank,
+`DecisionModel` is the project's central contract (BRAINSTORM.md §11–13): classify, route, score, rank,
 retry, stop, escalate — the work an LLM should not be paid to do. Until now it had no real provider.
 The reference implementation everyone points at, TypeSafe's Jev, is a paid API with no local option,
 so the plan (M3/T-034) was a stub.

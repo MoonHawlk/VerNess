@@ -119,12 +119,14 @@ function installEngine() {
 /**
  * Bring the model up: engine present, server running, weights fetched, weights warm.
  * @param {object} cfg - the VerNess configuration.
+ * @param {string} [model] - the model to bring up; defaults to the configured one.
  * @returns {Promise<boolean>} whether the model is ready to serve requests.
  */
-export async function modelUp(cfg) {
+export async function modelUp(cfg, model) {
   const m = cfg.model
   const base = m.baseURL
-  const ref = m.source ?? m.id
+  // The model the run will actually use (a /model or /models choice), else the configured one.
+  const ref = model ?? m.source ?? m.id
 
   if (sh('ollama', ['--version'], { capture: true, allowFail: true }).code !== 0) {
     if (m.autoInstallEngine === false) { fail('the engine is not installed (model.autoInstallEngine is false)'); return false }
