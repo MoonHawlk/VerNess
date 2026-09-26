@@ -21,6 +21,7 @@ import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { loadTeams } from './lib/teams.mjs'
+import { shAsync, spawnAsync } from './lib/util.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -169,16 +170,7 @@ let dshEntry
  * @returns {{code: number, out: string}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
-  if (dshEntry === undefined) {
-    const root = npmRootGlobal()
-    const dir = root === undefined ? undefined : join(root, '@deepseek-ai', 'dsh')
-    try {
-      const bin = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).bin
-      const rel = typeof bin === 'string' ? bin : bin?.dsh
-      dshEntry = rel === undefined ? null : join(dir, rel)
-      if (dshEntry !== null && !existsSync(dshEntry)) dshEntry = null
-    } catch { dshEntry = null }
-  }
+  resolveDshEntry()
   // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
   if (dshEntry === null) return sh('dsh', args, opts)
   const r = spawnSync(process.execPath, [dshEntry, ...args], {
@@ -189,6 +181,34 @@ function dsh(args, opts = {}) {
     maxBuffer: 64 * 1024 * 1024,
   })
   return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
+}
+
+/**
+ * `dsh` without blocking the event loop: what lets the team runner's `--parallel` actually overlap
+ * runs (T-144). Same entry resolution and the same shim fallback, just awaited.
+ * @param {string[]} args - arguments for dsh.
+ * @param {{env?: Record<string,string>, capture?: boolean}} [opts] - options.
+ * @returns {Promise<{code: number, out: string}>} exit status and captured output.
+ */
+function dshAsync(args, opts = {}) {
+  resolveDshEntry()
+  return dshEntry === null
+    ? shAsync('dsh', args, opts)
+    : spawnAsync(process.execPath, [dshEntry, ...args], opts)
+}
+
+/** Resolve, once, the JS entry point behind the global `dsh` shim; null when it cannot be found. */
+function resolveDshEntry() {
+  if (dshEntry === undefined) {
+    const root = npmRootGlobal()
+    const dir = root === undefined ? undefined : join(root, '@deepseek-ai', 'dsh')
+    try {
+      const bin = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).bin
+      const rel = typeof bin === 'string' ? bin : bin?.dsh
+      dshEntry = rel === undefined ? null : join(dir, rel)
+      if (dshEntry !== null && !existsSync(dshEntry)) dshEntry = null
+    } catch { dshEntry = null }
+  }
 }
 
 /**
@@ -523,8 +543,10 @@ function makeCtx(cfg, commands, convo) {
     cfg,
     commands,
     sh,
-    // The team runner sends multi-line prompts, so it gets the shell-free runner.
+    // The team runner sends multi-line prompts, so it gets the shell-free runner; the async one is
+    // what lets its --parallel overlap tasks.
     dsh,
+    dshAsync,
     sync: () => syncPatch(cfg),
     routeEnv: env,
     activePersonaId: activePersonaId(cfg),

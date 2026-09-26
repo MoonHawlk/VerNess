@@ -129,7 +129,7 @@ Ordered by (value ÷ effort). Each is a separate proposal, not a commitment.
 | # | Feature | Why it is worth doing | Depends on |
 |---|---|---|---|
 | 1 | **`/decide` quick-tool** — ask a typed question from the REPL, get answer + confidence, zero LLM tokens | The cheapest possible way to *feel* what the decision model is good and bad at, before trusting it anywhere | T-201 + T-140 (REPL dispatch) |
-| 2 | **Team task router** — pick the persona that should own a task with one `choice` over persona ids | Improves the team runner once it works: today it is committed but unwired, its `--parallel` is a no-op, and on Windows `cmd.exe` truncates its multi-line prompts | T-201, T-144, T-145 |
+| 2 | **Team task router** — pick the persona that should own a task with one `choice` over persona ids | Improves the team runner, whose blockers are fixed: `--parallel` overlaps tasks (T-144) and prompts survive on Windows (T-145) | T-201, T-144, T-145 |
 | 3 | **Escalation gate in the supervisor** — continue / retry / complete / escalate as a 4-option choice | The core loop from TODO.md §13–21, and a 4-option space is Laya's strong regime | M7 + T-206 |
 | 4 | **Tool-risk gate on `tools/pre-execute`** — score a tool call, map confidence bands to allow/ask/deny | Makes approvals proportional instead of all-or-nothing; the seam already exists | M9 + calibration |
 | 5 | **Evaluator pre-filter** — Laya screens obvious pass/fail before an LLM evaluator is paid for | Generator ≠ evaluator (law 4) gets cheaper, so we can afford to always evaluate | M7 |

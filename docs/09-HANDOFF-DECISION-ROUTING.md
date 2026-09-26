@@ -150,5 +150,5 @@ Expect **193–464 ms per call on CPU** (32.8 ms is the T4 figure). Respect
 - pnpm exits non-zero after successful installs; verify outcomes, not exit codes.
 - `ollama pull` can print `Error:` and exit 0. Verify through `/api/tags`.
 - On Windows, `.\turn_on.cmd` — PowerShell blocks unsigned `.ps1` by default.
-- Team runner: `--parallel` is currently a no-op and `cmd.exe` truncates multi-line prompts
-  (T-144/T-145). Fix before trusting a fan-out.
+- Team runner: `--parallel` and multi-line prompts both work now (T-144/T-145). A fan-out on one
+  local model still contends for the same weights - measure before assuming it is faster.

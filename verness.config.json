@@ -104,8 +104,10 @@
   // `enabled` only turns on SHADOW logging: the rules still decide everything that
   // runs. Nothing the model says steers the harness until its measured calibration
   // beats the rule baseline (T-223) - zero-shot it scores near chance.
+  // On since 2026-09-26 to accumulate the labelled set calibration needs; each REPL
+  // turn waits on one decision call (~1 s CPU), or skips it if the sidecar is down.
   "decisions": {
-    "enabled": false,
+    "enabled": true,
     "shadow": true,
     "baseURL": "http://127.0.0.1:8000",
     "apiKeyEnv": "LAYA_API_KEY",

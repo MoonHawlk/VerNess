@@ -265,3 +265,18 @@
 - Convention added to `docs/05-CONVENTIONS.md`: verify from a clean clone before claiming a feature
   ships, and check `git ls-files` when a new source directory appears - an ignored file is invisible
   to both `git add` and `git status`.
+
+## 2026-09-26 — `--parallel` stops lying (T-144); shadow decision logging switched on
+- The team runner advertised `--parallel N` and scheduled with `Promise.race`, but every task ran
+  through `spawnSync`, which blocks the event loop: the race only ever saw one task. Measured with
+  the old runner: two 400 ms tasks at `--parallel 2` took 914 ms.
+- Fixed by giving the command context an async sibling, `dshAsync` (same shell-free entry, same shim
+  fallback, built on `spawnAsync`/`shAsync` in `lib/util.mjs`). The synchronous `dsh` is untouched
+  for its other callers. A second bug only real concurrency would expose was closed at the same
+  time: persona overlays were one shared file per persona, rewritten per task; each task now writes
+  its own beside its transcript. Proof lives in `scripts/test/teams.parallel.mjs` (no tokens spent).
+- `decisions.enabled` is now `true`: every REPL task is shadow-routed and logged to
+  `.verness/decisions/` beside what the rules chose. Nothing is applied. Calibration (T-223) needs a
+  labelled set more than it needs code, so the set accumulates from normal use first. Each REPL turn
+  now waits on one decision call (~1 s at the measured CPU p50) when the sidecar is up, and prints a
+  one-line "unavailable" note and carries on when it is not.
