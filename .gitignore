@@ -32,3 +32,6 @@ verness-spike.log
 
 # Launcher run state (pids, logs) — see scripts/model.mjs
 .verness/
+
+# Claude Code local session state
+.claude/
