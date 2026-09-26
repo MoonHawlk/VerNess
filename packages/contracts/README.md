@@ -19,3 +19,8 @@ Later tasks in this milestone each add one paragraph here per contract they intr
 - **Issue / Result** (`src/issue.ts`) — the shared validator outcome shape (`Result<T>`), a
   single validation problem (`Issue`), and small helpers (`formatPath`, `closest`) for rendering
   paths and suggesting corrections in error messages.
+- **Capabilities** (`src/capabilities.ts`) — the capability vocabulary (`CAPABILITY_KEYS`,
+  `CAPABILITY_LEVELS`) and the shape a model, persona, or task uses to describe or require them
+  (`ModelCapabilities` / `CapabilityRequirements`), plus `levelRank`, `capabilityGaps` (what a
+  model falls short of), `mergeRequirements` (combine requirements, keeping the stricter value
+  per key), and `validateCapabilities`.
