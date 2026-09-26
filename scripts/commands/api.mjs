@@ -132,7 +132,9 @@ export default {
         route: provider,
         model,
         modelRoute: provider,
-        apiRoutes: { ...(state.apiRoutes ?? {}), [provider]: keyEnv === undefined ? {} : { apiKeyEnv: keyEnv } },
+        // The route remembers its model, so `/model reset` falls back to it instead of leaving the
+        // route with no model at all.
+        apiRoutes: { ...(state.apiRoutes ?? {}), [provider]: { ...(keyEnv === undefined ? {} : { apiKeyEnv: keyEnv }), model } },
       })
       ctx.sync()
       ok(`the agent now runs on ${model} via ${provider} (tools: ${accessMode()})`)

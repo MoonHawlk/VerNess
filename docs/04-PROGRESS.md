@@ -301,9 +301,15 @@
   with the exact `.env` line; with a deliberately invalid key the request reached the provider and
   returned `401 authentication_error`. `/models add` refused a missing quant (listing the real
   ones), resolved a Hugging Face URL, and a turn then ran on a newly registered model. The session
-  log records `sandbox/mode` per `/access`, and a write under `read-only` was denied.
+  log records `sandbox/mode` per `/access`; under `read-only` it shows `Set-Content` refused by the
+  OS (`PermissionDenied`). A permitted write under `workspace` is unproven: the 0.6B model never
+  produced a valid call.
 - **Not verified**: a successful hosted turn — no provider key exists on this machine (T-357). The
   0.6B local model emitted a `pwsh` call but omitted a required argument; that is the capability gap
   hosted models are meant to close, not a wiring fault.
 - **Found on the way**: headless has no approval answerer, so any sandbox escalation fails closed —
-  the chosen mode is the whole policy. On Windows the sandbox restricts writes only.
+  the chosen mode is the whole policy. On Windows the sandbox restricts writes only, and sandboxed
+  PowerShell runs in ConstrainedLanguage, so .NET type creation fails (T-366).
+- **Fixed after review**: `/model reset` on an API route left it with no model and exited the REPL;
+  `/api use` now records the model on the route, so reset falls back to it.
+- Task IDs start at T-350: another checkout took T-330..T-336 concurrently.

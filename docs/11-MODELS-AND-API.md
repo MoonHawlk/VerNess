@@ -1,6 +1,6 @@
 # 11 — Models: install local ones, or run on an API
 
-> Status: **built** (T-350..T-356). Open follow-ups are T-357..T-365 in `docs/03-BACKLOG.md`.
+> Status: **built** (T-350..T-356). Open follow-ups are T-357..T-366 in `docs/03-BACKLOG.md`.
 > Decision record: `docs/adr/0010-catalog-routes-and-route-state.md`.
 
 Two things used to take a config edit, a `sync` and some luck:
@@ -91,6 +91,11 @@ so an escalation fails closed rather than hanging. On Windows the sandbox restri
 reads and network stay open in every mode (`packages/sandbox/sandbox-windows-acl`, "partial
 enforcement").
 
+**Windows caveat, observed**: inside the sandbox (`read-only` and `workspace`) PowerShell runs in
+*ConstrainedLanguage* mode — the restricted token triggers it — so creating .NET types fails
+(`CannotCreateTypeConstrainedLanguage`), including the harness's own `[Console]::OutputEncoding`
+preamble. Plain cmdlets still run. Scripts that need .NET types only work under `full` (T-366).
+
 ## Verified on this machine (2026-09-26)
 
 | Check | Result |
@@ -102,7 +107,8 @@ enforcement").
 | `/models add <org/repo>:<missing quant>` | refused, listing the quants the repo publishes |
 | `/models add <hugging face URL>` | quant chosen from the repo's files, pulled, warmed, registered |
 | `/models add <registry-name> --use`, then a task | the turn ran on the new model (previously `UNKNOWN_MODEL`) |
-| `/access read-only` / `workspace` | session log records `sandbox/mode` accordingly; a write under read-only was denied |
+| `/access read-only` / `workspace` | session log records `sandbox/mode` accordingly. Under `read-only` the log shows `Set-Content` refused by the OS (`PermissionDenied`, exit 1). Under `workspace` the 0.6B model never produced a valid call, so a permitted write is **unproven** |
+| `/model reset` after `/api use` | falls back to the model the route was switched to (was: no model, REPL exit) |
 
 **Not verified**: a successful API turn, and an API model completing a tool call — no provider key
 exists on this machine. The 0.6B local model *did* emit a `pwsh` call but omitted a required
