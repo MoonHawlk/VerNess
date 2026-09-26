@@ -16,6 +16,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { loadCommands, runCommand } from './lib/commands.mjs'
+import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
@@ -399,6 +400,44 @@ function commandBar(commands) {
 }
 
 /**
+ * Argument candidates per command, recomputed when the dropdown needs them. Kept lazy because some
+ * sources (the local model list) shell out, and a keystroke must not pay for that.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {() => Record<string, string[]>} a memoised supplier, refreshed every few seconds.
+ */
+function makeArgsSupplier(cfg) {
+  let cache
+  let at = 0
+  return () => {
+    if (cache !== undefined && Date.now() - at < 5000) return cache
+    const personas = [...loadPersonas(cfg).keys()]
+    const teams = [...loadTeams().keys()]
+    const sessions = listSessions({ limit: 10 }).map(x => x.id.slice(0, 8))
+    const list = sh('ollama', ['list'], { capture: true, allowFail: true })
+    const models = list.code === 0
+      ? list.out.split('\n').slice(1).map(l => l.split(/\s\s+/)[0]).filter(x => x !== undefined && x.trim() !== '')
+      : []
+    const names = [...new Set([...loadPersonas(cfg).keys()])]
+    cache = {
+      persona: ['list', 'show', ...personas],
+      team: ['list', 'show', 'run', ...teams],
+      teams: ['list', 'show', 'run', ...teams],
+      resume: sessions,
+      model: ['reset', ...models],
+      decision: ['up', 'stats', 'down', '--force'],
+      dashboard: ['--no-open', '--limit'],
+      usage: ['--all', '--limit'],
+      cost: ['--all', '--limit'],
+      sessions: ['--all', '--limit'],
+      tools: ['--all', '--session'],
+      help: names.length > 0 ? [] : [],
+    }
+    at = Date.now()
+    return cache
+  }
+}
+
+/**
  * Tab completion for the REPL: command names after a slash, then that command's own arguments
  * (persona ids, team ids, session ids, local model ids) so the options can be discovered by pressing
  * tab rather than by reading documentation.
@@ -699,18 +738,27 @@ async function cmdRun(cfg, task) {
   info(convo.id() === undefined
     ? 'a new conversation starts with your first task; it is kept for every later turn'
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
+  info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
   info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    completer: makeCompleter(cfg, commands),
-  })
+  // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
+  // because an editor that redraws itself is meaningless without a terminal.
+  const interactive = process.stdin.isTTY === true
+  const suggest = makeSuggester(commands, makeArgsSupplier(cfg))
+  const rl = interactive
+    ? undefined
+    : createInterface({ input: process.stdin, output: process.stdout, completer: makeCompleter(cfg, commands) })
+  const history = []
   for (;;) {
     // The prompt carries the live state, so persona, model and conversation are never a guess.
     const id = convo.id()
     const status = [activePersonaId(loadConfig()), readState().model ?? r.id, id === undefined ? 'new' : shortSession(id)].join(' · ')
-    const line = (await rl.question(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'verness> ')}`)).trim()
+    const answer = interactive
+      ? await readLineWithSuggestions({ prompt: paint(C.cyan, 'verness> '), status: `  ${status}`, suggest, history })
+      : await rl.question(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'verness> ')}`)
+    if (answer === null) break
+    const line = answer.trim()
     if (line === '') break
+    history.push(line)
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
     // be swallowed by the registry.
     if (line.startsWith('/')) {
@@ -737,7 +785,7 @@ async function cmdRun(cfg, task) {
       if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)
     }
   }
-  rl.close()
+  rl?.close()
 }
 
 /** Rebuild the local knowledge graph (AST only, no LLM calls). */

@@ -256,6 +256,12 @@ Thought graph — ephemeral and persistent working memory (design: `docs/10-THOU
 - [ ] T-296 Contradiction surfaces for resolution; a new finding never silently overwrites a persistent one
 - [ ] T-297 Poisoning guard: every persistent node records the session and model that produced it, so a bad run is traceable and revocable
 
+TUI
+- [x] T-300 Inline suggestions while typing: `scripts/lib/prompt.mjs` is a raw-mode line editor with ghost completion, a live dropdown with per-command hints, arrow selection, Tab/Right accept, history on Up/Down, and a plain-readline fallback when stdin is not a TTY
+- [x] T-301 Simulated-terminal test (`scripts/test/prompt.simulated-tty.mjs`): fake TTY, captured stdout, synthetic keypresses; asserts rendering, filtering, selection and acceptance
+- [ ] T-302 Wrap long input lines in the editor — the dropdown is suppressed rather than mis-positioned when the input exceeds the terminal width
+- [ ] T-303 Suggest task text too, not only commands: recent prompts from the session log as history-backed completions
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
