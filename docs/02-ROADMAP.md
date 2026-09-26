@@ -1,6 +1,8 @@
 # 02 — Roadmap
 
 Each milestone is small, independently verifiable, and ends with the system still runnable.
+The launcher tracks (command layer, teams, decisions in shadow mode, loop, dashboard, pet) run in
+parallel to M2–M9; see `docs/superpowers/plans/2026-09-26-00-master-plan.md` for the order of both.
 "Exit criteria" are literal commands/observations, not opinions.
 
 | M | Name | Why now | Status |

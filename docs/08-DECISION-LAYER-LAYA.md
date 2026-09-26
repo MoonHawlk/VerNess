@@ -5,7 +5,7 @@
 
 ## Why this matters more than "another model"
 
-The project's central bet (TODO.md §11–18, `docs/00-OVERVIEW.md` law 3) is that an LLM is *one* class
+The project's central bet (BRAINSTORM.md §11–18, `docs/00-OVERVIEW.md` law 3) is that an LLM is *one* class
 of compute, and that most agent decisions — route, rank, filter, retry, stop, escalate, allow/deny —
 should be made by something cheaper and more reliable. Until now the `DecisionModel` contract
 (M3, T-030..T-037) had no real provider: the plan was a `RuleDecisionProvider` plus a **stub** for
@@ -130,10 +130,10 @@ Ordered by (value ÷ effort). Each is a separate proposal, not a commitment.
 |---|---|---|---|
 | 1 | **`/decide` quick-tool** — ask a typed question from the REPL, get answer + confidence, zero LLM tokens | The cheapest possible way to *feel* what the decision model is good and bad at, before trusting it anywhere | T-201 + T-140 (REPL dispatch) |
 | 2 | **Team task router** — pick the persona that should own a task with one `choice` over persona ids | Improves the team runner once it works: today it is committed but unwired, its `--parallel` is a no-op, and on Windows `cmd.exe` truncates its multi-line prompts | T-201, T-144, T-145 |
-| 3 | **Escalation gate in the supervisor** — continue / retry / complete / escalate as a 4-option choice | The core loop from TODO.md §13–21, and a 4-option space is Laya's strong regime | M7 + T-206 |
+| 3 | **Escalation gate in the supervisor** — continue / retry / complete / escalate as a 4-option choice | The core loop from BRAINSTORM.md §13–21, and a 4-option space is Laya's strong regime | M7 + T-206 |
 | 4 | **Tool-risk gate on `tools/pre-execute`** — score a tool call, map confidence bands to allow/ask/deny | Makes approvals proportional instead of all-or-nothing; the seam already exists | M9 + calibration |
 | 5 | **Evaluator pre-filter** — Laya screens obvious pass/fail before an LLM evaluator is paid for | Generator ≠ evaluator (law 4) gets cheaper, so we can afford to always evaluate | M7 |
-| 6 | **Progressive reduction for data work** — rank 100k candidates, send the top-k to the LLM | The 500M-row scenario in TODO.md §16–17, finally with a real ranker | M8 |
+| 6 | **Progressive reduction for data work** — rank 100k candidates, send the top-k to the LLM | The 500M-row scenario in BRAINSTORM.md §16–17, finally with a real ranker | M8 |
 | 7 | **Decision accounting in `/cost`** — count decision calls separately and show LLM calls avoided | Turns "cheapest reliable computation first" from a slogan into a number on screen | T-136 (`/cost` wired) + T-142 |
 | 8 | **Fine-tune on our own decisions** — the card's own advice (0.362 → 0.766 on its benchmark) | The only route to decisions we would actually trust; needs a labelled set we do not have yet | T-220..T-223 |
 | 9 | **Guardrail/moderation pass** on inbound tasks, using the same sidecar | The model is explicitly trained for it; one more question in an existing call is ~free | T-206 |

@@ -16,8 +16,8 @@ expensive intelligence is only invoked where cheap computation could not decide 
 |---|---|---|
 | Substrate + profile + launcher | working | `./turn_on.cmd`, `scripts/verness.mjs` |
 | Local generative model (Qwen3 0.6B, HF GGUF) | working, `up`/`stats`/`down` | `scripts/model.mjs`, ADR-0007 |
-| Personas as files, teams, quick-tool registry | **committed but unwired** — see T-140..T-146 | `scripts/commands/`, `scripts/lib/` |
-| Decision layer | **planned only** | `docs/08-DECISION-LAYER-LAYA.md`, ADR-0009 |
+| Personas as files, teams, quick-tool registry | working (wired 2026-09-26) | `scripts/commands/`, `scripts/lib/` |
+| Decision layer | sidecar + shadow logging working; calibration next (plan WS-E) | `scripts/lib/decisions.mjs`, `docs/superpowers/plans/2026-09-26-05-decision-calibration-routing.md` |
 | Session-log reader (usage/telemetry) | working | `scripts/lib/sessions.mjs` |
 
 **Order matters**: T-140 (REPL dispatch) and T-141 (`writePatch` honouring persona state) are
@@ -50,7 +50,7 @@ every question in a call shares a single forward pass.
    "local_large": "ordinary reasoning over a small amount of context",
    "frontier":    "hard reasoning, long context, or code that must be correct first time"}}
 ```
-The tier maps to a concrete model through the **capability router** (TODO.md §34): the persona
+The tier maps to a concrete model through the **capability router** (BRAINSTORM.md §34): the persona
 declares requirements, each model declares capabilities, the router picks. Laya narrows the search
 space; it does not name the winner.
 
