@@ -37,7 +37,7 @@ export default {
       const g = cmd.group ?? 'other'
       groups.set(g, [...(groups.get(g) ?? []), cmd])
     }
-    const order = ['core', 'model', 'personas', 'teams', 'telemetry', 'other']
+    const order = ['core', 'model', 'decisions', 'personas', 'teams', 'telemetry', 'other']
     for (const g of [...groups.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))) {
       head(g)
       for (const cmd of groups.get(g).sort((a, b) => a.name.localeCompare(b.name))) {

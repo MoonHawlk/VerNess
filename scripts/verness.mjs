@@ -391,7 +391,7 @@ function commandBar(commands) {
   for (const cmd of new Set(commands.values())) {
     groups.set(cmd.group ?? 'other', [...(groups.get(cmd.group ?? 'other') ?? []), cmd.name])
   }
-  const order = ['core', 'model', 'personas', 'teams', 'telemetry', 'other']
+  const order = ['core', 'model', 'decisions', 'personas', 'teams', 'telemetry', 'other']
   const width = Math.max(...[...groups.keys()].map(g => g.length))
   return [...groups.keys()]
     .sort((a, b) => order.indexOf(a) - order.indexOf(b))
