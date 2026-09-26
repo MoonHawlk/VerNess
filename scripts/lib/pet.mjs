@@ -162,10 +162,10 @@ export function dshMatches(dsh) {
 }
 
 /**
- * The pet's mood, and the one sentence it says about it. Worried beats sleepy beats happy: a broken
- * thing matters more than an idle one.
+ * The pet's mood, and the one sentence it says about it.
+ * sad beats curious beats happy: a broken thing matters more than an idle one.
  * @param {object} v - vitals from `gatherVitals`.
- * @returns {{mood: 'happy'|'sleepy'|'worried', says: string}} the mood and its line.
+ * @returns {{mood: 'happy'|'curious'|'sad', says: string}} the mood and its line.
  */
 export function moodOf(v) {
   const problems = []
@@ -173,58 +173,104 @@ export function moodOf(v) {
   const e = v.workers.engine
   if (e.remote !== true && !e.up) problems.push('the model engine is not answering - try /up')
   if (v.workers.decision.enabled && !v.workers.decision.up) problems.push('decisions are enabled but the sidecar is down - /decision up')
-  if (problems.length > 0) return { mood: 'worried', says: problems[0] }
-  if (e.remote !== true && e.loaded.length === 0) return { mood: 'sleepy', says: 'engine is up but no model is warm - the first task wakes it' }
+  if (problems.length > 0) return { mood: 'sad', says: problems[0] }
+  if (e.remote !== true && e.loaded.length === 0) return { mood: 'curious', says: 'engine is up but no model is warm - the first task wakes it' }
   return { mood: 'happy', says: 'all workers awake. what are we building?' }
 }
 
-/**
- * The face on the cube's front (its screen), per mood: eyes and mouth, plus a mark floating above.
- * Odd-width pieces on an odd-width face, so everything centres exactly. ASCII only - legacy
- * consoles mangle the rest.
- */
-const FACES = {
-  happy: { mark: '', eyes: 'o   o', mouth: 'u' },
-  sleepy: { mark: 'z', eyes: '-   -', mouth: '.' },
-  worried: { mark: '!', eyes: 'o   o', mouth: '~' },
+// Circle pet — Ness. Mood shown through face and floating elements.
+// All frames: H=8 lines × W=9 chars, padEnd-normalised so animation overwrites cleanly.
+const W_FRAME = 9
+const FRAMES = {
+  happy: [
+    // quiet start
+    ['         ', '  o      ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+    // excited, first bounce
+    ['   o     ', ' o       ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(  \\u/  )', ' (     ) ', '  (   )  '],
+    // peak jump — circle floats up, big smile, bubbles everywhere
+    ['  o  o   ', '    o    ', '  (   )  ', ' ( ^_^ ) ', '(  \\u/  )', '(       )', ' (     ) ', '         '],
+    // settled, bubbles drifting (resting)
+    ['  o   o  ', '   o     ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
+  ],
+  sad: [
+    // normal but sad
+    ['         ', '         ', '  (   )  ', ' (     ) ', '( -   - )', '(   ~   )', ' (     ) ', '  (   )  '],
+    // starts drooping
+    ['         ', '         ', '  (   )  ', ' ( _   _)', '(   ~   )', '(       )', ' ( , , ) ', '  (   )  '],
+    // fully wilting — shape deforms
+    ['         ', '         ', '   ( )   ', '  (- -  )', ' ( ~~~  )', '(       )', ' /     \\ ', '         '],
+    // resting sad state
+    ['         ', '         ', '  (   )  ', ' ( -   -)', '(   ~   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
+  curious: [
+    // round, curious look
+    ['         ', '         ', '  (   )  ', ' ( o . ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+    // squashed into a wide oval
+    ['         ', '         ', ' /-----\\ ', '/ o   o \\', '(   ??  )', '\\-------/', '         ', '         '],
+    // stretched into a tall oval
+    ['         ', '  (   )  ', ' (     ) ', '( o . o )', '(   ?   )', ' (     ) ', '  (   )  ', '         '],
+    // back to round, still curious (resting)
+    ['         ', '         ', '  (   )  ', ' ( o ? ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
+  ],
 }
-/**
- * Cube geometry, oblique projection. The front face is 13 x 6 cells, which reads as square because a
- * terminal cell is about twice as tall as it is wide; the depth recedes 3 rows, one column per row,
- * so every receding edge is a single clean `/`.
- */
-const CUBE = { w: 13, h: 6, d: 3 }
+/** Floating mark above the art per mood. */
+const MARKS = { happy: '', sad: '!', curious: '?' }
 
 /**
- * Ness is a cube - a little TV with a face on its screen. Built from the geometry rather than drawn
- * by hand, so the edges stay parallel and the corners meet whatever the face shows.
- * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} ten lines (the mood mark, then the cube), each exactly 16 columns wide.
+ * The resting art used for the status panel (final animation frame).
+ * @param {'happy'|'sad'|'curious'} mood
+ * @returns {string[]} lines, all padded to W_FRAME.
  */
 export function petArt(mood) {
-  const f = FACES[mood] ?? FACES.happy
-  const { w, h, d } = CUBE
-  const inner = w - 2
-  const center = s => {
-    const left = Math.floor((inner - s.length) / 2)
-    return ' '.repeat(left) + s + ' '.repeat(inner - s.length - left)
+  const body = FRAMES[mood]?.at(-1) ?? FRAMES.happy.at(-1)
+  const mark = MARKS[mood] ?? ''
+  const markLine = mark !== '' ? ' '.repeat(Math.floor((W_FRAME - 1) / 2)) + mark : ''
+  return [markLine, ...body].map(l => l.padEnd(W_FRAME))
+}
+
+/**
+ * All animation frames for the given mood, each padded to W_FRAME.
+ * @param {'happy'|'sad'|'curious'} mood
+ * @returns {string[][]}
+ */
+export function petAnimFrames(mood) {
+  return (FRAMES[mood] ?? FRAMES.happy).map(frame => frame.map(l => l.padEnd(W_FRAME)))
+}
+
+/** @param {number} ms @returns {Promise<void>} */
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Play the boot animation then show the full status panel. On non-TTY, shows static panel only.
+ * @param {object} v - vitals from gatherVitals.
+ * @param {{columns?: number}} [opts]
+ */
+export async function animatePet(v, opts = {}) {
+  const { mood } = moodOf(v)
+  if (!process.stdout.isTTY) {
+    console.log()
+    for (const l of renderPet(v, opts)) console.log(l)
+    console.log()
+    return
   }
-  const edge = `+${'-'.repeat(inner)}+`
-  const face = { 1: f.eyes, 2: f.mouth }
-  const rows = []
-  for (let r = 0; r < d + h; r++) {
-    if (r === 0) rows.push(`${' '.repeat(d)}${edge}`)
-    else if (r < d) rows.push(`${' '.repeat(d - r)}/${' '.repeat(inner)}/${' '.repeat(r - 1)}|`)
-    else if (r === d) rows.push(`${edge}${' '.repeat(d - 1)}|`)
-    else if (r === d + h - 1) rows.push(edge)
-    else {
-      // The back-right edge drops to the back face's bottom corner, then recedes to the front one.
-      const back = r < h - 1 ? '|' : r === h - 1 ? '+' : '/'
-      const gap = r <= h - 1 ? d - 1 : d - 1 - (r - (h - 1))
-      rows.push(`|${center(face[r - d - 1] ?? '')}|${' '.repeat(gap)}${back}`)
-    }
+  const frames = petAnimFrames(mood)
+  const FH = frames[0].length
+  const writeFrame = frame => {
+    for (const l of frame) process.stdout.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
   }
-  return [`${' '.repeat(w + 1)}${f.mark}`, ...rows].map(l => l.padEnd(w + d))
+  writeFrame(frames[0])
+  for (let i = 1; i < frames.length; i++) {
+    await sleep(160)
+    process.stdout.write(`\x1b[${FH}A\r`)
+    writeFrame(frames[i])
+  }
+  // Erase animation area, then draw the full panel
+  process.stdout.write(`\x1b[${FH}A\r`)
+  for (let i = 0; i < FH; i++) process.stdout.write('\x1b[2K\n')
+  process.stdout.write(`\x1b[${FH}A\r`)
+  console.log()
+  for (const l of renderPet(v, opts)) console.log(l)
+  console.log()
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */

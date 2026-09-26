@@ -21,7 +21,7 @@ import { modelDown, modelStats, modelUp } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
-import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
+import { animatePet, gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute } from './lib/decisions.mjs'
 
@@ -794,9 +794,7 @@ async function cmdRun(cfg, task) {
   if (petEnabled(cfg)) {
     // The pet is the boot banner: versions and workers at a glance. `/pet` redraws it later.
     const vitals = await gatherVitals(cfg, { dsh: dshVersion, commands: count, session: convo.id() })
-    console.log()
-    for (const l of renderPet(vitals, { columns: process.stdout.columns })) console.log(l)
-    console.log()
+    await animatePet(vitals, { columns: process.stdout.columns })
   } else {
     step(`VerNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, r.id)} via ${route}`)
   }
@@ -870,6 +868,8 @@ async function cmdRunWeb(cfg) {
   step('booting the web surface')
   info('open http://localhost:6173 in your browser once the server is ready')
   dsh(['--profile', webName], { env })
+}
+
 /**
  * Turn everything off: the web UI server, the decision sidecar and the model engine.
  * The web UI runs in the foreground of whichever terminal launched it, so it is found by its port.
@@ -897,8 +897,6 @@ async function cmdOff(cfg, opts = {}) {
   return d && m
 }
 
-}
-
 /** Rebuild the local knowledge graph (AST only, no LLM calls). */
 function cmdGraph() {
   if (version('engram') === undefined) die('engram is not installed', 'run: npm i -g @sentropic/engram')
@@ -916,10 +914,10 @@ commands
   setup         install/repair pnpm, dsh, both profiles (CLI + web), deps and local model
   up            start the local model: engine, weights (Hugging Face GGUF), warm-up
   stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
-  off           turn everything off: web UI, decision sidecar and local model
-                  (add --force to also stop servers VerNess did not start)
   down          unload the model, free its memory and stop the engine we started
                   (add --force to stop a server VerNess did not start)
+  off           turn everything off: web UI, decision sidecar and local model
+                  (add --force to also stop servers VerNess did not start)
   doctor        show what is installed and what is missing
   sync          regenerate profiles/<name>/cordis.patch.yml from verness.config.json
   graph         rebuild the Engram knowledge graph (no LLM calls)
@@ -955,9 +953,9 @@ switch (first) {
   case 'down': process.exitCode = (await modelDown(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'setup': await cmdSetup(cfg); break
   case 'doctor': await cmdDoctor(cfg); break
-  case 'off': case 'stop': process.exitCode = (await cmdOff(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'sync': syncPatch(cfg); break
   case 'web': await cmdRunWeb(cfg); break
+  case 'off': case 'stop': process.exitCode = (await cmdOff(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'graph': cmdGraph(); break
   case 'help': case '--help': case '-h': console.log(HELP); break
   case 'run': await cmdRun(cfg, rest); break
