@@ -16,35 +16,97 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { formatPath } from '../../packages/contracts/src/issue.ts'
+import { locate } from '../../packages/contracts/src/locate.ts'
+import { validatePersonaFile } from '../../packages/contracts/src/validate-persona.ts'
 import { parseJsonc, REPO, RUN_DIR } from './util.mjs'
 
 /** @returns {string} the persona directory. */
 export const personasDir = () => join(REPO, 'personas')
 
 /**
- * Load every persona: files in `personas/`, plus any inline definitions from the config (files win).
+ * Load every persona: files in `personas/` (validated against the v2 schema), plus any inline
+ * definitions from the config (files win). Inline config definitions are not validated — they are
+ * operator-owned and keep their pre-existing, looser shape (Ruling R4).
  * @param {object} cfg - the VerNess configuration.
+ * @param {object} [opts] - options.
+ * @param {string} [opts.dir] - the persona directory to scan, for tests. Defaults to `personasDir()`.
  * @returns {Map<string, object>} personas by id.
  */
-export function loadPersonas(cfg) {
+export function loadPersonas(cfg, { dir = personasDir() } = {}) {
   const out = new Map()
   for (const [id, p] of Object.entries(cfg.personas?.definitions ?? {})) {
     out.set(id, normalize(id, { ...p, source: 'verness.config.json' }))
   }
-  const dir = personasDir()
   if (existsSync(dir)) {
     for (const f of readdirSync(dir)) {
       if (!f.endsWith('.json')) continue
       const id = f.replace(/\.json$/, '')
+      const source = `personas/${f}`
+      let text
+      let raw
       try {
-        const raw = parseJsonc(readFileSync(join(dir, f), 'utf8'))
-        out.set(raw.id ?? id, normalize(raw.id ?? id, { ...raw, source: `personas/${f}` }))
+        text = readFileSync(join(dir, f), 'utf8')
+        raw = parseJsonc(text)
       } catch (e) {
-        out.set(id, normalize(id, { name: id, broken: String(e.message), source: `personas/${f}` }))
+        out.set(id, normalize(id, { name: id, broken: String(e.message), issues: [String(e.message)], source }))
+        continue
       }
+
+      const expectedId = raw?.id ?? id
+      const result = validatePersonaFile(raw, { expectedId })
+      if (!result.ok) {
+        const issues = result.errors.map(issue => formatIssue(source, text, issue))
+        out.set(expectedId, normalize(expectedId, {
+          name: typeof raw?.name === 'string' ? raw.name : id,
+          broken: issues[0],
+          issues,
+          source,
+        }))
+        continue
+      }
+
+      out.set(result.value.id, normalize(result.value.id, personaFromValidated(result.value, source)))
     }
   }
   return out
+}
+
+/**
+ * Render one validation issue as `<source>:<line>:<column> <path>: <message>`, falling back to
+ * `<source> <path>: <message>` when `locate` cannot resolve a position for the path.
+ * @param {string} source - the persona file's source label, e.g. `personas/x.json`.
+ * @param {string} text - the raw (JSONC) file text `locate` should search.
+ * @param {import('../../packages/contracts/src/issue.ts').Issue} issue - the issue to render.
+ * @returns {string} the rendered issue.
+ */
+function formatIssue(source, text, issue) {
+  const pos = locate(text, issue.path)
+  const loc = pos === undefined ? source : `${source}:${pos.line}:${pos.column}`
+  return `${loc} ${formatPath(issue.path)}: ${issue.message}`
+}
+
+/**
+ * Adapt a schema-validated `Persona` (nested v2 shape) into the flat shape `normalize` expects.
+ * @param {import('../../packages/contracts/src/persona.ts').Persona} p - the validated persona.
+ * @param {string} source - the persona file's source label.
+ * @returns {object} the flat persona fields.
+ */
+function personaFromValidated(p, source) {
+  return {
+    name: p.identity.name,
+    description: p.identity.description,
+    prefix: p.prompt.prefix,
+    suffix: p.prompt.suffix,
+    tips: p.tips,
+    model: p.modelPolicy.preferred ?? {},
+    requirements: p.modelPolicy.requirements,
+    tools: { allow: p.tools.allow, deny: p.tools.deny, approval: p.tools.approval },
+    skills: p.skills,
+    evaluators: p.evaluation.evaluators,
+    commands: p.commands,
+    source,
+  }
 }
 
 /**
@@ -62,11 +124,14 @@ function normalize(id, p) {
     suffix: p.suffix ?? p.prompt?.suffix ?? '',
     tips: p.tips ?? [],
     model: p.model ?? {},
-    tools: { allow: p.tools?.allow ?? [], deny: p.tools?.deny ?? [] },
+    requirements: p.requirements ?? {},
+    tools: { allow: p.tools?.allow ?? [], deny: p.tools?.deny ?? [], approval: p.tools?.approval ?? {} },
     skills: p.skills ?? [],
     evaluators: p.evaluators ?? [],
+    commands: p.commands ?? [],
     source: p.source ?? 'unknown',
     broken: p.broken,
+    issues: p.issues,
   }
 }
 

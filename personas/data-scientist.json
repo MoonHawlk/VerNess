@@ -12,5 +12,6 @@
   },
   "skills": ["statistics", "sql", "python", "experiment-design"],
   "evaluators": ["numerical-correctness", "statistical-validity", "evidence-grounding"],
-  "tips": ["Report the query, the row count and the date range behind every number."]
+  "tips": ["Report the query, the row count and the date range behind every number."],
+  "commands": ["hypotheses"]
 }

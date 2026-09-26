@@ -60,6 +60,8 @@ dsh --profile verness "call verness_ping and report the result"
 ```
 
 ## Troubleshooting
+- **A persona is listed as broken** — run `node scripts/verness.mjs persona check` (or `/persona check`
+  in the REPL); it prints `personas/x.json:line:column path: message` for every issue.
 - **`N entry did not activate`** — read the error after it. Authoring mistakes in tool schemas are
   reported by the schema compiler, e.g. `parameters.x.required must be true when present`
   (optional parameters must simply omit `required`).

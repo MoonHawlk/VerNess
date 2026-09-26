@@ -7,7 +7,7 @@ Two files are all you need day to day:
 | `verness.config.json` | **the setup file** — personas, tips, model, plugins, general settings |
 | `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd` | **the launcher** — thin wrappers over `scripts/verness.mjs` |
 
-The launcher is plain Node (>=22.19, which the substrate already requires), so the same logic runs on
+The launcher is plain Node (`^22.19.0 || >=24`; 23.x is rejected; the substrate already requires 22.19), so the same logic runs on
 Windows, macOS and Linux. The only platform-specific code is path resolution and the Windows `.cmd`
 shim quirk (Node refuses to spawn a `.cmd` without a shell since 20.12, so the launcher opts into the
 shell on Windows and quotes every argument itself).
@@ -100,7 +100,7 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
 | `model` | the local/OpenAI-compatible route: model id, base URL, context window, auto-serve, auto-pull |
 | `extraRoutes` | additional named routes; with `api` + `baseURL` a hand-declared gateway, without them a catalog provider (key = the adapter's provider id) |
 | `activeRoute` | the default route; empty means the `model` route. `/api use` overrides it in state without editing this file |
-| `personas` | `active` plus `definitions`: identity `prefix`/`suffix`, and forward-declared `tools`/`skills` |
+| `personas` | `active` plus `definitions`: identity `prefix`/`suffix`, and forward-declared `tools`/`skills`. A `personas/<id>.json` file with the same id wins over an inline definition |
 | `tips` | standing guidance appended to the persona; every line costs tokens on every turn |
 | `settings.toolsMode` | `native` (default), `ptc`, or `both` |
 | `settings.plugins` | plugin rows: `{ id, package, path?, enabled? }` — `path` means a local package |
@@ -111,6 +111,16 @@ The persona subsystem is M4. Until then a persona is **its identity text**, inje
 existing `system-prompt` seam — real and useful, but `tools.allow`/`tools.deny` and `skills` are
 **recorded and not yet enforced**. When M4 lands, the same config keys start being enforced by a
 plugin on `tools/pre-execute`, and nothing in this file needs to change.
+
+Since M2, persona files (`personas/<id>.json`, JSONC) are **validated at load** against the
+`@verness/contracts` shape; a broken file is listed, not a crash. `/persona check` (or
+`node scripts/verness.mjs persona check`) prints each issue as `personas/x.json:line:column path: message`.
+A persona can also add its own commands (`personas/<id>/commands/<name>.mjs`, e.g. `/hypotheses`);
+global commands win on a name clash. Inline `verness.config.json` definitions are not validated.
+
+### Developing the launcher and contracts
+`pnpm install` once, then `pnpm test` (launcher tests plus `packages/*/test/*.test.ts` via Node type
+stripping) and `pnpm typecheck` (`tsc -p packages/contracts`).
 
 ## Generated, but committed
 `profiles/<name>/cordis.patch.yml` is rendered from the config by `sync` (and automatically by
@@ -172,8 +182,8 @@ engram install                      # /engram skill -> ~/.claude/skills/engram/,
 - `engram install` makes `/engram` available to Claude Code (`/graphify` is a deprecated alias);
   start a new Claude Code session to pick it up. `engram install --project` installs into the
   repo's `.claude/` instead.
-- `graph` is an AST-only rebuild with no LLM calls: about 4 s on this repo, last run 315 nodes,
-  974 edges, 13 communities. Output goes to `.engram/` (gitignored): `graph.json`,
+- `graph` is an AST-only rebuild with no LLM calls: about 4 s on this repo, last run (after M2) 513
+  nodes, 1592 edges, 19 communities. Output goes to `.engram/` (gitignored): `graph.json`,
   `GRAPH_REPORT.md`.
 - `engram update` also writes optional description batches
   (`.engram/description-instructions/batch-*.json`) that an assistant can fill for richer node

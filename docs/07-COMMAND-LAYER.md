@@ -61,38 +61,45 @@ what the launcher chooses to resend. `/btw` makes that explicit and bounded.
   "model-visible means logged", so the correct end state is a durable `SessionEvent` contributed by a
   plugin (T-161). Until then the launcher owns it and the docs say so.
 
-## Personas as files (T-140..T-143)
+## Personas as files (T-140..T-143, built in M2 as T-162..T-165)
 
-Today a persona is a block inside `verness.config.json` with prefix/suffix text. That does not scale
-to a real Data Scientist. Planned shape — one file per persona, `personas/<id>.yaml`:
+A persona is one file, `personas/<id>.json` (JSONC: comments and trailing commas allowed). Files win
+over inline `verness.config.json` definitions with the same id. The shape is `PersonaFile` in
+`@verness/contracts` (`packages/contracts/src/persona.ts`), e.g. `personas/data-scientist.json`:
 
-```yaml
-id: data-scientist
-identity:
-  name: Data Scientist
-  description: Statistical analysis, experimentation, modelling, data investigation.
-prompt:
-  prefix: You are a data scientist working inside the VerNess harness.
-  suffix: |
-    Reduce every question to the cheapest reliable computation before reasoning about it.
-    Show the query you ran and attach its result as evidence.
-models:
-  requirements: { reasoning: high, structured_output: high }
-tools:
-  allow: [python.execute, sql.query, data.profile, artifact.create]
-  deny: [production.write]
-  approval: { sql.write: human }
-skills: [statistics, sql, experiment-design]
-evaluators: [numerical-correctness, statistical-validity, evidence-grounding]
-commands: [/profile-data, /hypotheses]
+```json
+{
+  "id": "data-scientist",
+  "name": "Data Scientist",
+  "description": "Statistical analysis, experiment design, modelling and data investigation.",
+  "prompt": { "prefix": "You are a data scientist working inside the VerNess harness. …", "suffix": "…" },
+  "tools": {
+    "allow": ["read", "grep", "glob", "bash", "python.execute", "sql.query", "data.profile", "artifact.create"],
+    "deny": ["production.write", "sql.write"]
+  },
+  "skills": ["statistics", "sql", "python", "experiment-design"],
+  "evaluators": ["numerical-correctness", "statistical-validity", "evidence-grounding"],
+  "tips": ["Report the query, the row count and the date range behind every number."],
+  "commands": ["hypotheses"]
+}
 ```
+
+Optional fields: `model`, `models.requirements` (capability levels, see `capabilities.ts`) and
+`tools.approval` (tool → approver).
+
+- **Validated at load** by `validatePersonaFile`. A broken file is listed as broken and never crashes
+  the launcher. `/persona check` (or `node scripts/verness.mjs persona check`) prints one line per
+  issue as `personas/x.json:L:C path: message` and exits non-zero on errors.
+- **Persona commands**: each name in `commands` loads `personas/<id>/commands/<name>.mjs` (same
+  module shape as a global command) after the globals. Globals win; a collision is refused with a
+  warning that names the owner. Ids and command names must match `^[a-z][a-z0-9-]*$`.
 
 `tools`, `skills`, `evaluators` and `models.requirements` are **declared, not enforced** until
 M4–M7 land. Any command that displays them must label them as declared, or the surface lies.
 
 ## Teams and multiple tasks (T-150..T-154)
 
-A team is a named set of personas plus a task list: `teams/<id>.yaml`. v1 runs tasks **sequentially**
+A team is a named set of personas plus a task list: `teams/<id>.json`. v1 runs tasks **sequentially**
 by default (`--parallel N` overlaps independent tasks since T-144),
 each in its own `dsh` session under its own persona, collecting per-task status, artifacts and usage
 into `.verness/runs/<timestamp>/`. That is a launcher loop, and it will be labelled as one — the real
