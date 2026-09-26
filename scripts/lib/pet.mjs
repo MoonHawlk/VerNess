@@ -179,41 +179,51 @@ export function moodOf(v) {
 }
 
 /**
- * Ness's face, per mood: eyes, a mouth between two blushing cheeks, and a mark floating above.
- * Odd-width pieces on an odd-width face, so everything centres exactly. ASCII only - legacy
- * consoles mangle the rest.
+ * Ness is a baby sheep, drawn in blocks: every pixel of the original sprite is one half-cell, so a
+ * terminal cell (about twice as tall as wide) holds two pixels stacked and the proportions survive.
+ * The shades are her wool (`░`), cheeks and mouth (`▒`) and nose (`▓`).
  */
-const FACES = {
-  happy: { mark: '', eyes: '^   ^', mouth: 'w' },
-  sleepy: { mark: 'z', eyes: '-   -', mouth: 'o' },
-  worried: { mark: '!', eyes: 'o   o', mouth: '~' },
+const SHEEP = [
+  '      ▄▀▀▀▀▀▀▀▀▀▄',
+  '    ▄▀           ▀▄   ▄▄▄▄   ▄▄▄▓▄',
+  '   ▄▀ ▄▀▀▀▀▀▀▀▄    ▀▀▀    ▀▀▀     ▀▀▄',
+  ' ▄▀▀▄▀░░▄░░▄░░░█ ▄▀▄▒                ▀▄',
+  '  ▀▀█░░░▀░░▀░░░█ ▀▄▄▓▀                 ▀▄',
+  '   █░░░░░░░░░░░█                        █',
+  '  █░▓▓▓▓░░░░░▄▀                         █',
+  '  ▀▄░▓▓░▒░▒▄▀░ ░░ ░ ░░   ░    ░ ░       █',
+  '   ▀▄▄▄▄▄▓▓▀░░ ░  ░ ░  ░░░ ░    ░░      █',
+  '         █▓░                            █',
+  '           █░              ░          ░▄▀',
+  '          ░▀▄░░░░░░░░░  ░░░░░░    ░░▄▄▄▀',
+  '             ▀▄▀▄▄▄▀▓▄▄▄▀▀▀▀▀▄▄▄▓█▀█░█',
+  '              █░█ █░▒█        █▒▒█ █░█',
+  '              █░█ █░░█        █░▒█ █░█',
+  '              █▀█ █▀▀█        █▀▓█ █▀█',
+  '          ░░ ░  ░░▒░░░  ░ ░░░░░░',
+]
+/** Her eyes are two pixels tall, split over rows 3 (lower half) and 4 (upper half), columns 8 and 11. */
+const EYES = { rows: [3, 4], cols: [8, 11] }
+/** Per mood: the mark floating above her head, and whether her eyes are open. */
+const MOODS = {
+  happy: { mark: '', open: true },
+  sleepy: { mark: 'z', open: false },
+  worried: { mark: '!', open: true },
 }
-/** Width of the sheep, and of the face between its cheeks. */
-const SHEEP = { w: 17, face: 7 }
+/** Every line of the art is padded to this width, so the panel beside it stays aligned. */
+const ART_W = Math.max(...SHEEP.map(l => l.length))
 
 /**
- * Ness is a baby sheep: a tuft of wool on top, floppy ears, a face with blushing cheeks, a fluffy
- * body and two little hooves. Only the face changes with the mood, so the outline stays put.
+ * The sheep for a mood. Only the face changes - closed eyes keep just the lower lid - so her
+ * outline stays put.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} nine lines (the mood mark, then the sheep), each exactly 17 columns wide.
+ * @returns {string[]} eighteen lines (the mood mark, then the sheep), each exactly 41 columns wide.
  */
 export function petArt(mood) {
-  const f = FACES[mood] ?? FACES.happy
-  const center = (s, n) => {
-    const left = Math.floor((n - s.length) / 2)
-    return ' '.repeat(left) + s + ' '.repeat(n - s.length - left)
-  }
-  const rows = [
-    '     .-~-~-.',
-    '   .(  ~ ~  ).',
-    ' __(.-------.)__',
-    `(__/|${center(f.eyes, SHEEP.face)}|\\__)`,
-    `    |${center(`.${center(f.mouth, 3)}.`, SHEEP.face)}|`,
-    "   (~'-----'~)",
-    '  (~ ~ ~ ~ ~ ~)',
-    '   `-"-----"-`',
-  ]
-  return [`${' '.repeat(12)}${f.mark}`, ...rows].map(l => l.padEnd(SHEEP.w))
+  const m = MOODS[mood] ?? MOODS.happy
+  const rows = SHEEP.map(l => [...l])
+  if (!m.open) for (const c of EYES.cols) rows[EYES.rows[0]][c] = '░'
+  return [`    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -291,7 +301,8 @@ export function renderPet(v, opts = {}) {
   const rows = [['', title], ...panelRows(v)]
   const label = Math.max(...rows.map(([l]) => l.length))
   const cols = opts.columns
-  const side = cols !== undefined && cols >= 64
+  // Beside the panel only when the panel still gets a readable 50 columns next to the sheep.
+  const side = cols !== undefined && cols >= art[0].length + 56
   // One column of slack: a line that fills the last column makes conhost wrap an empty line.
   const room = side ? cols - art[0].length - 6 : (cols ?? Infinity) - 3
 
@@ -309,8 +320,12 @@ export function renderPet(v, opts = {}) {
 
   // The mood-mark line above the sheep is only worth a row when it carries a mark.
   const shown = art[0].trim() === '' ? art.slice(1) : art
-  if (!side) return [...shown.map(a => `  ${paint('cyan', a)}`.trimEnd()), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
-  // Side by side, bottom-aligned: the title sits by the sheep's wool and Ness speaks beside its hooves.
+  if (!side) {
+    // Too narrow even for the sheep alone: a wrapped sprite is noise, so the panel goes on without her.
+    const fits = cols === undefined || cols > art[0].length + 2
+    return [...(fits ? shown.map(a => `  ${paint('cyan', a)}`.trimEnd()) : []), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
+  }
+  // Side by side, bottom-aligned: the title sits by her head and Ness speaks beside her hooves.
   const beside = [...panel, '', speech]
   const height = Math.max(shown.length, beside.length)
   const artAt = height - shown.length
