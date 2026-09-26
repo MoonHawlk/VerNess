@@ -1,0 +1,180 @@
+/**
+ * The decision layer: a client for the SystemOne wire protocol, the three routing questions, and the
+ * rule baseline they must beat.
+ *
+ * We integrate a *protocol*, not a model (ADR-0009). `laya-serve` and TypeSafe Jev both answer
+ * `POST /v1/systemone`, so the provider is a base URL, not a code path.
+ *
+ * Nothing here steers the harness. Shadow mode logs what the model would have decided next to what
+ * the rules actually decided, which is both the safe rollout and the only way to build the labelled
+ * set the calibration gate (T-223) needs.
+ * @module scripts/lib/decisions
+ */
+
+import { appendFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { REPO } from './util.mjs'
+
+/** Where shadow-mode decisions are recorded (gitignored). */
+export const decisionsDir = () => join(REPO, '.verness', 'decisions')
+
+/**
+ * The three routing questions, all `choice` with small option sets — Laya's strong regime. No
+ * `score` (weakest primitive) and no `noul` (follows its own labels, issue #156). Every question in
+ * one call shares a single forward pass, so asking all three costs one round trip.
+ */
+export const ROUTING_QUESTIONS = {
+  level: {
+    type: 'choice',
+    instructions: 'How much work does this request require from an engineering assistant?',
+    criteria: {
+      trivial: 'a lookup or a one-line answer; no files need to be read',
+      simple: 'one file or one command; the path is obvious',
+      standard: 'several steps across a few files, but the approach is known',
+      complex: 'many steps, unclear approach, or design decisions are needed',
+      research: 'the answer is not known and must be investigated before acting',
+    },
+  },
+  tier: {
+    type: 'choice',
+    instructions: 'What capability does this request actually need?',
+    criteria: {
+      local_small: 'mechanical work: formatting, extraction, running a known command',
+      local_large: 'ordinary reasoning over a small amount of context',
+      frontier: 'hard reasoning, long context, or code that must be correct first time',
+    },
+  },
+  pipeline: {
+    type: 'choice',
+    instructions: 'Which execution strategy fits this request?',
+    criteria: {
+      standard: 'one model turn with tools',
+      agent: 'plan first, then execute over several turns',
+      decision: 'a deterministic or rule-driven loop; little generation needed',
+      adaptive: 'reduce the problem with cheap computation first, then reason over what survives',
+    },
+  },
+}
+
+/** @param {object} cfg - the VerNess configuration. @returns {object} the decisions config block. */
+export function decisionConfig(cfg) {
+  const d = cfg.decisions ?? {}
+  return {
+    enabled: d.enabled ?? false,
+    baseURL: d.baseURL ?? 'http://127.0.0.1:8000',
+    apiKeyEnv: d.apiKeyEnv ?? 'LAYA_API_KEY',
+    timeoutMs: d.timeoutMs ?? 20000,
+    shadow: d.shadow ?? true,
+    ...d,
+  }
+}
+
+/**
+ * Is the decision service up?
+ * @param {object} dc - the resolved decisions config.
+ * @returns {Promise<boolean>} whether `GET /health` answers.
+ */
+export async function decisionHealth(dc) {
+  try {
+    const r = await fetch(`${dc.baseURL}/health`, { signal: AbortSignal.timeout(2500) })
+    return r.ok
+  } catch { return false }
+}
+
+/**
+ * Ask the decision service one or more typed questions about a piece of state.
+ *
+ * `503` is backpressure, not failure: the server caps concurrency (`LAYA_MAX_CONCURRENT`, default
+ * 16) and rejects the excess, so a fan-out must retry rather than treat it as an error.
+ * @param {object} dc - the resolved decisions config.
+ * @param {string} state - the text being decided about.
+ * @param {Record<string, object>} questions - typed questions.
+ * @param {{retries?: number}} [opts] - retry budget for 503s.
+ * @returns {Promise<{ok: boolean, status?: number, ms: number, body?: any, error?: string}>} the result.
+ */
+export async function askDecision(dc, state, questions, opts = {}) {
+  const headers = { 'content-type': 'application/json' }
+  const key = process.env[dc.apiKeyEnv]
+  if (key !== undefined && key !== '') headers.authorization = `Bearer ${key}`
+  const body = JSON.stringify({ state: { document: state }, questions })
+  let retries = opts.retries ?? 3
+  const t0 = Date.now()
+  for (;;) {
+    try {
+      const r = await fetch(`${dc.baseURL}/v1/systemone`, {
+        method: 'POST', headers, body, signal: AbortSignal.timeout(dc.timeoutMs),
+      })
+      if (r.status === 503 && retries-- > 0) {
+        await new Promise(res => setTimeout(res, 250 + Math.random() * 500))
+        continue
+      }
+      const parsed = await r.json().catch(() => undefined)
+      return { ok: r.ok, status: r.status, ms: Date.now() - t0, body: parsed }
+    } catch (e) {
+      if (retries-- > 0) { await new Promise(res => setTimeout(res, 250)); continue }
+      return { ok: false, ms: Date.now() - t0, error: String(e.message ?? e) }
+    }
+  }
+}
+
+/**
+ * Read one answer out of a SystemOne response, tolerating shape differences between providers.
+ *
+ * Gates on `answer_confidence` — the temperature-calibrated field that ECE is fitted against — and
+ * never on `confidence` (raw entropy) or `action.act_probability` (documented to carry no signal,
+ * issue #185).
+ * @param {any} body - the parsed response body.
+ * @param {string} key - the question key.
+ * @returns {{answer?: string, confidence?: number, probabilities?: Record<string, number>}} the answer.
+ */
+export function readAnswer(body, key) {
+  const a = body?.answers?.[key]
+  if (a === undefined) return {}
+  const answer = a.choice ?? a.answer ?? (typeof a.score === 'number' ? String(a.score) : undefined)
+  const confidence = a.answer_confidence ?? a.confidence
+  return { answer, confidence, probabilities: a.probabilities }
+}
+
+/**
+ * The rule baseline: what the harness decides today, and the thing any model must beat before it is
+ * allowed to steer anything (T-251). Deliberately dumb, fast and explainable.
+ * @param {string} text - the task text.
+ * @returns {{level: string, tier: string, pipeline: string, why: string}} the rule decision.
+ */
+export function ruleRoute(text) {
+  const t = String(text).toLowerCase()
+  const words = t.split(/\s+/).filter(w => w !== '').length
+  const mentionsFiles = /\.(ts|js|mjs|json|md|yml|yaml|py|sql)\b|\bfile\b|\bdocs?\/|\bsrc\//.test(t)
+  const investigative = /\b(why|investigate|research|compare|evaluate|design|architect|root cause)\b/.test(t)
+  const mechanical = /\b(list|show|print|format|rename|count|read|cat|head|tail)\b/.test(t)
+  const multiStep = /\b(then|after that|and also|refactor|migrate|implement|build)\b/.test(t)
+
+  let level = 'standard'
+  let why = 'default'
+  if (investigative) { level = 'research'; why = 'investigative verb' }
+  else if (multiStep || words > 60) { level = 'complex'; why = multiStep ? 'multi-step verb' : 'long request' }
+  else if (mechanical && words <= 15 && !mentionsFiles) { level = 'trivial'; why = 'short mechanical request' }
+  else if (mechanical || words <= 25) { level = 'simple'; why = 'short or mechanical' }
+
+  const tier = level === 'trivial' || level === 'simple' ? 'local_small'
+    : level === 'standard' ? 'local_large'
+      : 'frontier'
+  const pipeline = level === 'research' ? 'adaptive'
+    : level === 'complex' ? 'agent'
+      : level === 'trivial' ? 'decision'
+        : 'standard'
+  return { level, tier, pipeline, why }
+}
+
+/**
+ * Record one shadow-mode decision: what the rules chose (and ran), what the model would have chosen,
+ * and how confident it was. This file is the labelled set T-260 will score.
+ * @param {object} record - the decision record.
+ */
+export function logShadowDecision(record) {
+  const dir = decisionsDir()
+  mkdirSync(dir, { recursive: true })
+  const day = new Date().toISOString().slice(0, 10)
+  appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`, 'utf8')
+}

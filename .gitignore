@@ -3,8 +3,11 @@
 
 # Dependencies & build output
 node_modules/
-lib/
 dist/
+# Build output only. A bare `lib/` also matched scripts/lib/, which silently kept every launcher
+# module out of git and would have left a fresh clone unable to start.
+/lib/
+packages/*/lib/
 *.tsbuildinfo
 
 # Local config / secrets
