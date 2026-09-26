@@ -442,3 +442,24 @@
 ## 2026-09-26 — priority change: WS-E (Laya decision layer) first
 - The owner moved WS-E ahead of M3/T-030. **Next**: WS-E Task 1 (shadow records gain `id`, `v: 2`,
   per-question `probabilities` and option-set `hash`), then T-220 labelling.
+
+## 2026-09-26 — WS-E Task 1 done; first Laya trial (13 tasks)
+- **Task 1**: shadow records are `v: 2` with a 12-hex `id`; each question stores `answer`,
+  `confidence`, `probabilities` and the option-set `hash` (`optionHash`). `readAnswer(body, key,
+  question)` returns `{invalid: true}` for a choice outside the criteria. `shadowRoute` and `/decide`
+  share `modelAnswers()`. `npm test` 131/131.
+- **README**: a Laya section with the reminder that Laya only evolves as far as it is validated
+  (label → measure → refit → gate).
+- **Trial**: `decision up` then `/decide` on 13 short operator tasks (create a file, grep/cat
+  searches, load the dashboard, change persona, call a higher LLM, review a result, plus one harder
+  variant of each). About 0.9 s per call on CPU. The 13 records were written before the id fix landed
+  and were backfilled with `v: 2` + `id` (content unchanged). Laya vs rules agreement: **level 5/13,
+  tier 9/13, pipeline 7/13**.
+- What the trial shows (not labelled yet, so no accuracy claims):
+  - `level`: Laya leans to `standard` for anything longer than a few words; confidence 0.31–0.51.
+  - `pipeline`: Laya picks `adaptive` for persona switches and "call a higher llm". Those are
+    harness commands, so `decision` (or no model turn at all) is probably right. Neither side chose it.
+  - Laya's `tier` goes up to `local_large` for review tasks where the rules stay `local_small`.
+    That is plausibly better and should be settled by labels.
+  - Every confidence is ≤ 0.76. That fits "near chance zero-shot" and is what the refit (T-222) is for.
+- Shadow log now: 14 records, 13 of them v2. **Next**: T-220 `/decisions-data label`.

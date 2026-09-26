@@ -75,7 +75,7 @@ Inherit the master plan. Also:
 - Shadow records gain, per question: `probabilities` (the full map), `hash`; and at the top level:
   `id` (a random 12-char id, the label key), `v: 2`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```js
 // scripts/test/decisions.log.test.mjs
@@ -104,11 +104,11 @@ test('probabilities are passed through', () => {
 })
 ```
 
-- [ ] **Step 2: Implement.** `optionHash` uses `node:crypto` `createHash('sha256')`. In `shadowRoute`
+- [x] **Step 2: Implement.** `optionHash` uses `node:crypto` `createHash('sha256')`. In `shadowRoute`
 and `/decide`, store `model[k] = { answer, confidence, probabilities, hash: optionHash(ROUTING_QUESTIONS[k]) }`,
 and add `id: randomBytes(6).toString('hex')` and `v: 2` to the record. Old `v`-less records stay
 readable; Task 2 treats them as having no probabilities.
-- [ ] **Step 3: Tests, commit** — `feat(decisions): log probabilities and option hashes for calibration`
+- [x] **Step 3: Tests, commit** — `feat(decisions): log probabilities and option hashes for calibration`
 
 ---
 

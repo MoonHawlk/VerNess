@@ -15,7 +15,7 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 
 > **Priority (owner, 2026-09-26): WS-E — the Laya decision layer — goes first.** Start with WS-E
 > Task 1 in `05-decision-calibration-routing.md` (log probabilities, option-set hash and record id in
-> shadow records), then T-220 → T-221 → T-222 → T-223. Other workstreams wait unless they block it.
+> shadow records; **done 2026-09-26**), then T-220 → T-221 → T-222 → T-223. Other workstreams wait unless they block it.
 
 ---
 
