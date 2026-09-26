@@ -223,6 +223,12 @@ Deferred / investigate
 - [ ] T-242 Fine-tune on our own decisions once T-220 has a labelled set (the card's own advice: 0.362 -> 0.766 on its benchmark)
 - [ ] T-243 Guardrail/moderation question on inbound tasks — one extra question in an existing call is nearly free
 
+Observability
+- [x] T-270 `/dashboard`: a self-contained static HTML page built from the session logs, the shadow decision log and team-run transcripts. Sessions with turns/tools/tokens/wall time, click-through to a full per-session timeline, decisions with model-vs-rules agreement and latency, team runs with per-task outcome. No server, no network, no dependencies
+- [ ] T-271 Dashboard: per-tool call counts and failure rate, and a latency histogram rather than p50 alone
+- [ ] T-272 Dashboard: filter by persona and by route; today it shows everything in the workspace
+- [ ] T-273 Dashboard: `--watch` to rebuild on change, for a second screen during long runs
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`) — Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
