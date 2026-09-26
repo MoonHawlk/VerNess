@@ -5,6 +5,8 @@
 - insert:
     - id: verness-spike
       name: '@verness/spike'
+    - id: dsh-web-ui
+      name: '@linxin666/dsh-web-all'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared
     # OpenAI-compatible gateways given api + baseURL + a non-empty models list.
     - id: llm-pi-ai
@@ -30,15 +32,14 @@
     provider: ollama-local
     model: 'hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0'
 
-# Persona "data-scientist" + tips, injected through the existing system-prompt seam.
+# Persona "generalist" + tips, injected through the existing system-prompt seam.
 - id: system-prompt
   config:
-    personaPrefix: 'You are a data scientist working inside the VerNess harness. Reduce every question to the cheapest reliable computation before reasoning about it.'
+    personaPrefix: 'You are a careful engineering assistant working inside the VerNess harness.'
     personaSuffix: |-
-      Prefer SQL or a deterministic script over prose estimation. Show the query or code you ran and attach its result as evidence. State sample sizes and uncertainty; never present a point estimate as if it were exact. If the data cannot answer the question, say so instead of narrating around it.
+      State what you verified and what you assumed. Never claim a command succeeded unless you ran it.
       - Working directory is the VerNess repo; upstream/ is a read-only submodule.
       - Prefer small, verifiable steps over long plans.
-      - Report the query, the row count and the date range behind every number.
       Your working directory is {{cwd}}.
 
 - id: tools
