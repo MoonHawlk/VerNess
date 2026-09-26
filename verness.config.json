@@ -94,6 +94,27 @@
     "Prefer small, verifiable steps over long plans.",
   ],
 
+  // ---------------------------------------------------------------- decisions
+  // The decision layer (ADR-0009): a System-1 model answering typed questions so
+  // cheap computation narrows the problem before an LLM turn is spent.
+  //
+  //   ./turn_on.sh decision up | stats | down      lifecycle of the sidecar
+  //   /decide <task>                               route a task, model vs rules
+  //
+  // `enabled` only turns on SHADOW logging: the rules still decide everything that
+  // runs. Nothing the model says steers the harness until its measured calibration
+  // beats the rule baseline (T-223) - zero-shot it scores near chance.
+  "decisions": {
+    "enabled": false,
+    "shadow": true,
+    "baseURL": "http://127.0.0.1:8000",
+    "apiKeyEnv": "LAYA_API_KEY",
+    "timeoutMs": 20000,
+    // pip install "laya[serve]" into this venv; `decision up` does it for you.
+    "venv": ".verness/py",
+    "checkpoint": "english",
+  },
+
   // ----------------------------------------------------------------- settings
   "settings": {
     // Tool presentation: native (default) | ptc | both.

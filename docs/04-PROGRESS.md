@@ -202,3 +202,25 @@
   with the outcome. That is the only way to get the labelled set the calibration gate (T-223) needs,
   and it costs one ~200 ms call per task. Nothing Laya says steers anything until its measured ECE
   beats the rule baseline it would replace.
+
+## 2026-09-26 (overnight) — the decision layer is running, and it is not trustworthy yet
+- **Sidecar is live.** `laya[serve]` 0.3.20 installed into `.verness/py` (torch 2.14, transformers
+  5.17, fastapi 0.141), started on `127.0.0.1:8000` with a generated `LAYA_API_KEY`, all three
+  checkpoints loaded (english, multilingual, typed-decisions). `/decision up|stats|down` manages it
+  exactly like the model engine. (T-210..T-214)
+- **Wire contract confirmed against the live server**, not the model card: a `choice` answer carries
+  `choice`, a full `probabilities` map, `confidence` (entropy-based) and `answer_confidence`. On this
+  build `answer_confidence` equals the winning probability. (T-200..T-203, T-206)
+- **Measured latency: p50 950 ms** for all three routing questions in one call (min 890, max 966,
+  n=5). That is 2-5x the documented 193-464 ms CPU range and ~29x the 32.8 ms T4 figure. A decision
+  is cheap compared with an LLM turn, but on this machine it is not free, and a per-task decision
+  adds about a second. (T-224)
+- **Zero-shot quality, measured on five hand-written tasks**: the model matched the expected task
+  level 2/5 (simple, research) and missed three (trivial->standard, standard->simple,
+  complex->standard), with confidences of 0.32-0.51. The rule baseline did better. On a clear
+  multi-step refactor the model said standard/local_small/standard where the rules said
+  complex/frontier/agent. This is exactly the card's own warning (0.362 zero-shot against a 0.461
+  majority-class baseline), now confirmed on our own decisions.
+- **Consequence**: shadow mode is not a formality, it is the correct default. `decisions.enabled` is
+  `false` in the committed config, and even when enabled it only logs. Nothing the model says steers
+  anything until calibration beats the rule baseline (T-223).

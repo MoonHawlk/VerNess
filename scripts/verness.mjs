@@ -20,8 +20,10 @@ import { modelDown, modelStats, modelUp } from './model.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { loadTeams } from './lib/teams.mjs'
+import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const RUN_DIR_LOCAL = join(REPO, '.verness', 'run')
 const WIN = process.platform === 'win32'
 const NODE_MIN = [22, 19, 0]
 
@@ -350,6 +352,34 @@ function resolveRoute(cfg) {
 }
 
 /**
+ * Shadow-route one task: ask the decision model what it would do, log it beside what the rules
+ * decide, and change nothing. This is how the labelled set for calibration gets built, and it is the
+ * only mode the decision layer runs in until it has earned more (ADR-0009, T-223).
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} text - the task text.
+ * @returns {Promise<void>} resolves once the decision is logged.
+ */
+async function shadowRoute(cfg, text) {
+  const dc = decisionConfig(cfg)
+  if (dc.enabled !== true || dc.shadow !== true) return
+  if (process.env[dc.apiKeyEnv] === undefined) {
+    try { process.env[dc.apiKeyEnv] = readFileSync(join(RUN_DIR_LOCAL, 'laya.key'), 'utf8').trim() } catch { /* no key file */ }
+  }
+  const rules = ruleRoute(text)
+  const r = await askDecision(dc, text, ROUTING_QUESTIONS, { retries: 1 })
+  if (!r.ok) { info(paint(C.dim, `shadow: decision service unavailable (${r.error ?? r.status})`)); return }
+  const model = {}
+  for (const k of Object.keys(ROUTING_QUESTIONS)) {
+    const a = readAnswer(r.body, k)
+    model[k] = { answer: a.answer, confidence: a.confidence }
+  }
+  const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
+  logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules, agreement: agree.length })
+  info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`
+    + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`))
+}
+
+/**
  * The command bar printed when the REPL opens: every quick-tool, grouped, so the options are
  * visible without asking for them. Discoverability is the point — a command nobody can see is a
  * command nobody uses.
@@ -616,8 +646,9 @@ async function cmdDoctor(cfg) {
     ['engram', version('engram') ?? '-', version('engram') === undefined ? 'optional' : 'ok'],
     ['profile', profileDir(cfg.profile.name), existsSync(profileDir(cfg.profile.name)) ? 'ok' : 'run setup'],
     ['submodule', 'upstream/deepseek-harness', existsSync(join(REPO, 'upstream/deepseek-harness/package.json')) ? 'ok' : 'run setup'],
-    ['persona', cfg.personas.active, `${(cfg.tips ?? []).length} tip(s)`],
-    ['model', cfg.model.id, cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute],
+    ['persona', activePersonaId(cfg), `${(cfg.tips ?? []).length} tip(s)`],
+    ['model', readState().model ?? cfg.model.id, cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute],
+    ['decisions', decisionConfig(cfg).baseURL, (await decisionHealth(decisionConfig(cfg))) ? 'serving' : (decisionConfig(cfg).enabled === true ? 'not serving' : 'off (optional)')],
   ]
   const w = Math.max(...rows.map(r => r[0].length))
   for (const [k, v, s] of rows) {
@@ -695,6 +726,7 @@ async function cmdRun(cfg, task) {
       }
       continue
     }
+    await shadowRoute(cfg, line)
     // Every turn after the first adopts the session the first one created, so the model keeps its
     // own history instead of meeting each question cold.
     const prior = convo.id()

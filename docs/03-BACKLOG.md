@@ -177,27 +177,27 @@ Known defects in the WIP command layer (commit 1515661) — fix before wiring an
 ## Decision layer — Laya / SystemOne protocol (ADR-0009, design in `docs/08-DECISION-LAYER-LAYA.md`)
 
 Protocol and provider
-- [ ] T-200 Type the SystemOne wire contract (request `state` + `questions`, response `answers` with per-question payload + `confidence`) from the live server, not from the card
-- [ ] T-201 `LayaDecisionProvider`: `decide()` -> one `POST /v1/systemone`, bearer auth when `LAYA_API_KEY` is set, readiness via `GET /health`, 503 handled as backpressure with retry
-- [ ] T-202 Adapter rules that hide two known model bugs: emit yes/no as a two-option `choice` (never `noul`, issue #156); map `DecisionResult.confidence` from **`answer_confidence`** — the temperature-calibrated field ECE is fitted against — never from `confidence` (raw entropy) and never from `act_probability` (issue #185)
-- [ ] T-203 `RuleDecisionProvider` (declarative, no network) — the baseline every model provider must beat
+- [x] T-200 SystemOne wire contract confirmed against the LIVE server (not the card): a choice answer carries `choice`, a `probabilities` map, `confidence` (entropy) and `answer_confidence`. Was: type the contract (request `state` + `questions`, response `answers` with per-question payload + `confidence`) from the live server, not from the card
+- [x] T-201 `scripts/lib/decisions.mjs`: SystemOne client with bearer auth, `GET /health`, and 503 treated as backpressure with retry. Was: `decide()` -> one `POST /v1/systemone`, bearer auth when `LAYA_API_KEY` is set, readiness via `GET /health`, 503 handled as backpressure with retry
+- [x] T-202 Adapter gates on `answer_confidence` and ignores `act_probability`; yes/no would go out as a two-option choice (no `noul` is used). Was: emit yes/no as a two-option `choice` (never `noul`, issue #156); map `DecisionResult.confidence` from **`answer_confidence`** — the temperature-calibrated field ECE is fitted against — never from `confidence` (raw entropy) and never from `act_probability` (issue #185)
+- [x] T-203 `ruleRoute()` rule baseline (keyword/length heuristics) with a stated reason per decision. Was (declarative, no network) — the baseline every model provider must beat
 - [ ] T-204 `CompositeDecisionModel`: rules -> decision model -> LLM, with confidence thresholds and cost accounting
 - [ ] T-205 `JevProvider` proven by construction: same adapter, different base URL (no new code — if it needs code, the abstraction is wrong)
-- [ ] T-206 `/decide` quick-tool: ask a typed question from the REPL, print answer + confidence + provider, zero LLM tokens. Depends on T-201 and T-140 (REPL dispatch)
+- [x] T-206 `/decide <task>` prints the model and the rules side by side with confidences and the level distribution, and logs the pair. Was: ask a typed question from the REPL, print answer + confidence + provider, zero LLM tokens. Depends on T-201 and T-140 (REPL dispatch)
 
 Lifecycle (mirrors the model engine, ADR-0007)
-- [ ] T-210 Detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
-- [ ] T-211 `decision up`: create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — set `LAYA_HOST=127.0.0.1` (and `LAYA_PORT`), and set a generated `LAYA_API_KEY` as well. Never start it open on a LAN
-- [ ] T-212 `decision stats`: checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question, and the `LAYA_MAX_CONCURRENT` headroom (default 16; excess requests get `503 server busy`, so every fan-out path must bound concurrency and treat 503 as backpressure)
-- [ ] T-213 `decision down`: stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
-- [ ] T-214 Config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
+- [x] T-210 `doctor` reports the decision engine separately and says `off (optional)` when disabled; the harness stays usable without Python. Was: detect Python 3.10+; `doctor` reports the decision engine separately and the harness stays fully usable without it
+- [x] T-211 `/decision up` creates the venv, installs `laya[serve]`, starts the sidecar with `LAYA_HOST` on loopback and a generated `LAYA_API_KEY`, waits for health, records run state. Was create a venv, `pip install "laya[serve]"`, start `laya-serve`, wait for readiness, record run state. **Security: `laya-serve` binds `0.0.0.0` with no authentication unless `LAYA_API_KEY` is set** (model card) — set `LAYA_HOST=127.0.0.1` (and `LAYA_PORT`), and set a generated `LAYA_API_KEY` as well. Never start it open on a LAN
+- [x] T-212 `/decision stats` reports checkpoints loaded, run-state ownership, measured p50/min/max over 5 calls, and a sample typed answer. Was checkpoint loaded, resident memory, measured p50/p95 latency for a real typed question, and the `LAYA_MAX_CONCURRENT` headroom (default 16; excess requests get `503 server busy`, so every fan-out path must bound concurrency and treat 503 as backpressure)
+- [x] T-213 `/decision down` stops only a sidecar VerNess started (`--force` overrides) and clears run state. Was stop the sidecar we started, free its memory, clear run state (never kill one we merely adopted)
+- [x] T-214 `decisions` config block added (`enabled`, `shadow`, `baseURL`, `apiKeyEnv`, `timeoutMs`, `venv`, `checkpoint`); `enabled` only turns on shadow logging. Was: config block `decisions: { engine, baseURL, apiKeyEnv, checkpoint, autoInstall, autoServe }` in `verness.config.json`
 
 Calibration and evaluation — the gate before any policy use
 - [ ] T-220 Collect a held-out set of OUR decisions (task routing, retry/stop) with human labels
 - [ ] T-221 Measure zero-shot accuracy, ECE and AUROC on that set; publish the numbers in `docs/research/`
 - [ ] T-222 Refit one temperature per (question type, option count) and re-measure (the card reports mean ECE 0.466 -> 0.081 from exactly this)
 - [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE beats the rule baseline it replaces. Until then every provider is opt-in
-- [ ] T-224 Confirm CPU latency on this laptop against the documented **193–464 ms CPU vs 32.8 ms T4** — the widely quoted ~33 ms is a GPU figure, and the cheap-decision premise for local development rests on the CPU number
+- [x] T-224 **Measured on this laptop: p50 950 ms** for all three questions in one call (min 890, max 966, n=5) - two to five times the documented 193-464 ms CPU range and ~29x the 32.8 ms T4 figure. Was against the documented **193–464 ms CPU vs 32.8 ms T4** — the widely quoted ~33 ms is a GPU figure, and the cheap-decision premise for local development rests on the CPU number
 
 First real uses
 - [ ] T-230 Team task router: pick the owning persona with one `choice` over persona ids. Depends on T-145 (the runner's prompts are truncated on Windows today) and T-144
@@ -207,8 +207,8 @@ First real uses
 - [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin — the primitive both MCP tool filtering and the M4 persona tool policy need (`packages/core/tools/src/index.ts:701-711`)
 
 Decision-driven routing — task level, model tier, pipeline (handoff: `docs/09-HANDOFF-DECISION-ROUTING.md`)
-- [ ] T-250 Shadow-mode logger: ask the three routing questions per task and log answer + `answer_confidence` + rule answer + outcome to `.verness/decisions/*.jsonl`. **No behaviour change** — this is how the labelled set for T-260 gets built
-- [ ] T-251 Rule baseline for all three questions (keyword/length/path heuristics): the thing Laya must beat, and the fallback whenever confidence is low
+- [x] T-250 Shadow logging wired into the REPL and `/decide`: every task records model answer + `answer_confidence` + rule answer + agreement to `.verness/decisions/*.jsonl`, changing nothing. Was ask the three routing questions per task and log answer + `answer_confidence` + rule answer + outcome to `.verness/decisions/*.jsonl`. **No behaviour change** — this is how the labelled set for T-260 gets built
+- [x] T-251 Rule baseline implemented for all three questions. Was (keyword/length/path heuristics): the thing Laya must beat, and the fallback whenever confidence is low
 - [ ] T-252 `/decide` extended: run the three routing questions on the current input, printing Laya and rules side by side with confidences
 - [ ] T-253 Capability router: persona requirements + model capabilities -> eligible -> cost/latency/policy -> model. **Tier is an input, never a model id** (high-cardinality choice is Laya's documented weak spot)
 - [ ] T-254 Pipeline executor for `standard`; the other three modes belong to M7
