@@ -15,7 +15,9 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { loadCommands, runCommand } from './lib/commands.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
+import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
@@ -212,12 +214,13 @@ function yblock(key, value, pad) {
  * @returns {{prefix: string, suffix: string, name: string}} the resolved persona text.
  */
 function resolvePersona(cfg) {
-  const name = cfg.personas.active
-  const p = cfg.personas.definitions?.[name]
-  if (p === undefined) die(`personas.active = "${name}" has no definition in verness.config.json`)
-  const tips = (cfg.tips ?? []).filter(t => String(t).trim() !== '')
-  const suffix = [p.suffix ?? '', ...tips.map(t => `- ${t}`)].filter(s => s !== '').join('\n')
-  return { name, prefix: p.prefix ?? '', suffix }
+  const id = activePersonaId(cfg)
+  const persona = loadPersonas(cfg).get(id)
+  if (persona === undefined) {
+    die(`active persona "${id}" has no definition`, 'add personas/<id>.json, or run: ./turn_on.sh persona list')
+  }
+  const { prefix, suffix } = personaPrompt(persona, cfg.tips ?? [])
+  return { name: id, prefix, suffix, persona }
 }
 
 /**
@@ -263,11 +266,17 @@ function writePatch(cfg) {
     if (r.reasoning === false) L.push('                reasoningEfforts: false')
   }
   L.push('')
+  // Precedence for the model actually used: an explicit /model override, then the active persona's
+  // preference, then the route default. The override lives in .verness/state.json so switching never
+  // rewrites the commented config file.
+  const override = readState().model
+  const modelId = override ?? persona.persona?.model?.id ?? routes[active].id
+  const modelRoute = persona.persona?.model?.route ?? active
   L.push('# A patch replaces the targeted row config wholesale, so every field is restated.')
   L.push('- id: agent-default-model')
   L.push('  config:')
-  L.push(`    provider: ${active}`)
-  L.push(`    model: ${yq(routes[active].id)}`)
+  L.push(`    provider: ${modelRoute}`)
+  L.push(`    model: ${yq(modelId)}`)
   L.push('')
   L.push(`# Persona "${persona.name}" + tips, injected through the existing system-prompt seam.`)
   L.push('- id: system-prompt')
@@ -284,6 +293,81 @@ function writePatch(cfg) {
   const file = join(dir, 'cordis.patch.yml')
   writeFileSync(file, L.join('\n'), 'utf8')
   return file
+}
+
+/**
+ * The route the next run will use, and the environment it needs.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {{route: string, r: object, env: Record<string,string>}} the resolved route.
+ */
+function resolveRoute(cfg) {
+  const route = cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute
+  const r = cfg.extraRoutes[route] ?? cfg.model
+  const env = {}
+  if (r.apiKeyEnv !== undefined && process.env[r.apiKeyEnv] === undefined && r.apiKeyValue !== undefined) {
+    env[r.apiKeyEnv] = r.apiKeyValue
+  }
+  return { route, r, env }
+}
+
+/**
+ * Build the context every quick-tool receives. Commands run in this process: no model call and no
+ * tokens, which is the whole reason they live outside the agent loop.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {Map<string, object>} commands - the loaded registry.
+ * @returns {object} the command context.
+ */
+function makeCtx(cfg, commands) {
+  const { env } = resolveRoute(cfg)
+  return {
+    cfg,
+    commands,
+    sh,
+    sync: () => syncPatch(cfg),
+    routeEnv: env,
+    activePersonaId: activePersonaId(cfg),
+    // Sessions live under a directory named after the workspace path.
+    workspaceKey: REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''),
+    builtins: {
+      up: async () => ((await modelUp(cfg)) ? 0 : 1),
+      down: async a => ((await modelDown(cfg, { force: a.includes('--force') })) ? 0 : 1),
+      stats: async () => ((await modelStats(cfg)) ? 0 : 1),
+      doctor: async () => { await cmdDoctor(cfg); return 0 },
+      sync: () => { syncPatch(cfg); return 0 },
+      graph: () => { cmdGraph(); return 0 },
+      model: a => cmdModel(cfg, a),
+    },
+  }
+}
+
+/**
+ * `/model` - show the resolved model, or override it. The override is state, not config.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string[]} args - an optional model id, or `reset`.
+ * @returns {number} exit code.
+ */
+function cmdModel(cfg, args) {
+  const { route, r } = resolveRoute(cfg)
+  if (args.length === 0) {
+    const state = readState()
+    step(`route ${route}`)
+    info(`configured model  : ${r.id}`)
+    info(`persona preference: ${loadPersonas(cfg).get(activePersonaId(cfg))?.model?.id ?? '(none)'}`)
+    info(`/model override   : ${state.model ?? '(none)'}`)
+    const list = sh('ollama', ['list'], { capture: true, allowFail: true })
+    if (list.code === 0) {
+      info('locally available:')
+      for (const l of list.out.split('\n').slice(1, 9)) if (l.trim() !== '') info(`  ${l.split(/\s\s+/)[0]}`)
+    }
+    info('switch with /model <id>, clear with /model reset')
+    return 0
+  }
+  if (args[0] === 'reset') { writeState({ model: undefined }); syncPatch(cfg); ok('model override cleared'); return 0 }
+  writeState({ model: args[0] })
+  syncPatch(cfg)
+  ok(`model override set to ${args[0]} (route ${route})`)
+  info('the engine pulls it on the next run if it is not already present')
+  return 0
 }
 
 /**
@@ -431,12 +515,21 @@ async function cmdRun(cfg, task) {
   if (task.length > 0) { sh('dsh', [...args, task.join(' ')], { env }); return }
   if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); sh('dsh', args, { env }); return }
 
-  step(`ready - persona "${cfg.personas.active}", model ${r.id} via ${route}`)
-  info('type a task and press enter; an empty line or ctrl+c exits')
+  const commands = await loadCommands()
+  step(`ready - persona "${activePersonaId(cfg)}", model ${r.id} via ${route}`)
+  info(`type a task, or /help for ${new Set([...commands.values()]).size} quick-tools; empty line or ctrl+c exits`)
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   for (;;) {
     const line = (await rl.question(paint(C.cyan, '\nverness> '))).trim()
     if (line === '') break
+    // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
+    // be swallowed by the registry.
+    if (line.startsWith('/')) {
+      // Re-read the config: an earlier command may have switched persona or model.
+      const { handled } = await runCommand(line, makeCtx(loadConfig(), commands))
+      if (!handled) warn(`no such command: ${line.split(/\s+/)[0]} - try /help`)
+      continue
+    }
     sh('dsh', [...args, line], { env })
   }
   rl.close()
@@ -481,6 +574,13 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
  * @param {typeof DEFAULTS} cfg - configuration.
  */
 async function dispatch(first, rest, cfg) {
+  // A bare word that names a quick-tool runs it; a quoted sentence never does, so
+  // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
+  const commands = await loadCommands()
+  if (first !== undefined && (first.startsWith('/') || (!first.includes(' ') && commands.has(first.toLowerCase())))) {
+    const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands))
+    if (handled) { process.exitCode = code; return }
+  }
 switch (first) {
   case 'up': process.exitCode = (await modelUp(cfg)) ? 0 : 1; break
   case 'stats': process.exitCode = (await modelStats(cfg)) ? 0 : 1; break
