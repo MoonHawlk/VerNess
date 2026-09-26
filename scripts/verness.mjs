@@ -553,6 +553,7 @@ function makeCtx(cfg, commands, convo) {
       doctor: async () => { await cmdDoctor(cfg); return 0 },
       sync: () => { syncPatch(cfg); return 0 },
       graph: () => { cmdGraph(); return 0 },
+      web: a => cmdWeb(cfg, a),
       model: a => cmdModel(cfg, a),
     },
   }
@@ -594,57 +595,44 @@ function cmdModel(cfg, args) {
  */
 function syncPatch(cfg) {
   const src = writePatch(cfg)
-  const patchContent = readFileSync(src, 'utf8')
   const dir = profileDir(cfg.profile.name)
   if (!existsSync(dir)) die(`profile "${cfg.profile.name}" does not exist yet`, 'run: ./turn_on.sh setup')
-  writeFileSync(join(dir, 'cordis.patch.yml'), patchContent, 'utf8')
-  ok(`patch synced -> ${join(dir, 'cordis.patch.yml')}`)
-  const webDir = profileDir(`${cfg.profile.name}-web`)
-  if (existsSync(webDir)) {
-    writeFileSync(join(webDir, 'cordis.patch.yml'), patchContent, 'utf8')
-    ok(`patch synced -> ${join(webDir, 'cordis.patch.yml')}`)
+  // One patch serves both surfaces: the rows it targets (model, system prompt, tools) are identical
+  // in the headless and web templates, so a persona or model switch reaches the browser UI too.
+  for (const d of [dir, profileDir(webProfileName(cfg))]) {
+    if (!existsSync(d)) continue
+    writeFileSync(join(d, 'cordis.patch.yml'), readFileSync(src, 'utf8'), 'utf8')
+    ok(`patch synced -> ${join(d, 'cordis.patch.yml')}`)
   }
 }
 
-// ---------------------------------------------------------------------- commands
+/**
+ * The sibling profile that serves the browser UI. It is kept apart from the main profile so the
+ * terminal REPL and the web composer can both be used without re-creating either.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {string} the web profile's name.
+ */
+const webProfileName = cfg => cfg.profile.webName ?? `${cfg.profile.name}-web`
 
-/** Install or repair everything the harness needs. @param {typeof DEFAULTS} cfg - configuration. */
-async function cmdSetup(cfg) {
-  step(`node ${process.versions.node}`)
-  if (!nodeOk()) die(`Node ${NODE_MIN.join('.')}+ is required by the substrate`, 'install Node 22.19+ or 24+ and re-run')
-  ok('node version satisfies the substrate engine range')
-
-  if (version('pnpm') === undefined) {
-    step(`installing pnpm@${cfg.substrate.pnpmVersion} (dsh plugin shells out to it)`)
-    if (sh('npm', ['i', '-g', `pnpm@${cfg.substrate.pnpmVersion}`]).code !== 0) die('pnpm install failed')
-  }
-  ok(`pnpm ${version('pnpm')}`)
-
+/**
+ * Create a profile from a shipped template if it is missing, then install what every VerNess
+ * profile needs: the route adapter, the linked substrate packages and our plugins.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} name - the profile name.
+ * @param {string} template - the shipped template it is created from.
+ */
+function ensureProfile(cfg, name, template) {
   const want = cfg.substrate.version
-  const have = version('dsh', '--version')
-  if (have !== want) {
-    step(`installing @deepseek-ai/dsh@${want}${have === undefined ? '' : ` (found ${have})`}`)
-    if (sh('npm', ['i', '-g', `@deepseek-ai/dsh@${want}`]).code !== 0) die('dsh install failed')
-  }
-  ok(`dsh ${version('dsh', '--version')}`)
-
-  if (!existsSync(join(REPO, 'upstream', 'deepseek-harness', 'package.json'))) {
-    step('fetching the read-only upstream submodule (source of truth for seams)')
-    sh('git', ['submodule', 'update', '--init', '--depth', '1'], { allowFail: true })
-  }
-  ok('upstream submodule present')
-
-  const name = cfg.profile.name
   const dir = profileDir(name)
   if (!existsSync(join(dir, 'package.json'))) {
-    step(`creating profile "${name}" from the ${cfg.profile.template} template`)
-    if (dsh(['--profile', name, '--from-default-profile', cfg.profile.template, '--dump-config'], { capture: true }).code !== 0) {
+    step(`creating profile "${name}" from the ${template} template`)
+    if (dsh(['--profile', name, '--from-default-profile', template, '--dump-config'], { capture: true }).code !== 0) {
       die(`could not create profile "${name}"`)
     }
   }
   ok(`profile ${dir}`)
 
-  step('installing profile dependencies')
+  step(`installing profile dependencies (${name})`)
   const piai = '@deepseek-ai/dsh-llm-pi-ai'
   sh('pnpm', ['add', `${piai}@${want}`], { cwd: dir, capture: true, allowFail: true })
   if (profileDeps(dir)[piai] === undefined) warn(`could not install ${piai}@${want}`)
@@ -678,46 +666,45 @@ async function cmdSetup(cfg) {
     if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package} from ${p.path}`)
     else ok(`plugin ${p.package} <- ${p.path}`)
   }
+}
+
+// ---------------------------------------------------------------------- commands
+
+/** Install or repair everything the harness needs. @param {typeof DEFAULTS} cfg - configuration. */
+async function cmdSetup(cfg) {
+  step(`node ${process.versions.node}`)
+  if (!nodeOk()) die(`Node ${NODE_MIN.join('.')}+ is required by the substrate`, 'install Node 22.19+ or 24+ and re-run')
+  ok('node version satisfies the substrate engine range')
+
+  if (version('pnpm') === undefined) {
+    step(`installing pnpm@${cfg.substrate.pnpmVersion} (dsh plugin shells out to it)`)
+    if (sh('npm', ['i', '-g', `pnpm@${cfg.substrate.pnpmVersion}`]).code !== 0) die('pnpm install failed')
+  }
+  ok(`pnpm ${version('pnpm')}`)
+
+  const want = cfg.substrate.version
+  const have = version('dsh', '--version')
+  if (have !== want) {
+    step(`installing @deepseek-ai/dsh@${want}${have === undefined ? '' : ` (found ${have})`}`)
+    if (sh('npm', ['i', '-g', `@deepseek-ai/dsh@${want}`]).code !== 0) die('dsh install failed')
+  }
+  ok(`dsh ${version('dsh', '--version')}`)
+
+  if (!existsSync(join(REPO, 'upstream', 'deepseek-harness', 'package.json'))) {
+    step('fetching the read-only upstream submodule (source of truth for seams)')
+    sh('git', ['submodule', 'update', '--init', '--depth', '1'], { allowFail: true })
+  }
+  ok('upstream submodule present')
+
+  ensureProfile(cfg, cfg.profile.name, cfg.profile.template)
+  // The browser UI (a composer bar instead of a terminal prompt) lives in a sibling profile.
+  if (cfg.profile.template !== 'web') ensureProfile(cfg, webProfileName(cfg), 'web')
 
   syncPatch(cfg)
-
-  // Create the companion web profile so `./turn_on.sh web` opens the browser UI.
-  const webName = `${name}-web`
-  const webDir = profileDir(webName)
-  if (!existsSync(join(webDir, 'package.json'))) {
-    step(`creating web profile "${webName}"`)
-    if (dsh(['--profile', webName, '--from-default-profile', 'web', '--dump-config'], { capture: true }).code !== 0) {
-      warn(`could not create web profile "${webName}" — ./turn_on.sh web will not work until setup succeeds`)
-    }
-  }
-  if (existsSync(join(webDir, 'package.json'))) {
-    ok(`web profile ${webDir}`)
-    sh('pnpm', ['add', `${piai}@${want}`], { cwd: webDir, capture: true, allowFail: true })
-    for (const pkg of cfg.settings.linkedSubstratePackages ?? []) {
-      if (root === undefined) { warn(`cannot resolve npm root -g; skipped linking ${pkg} in web profile`); break }
-      const target = join(root, '@deepseek-ai', 'dsh', 'node_modules', ...pkg.split('/'))
-      if (!existsSync(target)) continue
-      if (profileDeps(webDir)[pkg]?.startsWith('link:') !== true) {
-        sh('pnpm', ['remove', pkg], { cwd: webDir, capture: true, allowFail: true })
-        sh('pnpm', ['add', `link:${target}`], { cwd: webDir, capture: true, allowFail: true })
-      }
-      if (profileDeps(webDir)[pkg]?.startsWith('link:') === true) ok(`linked ${pkg} -> runtime copy (web profile)`)
-    }
-    for (const p of cfg.settings.plugins ?? []) {
-      if (p.path === undefined) {
-        sh('pnpm', ['add', p.package], { cwd: webDir, capture: true, allowFail: true })
-        if (profileDeps(webDir)[p.package] !== undefined) ok(`plugin ${p.package} (web profile)`)
-      } else {
-        const abs = resolve(REPO, p.path)
-        if (existsSync(abs)) sh('pnpm', ['add', `file:${abs}`], { cwd: webDir, capture: true, allowFail: true })
-      }
-    }
-  }
 
   await modelUp(cfg)
   step('setup complete')
   info(WIN ? 'next: .\\turn_on.ps1' : 'next: ./turn_on.sh')
-  info(WIN ? 'web UI: .\\turn_on.ps1 web' : 'web UI: ./turn_on.sh web')
 }
 
 /**
@@ -741,7 +728,7 @@ async function cmdDoctor(cfg) {
     ['engine', version(cfg.model.engine ?? 'ollama') ?? '-', (await engineAnswers(cfg.model.baseURL)) ? 'serving' : 'not serving'],
     ['engram', version('engram') ?? '-', version('engram') === undefined ? 'optional' : 'ok'],
     ['profile', profileDir(cfg.profile.name), existsSync(profileDir(cfg.profile.name)) ? 'ok' : 'run setup'],
-    ['web profile', profileDir(`${cfg.profile.name}-web`), existsSync(profileDir(`${cfg.profile.name}-web`)) ? 'ok' : 'run setup'],
+    ['web ui', profileDir(webProfileName(cfg)), existsSync(join(profileDir(webProfileName(cfg)), 'package.json')) ? 'ok' : 'created on first `web`'],
     ['submodule', 'upstream/deepseek-harness', existsSync(join(REPO, 'upstream/deepseek-harness/package.json')) ? 'ok' : 'run setup'],
     ['persona', activePersonaId(cfg), `${(cfg.tips ?? []).length} tip(s)`],
     ['model', readState().model ?? cfg.model.id, cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute],
@@ -755,24 +742,52 @@ async function cmdDoctor(cfg) {
 }
 
 /**
+ * Everything a boot needs before dsh starts: the runtime, the profile, a fresh patch, a warm model
+ * and the route's key in the environment.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} [name] - the profile about to boot.
+ * @returns {Promise<{route: string, r: object, env: Record<string, string>}>} the active route and
+ *   the environment dsh must run with.
+ */
+async function prepareBoot(cfg, name = cfg.profile.name) {
+  if (version('dsh', '--version') === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
+  if (!existsSync(join(profileDir(name), 'package.json'))) die(`profile "${name}" is missing`, 'run: ./turn_on.sh setup')
+  syncPatch(cfg)
+  const { route, r, env } = resolveRoute(cfg)
+  if (r.engine !== undefined && !(await modelUp(cfg))) die('the local model is not ready')
+  if (r.apiKeyEnv !== undefined && process.env[r.apiKeyEnv] === undefined && r.apiKeyValue === undefined) {
+    die(`${r.apiKeyEnv} is not set and no apiKeyValue is configured for route "${route}"`)
+  }
+  return { route, r, env }
+}
+
+/**
+ * Serve the browser UI: a chat window with a message bar, instead of the terminal prompt. It boots
+ * the sibling web profile with the same model, persona and plugins, creating it on first use.
+ * Extra arguments reach the web app (`--port 8080`, `--no-open`, `--host`).
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string[]} rest - arguments passed through to the web app.
+ */
+async function cmdWeb(cfg, rest) {
+  const name = cfg.profile.template === 'web' ? cfg.profile.name : webProfileName(cfg)
+  if (version('dsh', '--version') === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
+  if (!existsSync(join(profileDir(name), 'package.json'))) ensureProfile(cfg, name, 'web')
+  const { r, env } = await prepareBoot(cfg, name)
+  step(`serving the web UI - persona ${activePersonaId(cfg)}, model ${r.id}`)
+  info('the browser opens on its own; if it does not, open the URL printed below (it carries the login token)')
+  info('ctrl+c stops the server')
+  const code = dsh(['--profile', name, ...rest], { env }).code
+  process.exitCode = code
+  return code
+}
+
+/**
  * Boot the harness. With a task it runs one-shot; without, it prompts (headless) or opens the app.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @param {string[]} task - the task words, if any.
  */
 async function cmdRun(cfg, task) {
-  const dshVersion = version('dsh', '--version')
-  if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
-  if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
-  syncPatch(cfg)
-  const route = cfg.activeRoute === '' ? cfg.model.route : cfg.activeRoute
-  const r = cfg.extraRoutes[route] ?? cfg.model
-  if (r.engine !== undefined && !(await modelUp(cfg))) die('the local model is not ready')
-  const env = {}
-  if (r.apiKeyEnv !== undefined && process.env[r.apiKeyEnv] === undefined) {
-    if (r.apiKeyValue === undefined) die(`${r.apiKeyEnv} is not set and no apiKeyValue is configured for route "${route}"`)
-    env[r.apiKeyEnv] = r.apiKeyValue
-  }
-
+  const { route, r, env } = await prepareBoot(cfg)
   const args = ['--profile', cfg.profile.name]
   const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
 
@@ -807,6 +822,7 @@ async function cmdRun(cfg, task) {
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
   info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
+  info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
   const interactive = process.stdin.isTTY === true
@@ -856,21 +872,6 @@ async function cmdRun(cfg, task) {
 }
 
 /**
- * Boot the web surface profile. The model engine is shared with the headless profile; the
- * cordis.patch.yml is kept in sync by `syncPatch` so model/persona config is always current.
- * @param {typeof DEFAULTS} cfg - configuration.
- */
-async function cmdRunWeb(cfg) {
-  const webName = `${cfg.profile.name}-web`
-  const webDir = profileDir(webName)
-  if (!existsSync(join(webDir, 'package.json'))) die(`profile "${webName}" does not exist`, 'run: ./turn_on.sh setup')
-  syncPatch(cfg)
-  const { route, r, env } = resolveRoute(cfg)
-  if (r.engine !== undefined && !(await modelUp(cfg))) die('the local model is not ready')
-  step('booting the web surface')
-  info('open http://localhost:6173 in your browser once the server is ready')
-  dsh(['--profile', webName], { env })
-/**
  * Turn everything off: the web UI server, the decision sidecar and the model engine.
  * The web UI runs in the foreground of whichever terminal launched it, so it is found by its port.
  * @param {typeof DEFAULTS} cfg - configuration.
@@ -878,12 +879,15 @@ async function cmdRunWeb(cfg) {
  * @returns {Promise<boolean>} whether every part shut down cleanly.
  */
 async function cmdOff(cfg, opts = {}) {
-  step('stopping the web UI (port 6173)')
+  step('stopping the web UI')
   if (WIN) {
     const r = sh('powershell', ['-NoProfile', '-Command', 'Get-NetTCPConnection -LocalPort 6173 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }'], { capture: true, allowFail: true })
     ok(r.code === 0 ? 'web UI stopped (if it was running)' : 'no web UI running')
   } else {
-    const pids = (sh('lsof', ['-ti', 'tcp:6173', '-sTCP:LISTEN'], { capture: true, allowFail: true }).out).split(/\s+/).filter(Boolean)
+    // By port for the default server, and by profile for one started with `web --port <n>`.
+    const byPort = sh('lsof', ['-ti', 'tcp:6173', '-sTCP:LISTEN'], { capture: true, allowFail: true }).out
+    const byName = sh('pgrep', ['-f', `profile ${webProfileName(cfg)}( |$)`], { capture: true, allowFail: true }).out
+    const pids = [...new Set(`${byPort} ${byName}`.split(/\s+/).filter(x => /^\d+$/.test(x)))]
     if (pids.length === 0) ok('no web UI running')
     else {
       for (const pid of pids) { try { process.kill(Number(pid), 'SIGTERM') } catch { warn(`pid ${pid} was already gone`) } }
@@ -897,8 +901,6 @@ async function cmdOff(cfg, opts = {}) {
   return d && m
 }
 
-}
-
 /** Rebuild the local knowledge graph (AST only, no LLM calls). */
 function cmdGraph() {
   if (version('engram') === undefined) die('engram is not installed', 'run: npm i -g @sentropic/engram')
@@ -910,10 +912,12 @@ const HELP = `VerNess launcher
   ./turn_on.sh [command]      macOS/Linux        .\\turn_on.ps1 [command]   Windows
 
 commands
-  (none)        boot the harness; headless profile prompts for tasks in a loop (CLI)
-  web           open the browser UI (dsh-web-ui); requires ./turn_on.sh setup first
-  "<task>"      run one task and exit (one-shot, works in both CLI and web profiles)
-  setup         install/repair pnpm, dsh, both profiles (CLI + web), deps and local model
+  (none)        boot the harness; headless profiles prompt for tasks in a loop
+  "<task>"      run one task and exit
+  web           open the browser UI: a chat window with a message bar instead of the
+                  terminal prompt (same model, persona and plugins; alias: ui)
+                  pass-through flags: --port <n>  --no-open  --host <host>
+  setup         install/repair pnpm, dsh, the profile, its deps and the local model
   up            start the local model: engine, weights (Hugging Face GGUF), warm-up
   stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
   off           turn everything off: web UI, decision sidecar and local model
@@ -957,7 +961,6 @@ switch (first) {
   case 'doctor': await cmdDoctor(cfg); break
   case 'off': case 'stop': process.exitCode = (await cmdOff(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'sync': syncPatch(cfg); break
-  case 'web': await cmdRunWeb(cfg); break
   case 'graph': cmdGraph(); break
   case 'help': case '--help': case '-h': console.log(HELP); break
   case 'run': await cmdRun(cfg, rest); break

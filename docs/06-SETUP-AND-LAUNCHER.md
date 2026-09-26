@@ -17,6 +17,7 @@ shell on Windows and quotes every argument itself).
 ```sh
 ./turn_on.sh                # boot; a headless profile prompts for tasks in a loop
 ./turn_on.sh "audit docs/"  # run one task and exit
+./turn_on.sh web            # browser UI: a chat window with a message bar (also /web in the REPL)
 ./turn_on.sh setup          # install/repair everything (idempotent — safe to re-run)
 ./turn_on.sh doctor         # what is installed, what is missing
 ./turn_on.sh sync           # regenerate the profile patch from the config
@@ -41,6 +42,22 @@ read-only submodule → create the profile from its template → install the rou
 substrate packages to the runtime's own copy → add our local plugin packages → generate and sync the
 patch → start Ollama and pull the model. Every step is a no-op when already satisfied.
 
+## The browser UI (`web`)
+`web` (alias `ui`, or `/web` inside the REPL) serves the substrate's own web client: a chat window
+with a message bar, sessions in a sidebar, and tool calls rendered inline. Use it when a terminal prompt is
+the wrong shape for the work. It boots a **sibling profile**, `<profile.name>-web` (override with
+`profile.webName`), created from the upstream `web` template, so the terminal REPL keeps working
+unchanged beside it.
+
+- Same model, persona, tips and plugins. `sync` writes the one generated patch into both profiles,
+  because the rows it targets (`agent-default-model`, `system-prompt`, `tools`) are identical in the
+  headless and web templates. A `/persona` or `/model` switch therefore reaches the browser too.
+- `setup` creates it, and the first `web` creates it if `setup` has not.
+- Flags pass through to the web app: `--port <n>`, `--no-open`, `--host <host>`.
+- The server is token-gated. It opens the browser for you; otherwise open the printed URL, since
+  it carries the login token. Pick the `VerNess` workspace, then type in the bar. Ctrl+C stops it. Launched as `/web` from
+  the REPL, it also ends the REPL, which shares the console.
+
 ## The setup file
 
 `verness.config.json` is JSON with `//` comments and trailing commas allowed. Every field is
@@ -49,7 +66,7 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
 | Section | What it controls |
 |---|---|
 | `substrate` | pinned `dsh` and pnpm versions (keep in lockstep with the submodule tag — ADR-0002) |
-| `profile` | profile name and the template it is created from (`headless`, `web`, `acp`, `sdk`) |
+| `profile` | profile name and the template it is created from (`headless`, `web`, `acp`, `sdk`); `webName` names the browser-UI sibling (default `<name>-web`) |
 | `model` | the local/OpenAI-compatible route: model id, base URL, context window, auto-serve, auto-pull |
 | `extraRoutes` | additional named routes (paid providers); keys are route names |
 | `activeRoute` | which route the agent uses; empty means the `model` route |
