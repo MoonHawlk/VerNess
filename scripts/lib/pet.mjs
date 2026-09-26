@@ -179,52 +179,41 @@ export function moodOf(v) {
 }
 
 /**
- * The face on the cube's front (its screen), per mood: eyes and mouth, plus a mark floating above.
+ * Ness's face, per mood: eyes, a mouth between two blushing cheeks, and a mark floating above.
  * Odd-width pieces on an odd-width face, so everything centres exactly. ASCII only - legacy
  * consoles mangle the rest.
  */
 const FACES = {
-  happy: { mark: '', eyes: 'o   o', mouth: 'u' },
-  sleepy: { mark: 'z', eyes: '-   -', mouth: '.' },
+  happy: { mark: '', eyes: '^   ^', mouth: 'w' },
+  sleepy: { mark: 'z', eyes: '-   -', mouth: 'o' },
   worried: { mark: '!', eyes: 'o   o', mouth: '~' },
 }
-/**
- * Cube geometry, oblique projection. The front face is 13 x 6 cells, which reads as square because a
- * terminal cell is about twice as tall as it is wide; the depth recedes 3 rows, one column per row,
- * so every receding edge is a single clean `/`.
- */
-const CUBE = { w: 13, h: 6, d: 3 }
+/** Width of the sheep, and of the face between its cheeks. */
+const SHEEP = { w: 17, face: 7 }
 
 /**
- * Ness is a cube - a little TV with a face on its screen. Built from the geometry rather than drawn
- * by hand, so the edges stay parallel and the corners meet whatever the face shows.
+ * Ness is a baby sheep: a tuft of wool on top, floppy ears, a face with blushing cheeks, a fluffy
+ * body and two little hooves. Only the face changes with the mood, so the outline stays put.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} ten lines (the mood mark, then the cube), each exactly 16 columns wide.
+ * @returns {string[]} nine lines (the mood mark, then the sheep), each exactly 17 columns wide.
  */
 export function petArt(mood) {
   const f = FACES[mood] ?? FACES.happy
-  const { w, h, d } = CUBE
-  const inner = w - 2
-  const center = s => {
-    const left = Math.floor((inner - s.length) / 2)
-    return ' '.repeat(left) + s + ' '.repeat(inner - s.length - left)
+  const center = (s, n) => {
+    const left = Math.floor((n - s.length) / 2)
+    return ' '.repeat(left) + s + ' '.repeat(n - s.length - left)
   }
-  const edge = `+${'-'.repeat(inner)}+`
-  const face = { 1: f.eyes, 2: f.mouth }
-  const rows = []
-  for (let r = 0; r < d + h; r++) {
-    if (r === 0) rows.push(`${' '.repeat(d)}${edge}`)
-    else if (r < d) rows.push(`${' '.repeat(d - r)}/${' '.repeat(inner)}/${' '.repeat(r - 1)}|`)
-    else if (r === d) rows.push(`${edge}${' '.repeat(d - 1)}|`)
-    else if (r === d + h - 1) rows.push(edge)
-    else {
-      // The back-right edge drops to the back face's bottom corner, then recedes to the front one.
-      const back = r < h - 1 ? '|' : r === h - 1 ? '+' : '/'
-      const gap = r <= h - 1 ? d - 1 : d - 1 - (r - (h - 1))
-      rows.push(`|${center(face[r - d - 1] ?? '')}|${' '.repeat(gap)}${back}`)
-    }
-  }
-  return [`${' '.repeat(w + 1)}${f.mark}`, ...rows].map(l => l.padEnd(w + d))
+  const rows = [
+    '     .-~-~-.',
+    '   .(  ~ ~  ).',
+    ' __(.-------.)__',
+    `(__/|${center(f.eyes, SHEEP.face)}|\\__)`,
+    `    |${center(`.${center(f.mouth, 3)}.`, SHEEP.face)}|`,
+    "   (~'-----'~)",
+    '  (~ ~ ~ ~ ~ ~)',
+    '   `-"-----"-`',
+  ]
+  return [`${' '.repeat(12)}${f.mark}`, ...rows].map(l => l.padEnd(SHEEP.w))
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -318,10 +307,10 @@ export function renderPet(v, opts = {}) {
   const panel = rows.map(draw)
   const speech = `${paint('cyan', `${v.name}:`)} ${fit(says, room - v.name.length - 2)}`
 
-  // The mood-mark line above the cube is only worth a row when it carries a mark.
+  // The mood-mark line above the sheep is only worth a row when it carries a mark.
   const shown = art[0].trim() === '' ? art.slice(1) : art
   if (!side) return [...shown.map(a => `  ${paint('cyan', a)}`.trimEnd()), `  ${speech}`, '', ...panel.map(p => `  ${p}`)]
-  // Side by side, bottom-aligned: the title sits by the top of the cube and Ness speaks beside its bottom edge.
+  // Side by side, bottom-aligned: the title sits by the sheep's wool and Ness speaks beside its hooves.
   const beside = [...panel, '', speech]
   const height = Math.max(shown.length, beside.length)
   const artAt = height - shown.length
