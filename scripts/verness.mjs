@@ -25,7 +25,7 @@ import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
-import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, readAnswer, ruleRoute } from './lib/decisions.mjs'
+import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.verness', 'run')
@@ -422,11 +422,7 @@ async function shadowRoute(cfg, text) {
   const rules = ruleRoute(text)
   const r = await askDecision(dc, text, ROUTING_QUESTIONS, { retries: 1 })
   if (!r.ok) { info(paint(C.dim, `shadow: decision service unavailable (${r.error ?? r.status})`)); return }
-  const model = {}
-  for (const k of Object.keys(ROUTING_QUESTIONS)) {
-    const a = readAnswer(r.body, k)
-    model[k] = { answer: a.answer, confidence: a.confidence }
-  }
+  const model = modelAnswers(r.body)
   const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
   logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules, agreement: agree.length })
   info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`

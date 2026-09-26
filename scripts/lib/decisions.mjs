@@ -11,6 +11,7 @@
  * @module scripts/lib/decisions
  */
 
+import { createHash, randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -119,21 +120,50 @@ export async function askDecision(dc, state, questions, opts = {}) {
 }
 
 /**
+ * Identify a question's option set, so calibration never mixes records logged under different
+ * options (someone edits a criteria key). Only the keys count; rewording a description does not.
+ * @param {{criteria: Record<string, string>}} question - a typed question.
+ * @returns {string} the first 8 hex characters of sha256 over the sorted option keys.
+ */
+export function optionHash(question) {
+  return createHash('sha256').update(JSON.stringify(Object.keys(question.criteria).sort())).digest('hex').slice(0, 8)
+}
+
+/**
  * Read one answer out of a SystemOne response, tolerating shape differences between providers.
  *
  * Gates on `answer_confidence` — the temperature-calibrated field that ECE is fitted against — and
  * never on `confidence` (raw entropy) or `action.act_probability` (documented to carry no signal,
  * issue #185).
+ *
+ * With `question`, a choice outside its criteria is a provider bug: it comes back as
+ * `{invalid: true}` with no answer, so the rules apply.
  * @param {any} body - the parsed response body.
  * @param {string} key - the question key.
- * @returns {{answer?: string, confidence?: number, probabilities?: Record<string, number>}} the answer.
+ * @param {{criteria: Record<string, string>}} [question] - the question asked, to validate against.
+ * @returns {{answer?: string, confidence?: number, probabilities?: Record<string, number>, invalid?: boolean}} the answer.
  */
-export function readAnswer(body, key) {
+export function readAnswer(body, key, question) {
   const a = body?.answers?.[key]
   if (a === undefined) return {}
   const answer = a.choice ?? a.answer ?? (typeof a.score === 'number' ? String(a.score) : undefined)
   const confidence = a.answer_confidence ?? a.confidence
+  if (question !== undefined && answer !== undefined && !Object.hasOwn(question.criteria, answer)) {
+    return { invalid: true, probabilities: a.probabilities }
+  }
   return { answer, confidence, probabilities: a.probabilities }
+}
+
+/**
+ * The model's side of a shadow record: every routing question's answer, confidence, full
+ * probability map and option-set hash — what calibration (T-221, T-222) scores.
+ * @param {any} body - the parsed SystemOne response body.
+ * @returns {Record<string, {answer?: string, confidence?: number, probabilities?: Record<string, number>, invalid?: boolean, hash: string}>} per question.
+ */
+export function modelAnswers(body) {
+  const model = {}
+  for (const [k, q] of Object.entries(ROUTING_QUESTIONS)) model[k] = { ...readAnswer(body, k, q), hash: optionHash(q) }
+  return model
 }
 
 /**
