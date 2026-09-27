@@ -560,3 +560,18 @@
   T-398, which starts with a spike proving an out-of-tree browser plugin loads. Also found: the
   `dsh-web-ui` row (`@linxin666/dsh-web-all`) is enabled in the config but not installed in the web
   profile (T-399).
+
+## 2026-09-27 — persona catalog built: T-393, T-395, T-394, ten personas (T-400..T-409, T-420..T-429)
+- **T-393** `scripts/test/personas.catalog.test.mjs`: every persona file validates and is named after
+  its id; every persona command exists, clashes with no global command, and runs with no model.
+  Verified to fail on a probe file.
+- **Ten personas** from the WS-I specs, each with one zero-token command. Verified that each persona
+  loads only its own command, none leaks into another, and `/testplan login flow` runs through the
+  real registry. `/persona check`: 17 ok.
+- **T-395** `family` in the contracts (validated, round-trips), set in all 16 files; `/persona` and
+  `/agents` group by it. The inline `generalist` lists under `other`, because it is defined in
+  `verness.config.json` and was not edited.
+- **T-394** `docs/12-PERSONAS.md` section 5: the catalog table, generated from the files, and "which
+  persona do I pick?" for every overlapping pair.
+- `npm test` and `pnpm typecheck` clean. **Left in WS-I**: T-396 (two-stage routing, needed before
+  T-230) and T-397 (the feature-delivery team).
