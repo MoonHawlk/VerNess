@@ -36,7 +36,11 @@ for (const [label, profile, isWeb] of [['headless', name, false], ['web', web, t
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
   const deps = pkg.dependencies ?? {}
   console.log(`  bundles: ${profileBundles(dir).join(', ') || 'none'}`)
-  for (const p of plugins) console.log(`  plugin ${p.package}: ${deps[p.package] === undefined ? 'NOT INSTALLED' : `installed (${deps[p.package].slice(0, 40)})`}`)
+  for (const p of plugins) {
+    // A row with `surfaces` (e.g. ["web"]) belongs only to those profiles; elsewhere it is absent by design.
+    if (Array.isArray(p.surfaces) && !p.surfaces.includes(label)) { console.log(`  plugin ${p.package}: not for this profile (surfaces: ${p.surfaces.join(', ')})`); continue }
+    console.log(`  plugin ${p.package}: ${deps[p.package] === undefined ? 'NOT INSTALLED' : `installed (${deps[p.package].slice(0, 40)})`}`)
+  }
   if (isWeb) {
     for (const b of webBundles) {
       const inDeps = deps[b] !== undefined

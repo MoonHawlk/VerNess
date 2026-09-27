@@ -184,6 +184,10 @@ manager, and a plugin market. SSH, the pet and a few low-use panels ship switche
 under Settings → Plugins → Plugin manager. Each panel is fault-isolated: one that breaks is listed at
 `GET /api/dsh-web-all/degraded` and the rest keep working.
 
+Your quick-tools work there too: type `/cost`, `/usage`, `/persona`, `/agents`, `/dd`, `/routing` or a
+persona command in the message bar. `/model` and `/help` are the web UI's own; `/persona` and `/api`
+changes apply after restarting the UI.
+
 It still shows the DeepSeek Harness name and logo; replacing them with VerNess's is planned (T-398).
 
 `./turn_on.sh ui` is an alias. The persona, route/model and access mode are read when the server starts, so after changing any of them restart the UI: `./turn_on.sh off`, then `./turn_on.sh web`.
@@ -277,7 +281,8 @@ rules still make every real decision.
 | Feature | Status | Notes |
 |---------|--------|-------|
 | CLI / headless REPL | ✅ | `./turn_on.sh` |
-| Browser UI (`dsh-web-app`) | ✅ | `./turn_on.sh web`; VerNess branding planned (T-398) |
+| Browser UI (`dsh-web-app`) | ✅ | `./turn_on.sh web`; VerNess branding planned (T-398), skin (T-430) |
+| Quick-tools in the web UI | ✅ | type `/cost`, `/persona`, `/dd`… in the message bar ([ADR-0011](docs/adr/0011-web-commands-bridge.md)) |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
 | Slash commands | ✅ | one file per command in `scripts/commands/`; `/help` lists them |
@@ -476,6 +481,7 @@ Each milestone is independently runnable. See `docs/02-ROADMAP.md` for exit crit
 
 | Tag | Contents |
 |-----|----------|
+| `v0.4.0` | Your quick-tools in the web UI (`@verness/commands`, ADR-0011), `/exit`, short command names and `//`, `/config`, the calibration gate (`/dd gate`), `/routing`, the feature-delivery team, `dsh-web-all` in the web UI, repo tools. Notes: [CHANGELOG.md](CHANGELOG.md) |
 | `v0.3.0` | Decision layer measured: shadow records with probabilities, blind labelling (`/decisions-data label`, `--relabel`), calibration report and held-out temperature refit (`report`, `refit`). Ten new personas with their own zero-token commands, persona `family`, the catalog in `docs/12-PERSONAS.md`. Dashboard backlog with priorities. Windows: no terminal windows flashing at boot. Docs: persona guide, and the project explained simply |
 | `v0.2.0` | M2: `@verness/contracts`, persona files validated at load (`/persona check`), `data-analyst` and `reviewer` personas, persona-scoped commands |
 | `v0.1.0` | M0/M1: launcher, local model lifecycle, web UI, load-bearing spike plugin |

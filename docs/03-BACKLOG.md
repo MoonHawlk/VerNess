@@ -233,11 +233,6 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
 Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
 `node scripts/verness.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
-- [ ] T-374 Spike: confirm that registering on cordis `ready` leaves `/model` to the substrate, and that headless does not mount the plugin
-- [ ] T-375 `node scripts/verness.mjs --list-commands` emits the quick-tools as JSON; a quick-tool can opt out with `web: false`
-- [ ] T-376 `@verness/commands` dsh plugin: register each listed quick-tool with dsh-commands, and a handler that runs it through the launcher
-- [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
-- [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
 
 ## Web UI branding: VerNess logo and titles in the browser UI
 Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
@@ -247,6 +242,13 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
 - [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
 - [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a VerNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the VerNess skin on a fresh profile, on macOS and Windows; the owner approves the look
+
+## Releases
+- [ ] T-431 `scripts/tools/release-notes.mjs`: draft the next `CHANGELOG.md` entry from the merges and task IDs since the last tag (`git log <tag>..epic`) and their `03-BACKLOG-DONE.md` lines, grouped Added / Changed / Fixed, with an Upgrade section when setup must be re-run. A human edits the draft; the rule that every release has notes is in `05-CONVENTIONS.md`
+
+## Launcher follow-ups from the web bridge (ADR-0011)
+- [ ] T-432 `setup` does not pick up an edited local plugin file: pnpm reuses its copy of a same-version `file:` package, so a changed `packages/commands` or `packages/spike` stays stale until a fresh `DSH_HOME`. Reinstall `path` plugins when their files changed (content hash in the profile), and fix the "edits are live" line in `06-SETUP-AND-LAUNCHER.md`
+- [ ] T-433 The web bridge's `config.repo` is whichever checkout last ran `sync`, so a worktree's `sync` makes the web UI run that worktree's launcher. Pin it to the main checkout (or warn when `sync` runs from a worktree); and on Windows, cancelling a command can leave a grandchild process (`/team` dsh run) behind: kill the process tree
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5

@@ -19,8 +19,9 @@
 - `main` holds released versions only. Nothing is committed to it directly.
 - `epic` is the integration branch. Every feature or fix branch starts from `epic` and merges back
   into it with `git merge --no-ff`, so each branch stays visible as one unit in the history.
-- A release is `epic` merged into `main` (`--no-ff`), with `package.json` `version` bumped in the
-  same merge and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
+- A release is `epic` merged into `main` (`--no-ff`), with `package.json` `version` bumped **and the
+  release notes written** in the same merge (a new `CHANGELOG.md` entry: Added / Changed / Fixed /
+  Upgrade, each line with its task ID; plus a row in the README's Releases table), and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
   `git push origin main epic --follow-tags`.
 - Versions follow semver while pre-1.0: a release with new commands or config fields bumps the
   minor (`0.1.0` -> `0.2.0`); a release of fixes only bumps the patch.
