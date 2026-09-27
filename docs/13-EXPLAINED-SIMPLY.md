@@ -102,7 +102,7 @@ brackets.
 |---|---|
 | `/decision` (`/decisions`) | Laya's on/off switch: `up` installs and starts it, `stats` shows its speed and a sample answer, `down` stops it. |
 | `/decide <task>` | Asks Laya and the rules about one task and shows both answers side by side, with Laya's confidence. Nothing is applied; the result is logged. Use it to see what Laya is good and bad at. |
-| `/decisions-data` (`/dd`) | The grading desk. `status` counts graded tasks against the 50 needed. `label` shows you old tasks one by one so you can pick the right answers. `report` prints Laya's score against the rules. `refit` adjusts Laya's confidence once there are 50+ grades. **`gate` is not built yet.** |
+| `/decisions-data` (`/dd`) | The grading desk. `status` counts graded tasks against the 50 needed. `label` shows you old tasks one by one so you can pick the right answers. `report` prints Laya's score against the rules. `refit` adjusts Laya's confidence once there are 50+ grades. `gate` says, per question, whether Laya has earned the right to decide (`PASS`) or not yet (`HOLD`, and why). |
 
 ### personas: job hats
 
@@ -197,8 +197,8 @@ From `docs/02-ROADMAP.md` and `docs/03-BACKLOG.md`. Milestones M0 to M2 are done
 - **Choosing the cheapest way is still a plan.** Nothing picks a model or a method automatically
   yet. You pick the model with `/model` or `/api`. (The "decision" system is M3, model routing is
   M6, and the SQL/data engines that do big jobs without the AI are M8.)
-- **Laya does not decide anything.** It only practises in shadow mode. **The gate** that would let
-  it decide is not built (T-223). It needs at least 50 graded tasks per question first; 20 are done.
+- **Laya does not decide anything.** It only practises in shadow mode. **The gate** (T-223) now
+  checks whether it could, but only reports: it needs at least 50 graded tasks per question first.
 - **Tool rules on job hats are written down but not enforced** until M4 (T-042). The reviewer
   "may not edit" today only because its instructions say so.
 - **Skills** (step-by-step know-how the AI loads when needed) are M5. **An independent checker**

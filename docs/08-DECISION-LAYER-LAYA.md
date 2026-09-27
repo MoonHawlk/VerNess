@@ -7,8 +7,9 @@
 > `/decide` (T-206), the sidecar lifecycle `/decision up|stats|down` (T-210..T-214), shadow logging
 > from the REPL and `/decide` with probabilities and option hashes, blind labelling
 > (`/decisions-data label`, `--relabel`; T-220), and the calibration report and held-out
-> temperature refit (`/decisions-data report | refit`; T-221, T-222). First numbers:
-> `docs/research/decision-calibration.md`. **Not built:** the gate as code (T-223), the composite
+> temperature refit (`/decisions-data report | refit`; T-221, T-222), and the gate as code
+> (`decisionGate`, `/decisions-data gate`; T-223, report only). First numbers:
+> `docs/research/decision-calibration.md`. **Not built:** the composite
 > model (T-204), routing that applies anything (T-253, T-262), and the M3 plugin (T-030..T-036).
 > Nothing the model says steers the harness yet.
 
@@ -126,8 +127,22 @@ See `docs/03-BACKLOG.md` T-200..T-232 for the authoritative list. Shape of the w
    install the sidecar, start it, probe latency, shut it down and free memory. Python lives in the
    sidecar only, never in our process (ADR-0009).
 3. **T-220..T-223 — calibration and evaluation.** A held-out set of *our own* decisions, a
-   temperature refit, and a reported ECE/AUROC. **Gate**: no decision path may be enabled by default
-   until its measured ECE beats the rule baseline it replaces.
+   temperature refit, and a reported ECE/AUROC. **Gate** (T-223, as code: `decisionGate` in
+   `scripts/lib/calibration.mjs`; `/decisions-data gate` prints `PASS` or `HOLD — <why>` per
+   question): no decision path may be enabled until, for that question, **all five** hold:
+   1. at least **50** labelled records under today's option set;
+   2. model accuracy **≥** rules accuracy;
+   3. model ECE **<** rules ECE (the rules have no confidence, are scored as always sure, so their
+      ECE is `1 − accuracy`);
+   4. model ECE **≤ 0.15**;
+   5. AUROC **≥ 0.6** (confidence must separate right answers from wrong ones, or confidence bands
+      mean nothing).
+
+   The model's ECE and AUROC are the held-out refit's when a refit was kept, the raw ones otherwise;
+   accuracy is always measured on every label (a temperature cannot change an answer, so the
+   refit's accuracy is the same number on a smaller sample). The
+   gate is evidence, not consent: it only reports, and nothing is applied until the operator also
+   turns the question on (T-262).
 4. **T-230..T-232 — the first two real uses**, both cheap to verify: the team task router, and the
    supervisor's continue/retry/complete/escalate decision.
 

@@ -5,11 +5,16 @@
  * beside them in `labels.jsonl`, one `{id, question, label, at}` line each, append-only. The newest
  * label for an `(id, question)` wins, so a mistake is corrected by labelling again. `skip` is a
  * label: it marks a task that fits none of the options, and it is never asked again.
+ *
+ * `currentReport` and `latestGate` join the two and hand them to the pure `calibration.mjs`.
  * @module scripts/lib/labels
  */
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { MIN_LABELS, decisionGate, report } from './calibration.mjs'
+import { ROUTING_QUESTIONS, optionHash } from './decisions.mjs'
 
 /** The label file inside the decisions directory. */
 export const LABELS_FILE = 'labels.jsonl'
@@ -128,4 +133,35 @@ export function parseLabelInput(input, options) {
     return i >= 0 && i < options.length ? { label: options[i] } : { invalid: true }
   }
   return options.includes(t) ? { label: t } : { invalid: true }
+}
+
+/**
+ * The calibration report for the current logs and labels, under today's option sets.
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} [questions] - the question keys; every routing question by default.
+ * @returns {object[]} the `report()` rows.
+ */
+export function currentReport(dir, questions = Object.keys(ROUTING_QUESTIONS)) {
+  const hashes = Object.fromEntries(questions.map(q => [q, optionHash(ROUTING_QUESTIONS[q])]))
+  return report(readShadow(dir), readLabels(dir), { questions, hashes })
+}
+
+/**
+ * The gate (T-223) per question, recomputed from the current logs and labels. Only the row for
+ * today's option set counts: evidence gathered under other options says nothing about these. A
+ * question with no labelled row holds with `insufficient data (0 < 50)`.
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} [questions] - the question keys; every routing question by default.
+ * @returns {Record<string, {pass: boolean, why: string, hash: string, n: number}>} per question.
+ */
+export function latestGate(dir, questions = Object.keys(ROUTING_QUESTIONS)) {
+  const rows = currentReport(dir, questions)
+  const out = {}
+  for (const q of questions) {
+    const hash = optionHash(ROUTING_QUESTIONS[q])
+    const row = rows.find(r => r.question === q && r.hash === hash)
+    const verdict = row === undefined ? { pass: false, why: `insufficient data (0 < ${MIN_LABELS})` } : decisionGate(row)
+    out[q] = { ...verdict, hash, n: row?.n ?? 0 }
+  }
+  return out
 }

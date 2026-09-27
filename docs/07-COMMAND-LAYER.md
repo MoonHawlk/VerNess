@@ -137,6 +137,7 @@ logs the result. `/decisions-data` (alias `/dd`) turns those logs into evidence:
 | `/dd label --relabel <id or task words>` | fix a label; the newest one wins |
 | `/dd report [--write]` | accuracy, ECE and AUROC per question, model vs rules; `--write` publishes `docs/research/decision-calibration.md` |
 | `/dd refit` | keeps a temperature refit only with 50+ labels and a held-out improvement |
+| `/dd gate` | the calibration gate (T-223), one line per question: `PASS` or `HOLD — <why>`; reports only, applies nothing |
 
 Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 

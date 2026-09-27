@@ -172,3 +172,45 @@ export function report(records, labels, { questions, hashes }) {
   }
   return out
 }
+
+/** The gate's thresholds (T-223): enough labels, calibrated enough, and a confidence that ranks. */
+export const GATE = { minLabels: MIN_LABELS, maxEce: 0.15, minAuroc: 0.6 }
+
+/**
+ * Two decimals, or three when two would print a failing value as equal to its threshold.
+ * @param {number} v - the measured value.
+ * @param {number} t - the value it is compared with.
+ * @returns {string} the value, for a `why`.
+ */
+const num = (v, t) => (v !== t && v.toFixed(2) === t.toFixed(2) ? v.toFixed(3) : v.toFixed(2))
+
+/**
+ * The calibration gate (T-223): may the model's answer to this question ever be applied? It passes
+ * only if every condition holds, checked in this order:
+ * 1. `n ≥ 50` labelled records;
+ * 2. model accuracy ≥ rules accuracy;
+ * 3. model ECE < rules ECE (the rules are always sure, so theirs is `1 − accuracy`);
+ * 4. model ECE ≤ 0.15;
+ * 5. AUROC ≥ 0.6 (confidence must separate right from wrong, or confidence bands mean nothing).
+ * The model's ECE and AUROC are the held-out refit's when there is one, the raw ones otherwise.
+ * Accuracy is always the raw one over every labelled record: a temperature cannot change an answer,
+ * so the refit's accuracy is the same quantity measured on the smaller holdout. Passing is
+ * evidence only: nothing is applied until the operator also turns the question on (T-262).
+ * @param {{n: number, model: {accuracy: number, ece: number, auroc: number|null}, modelRefit?: {accuracy: number, ece: number, auroc: number|null}, rules: {accuracy: number, ece: number}}} row - a `report()` row.
+ * @returns {{pass: boolean, why: string}} the verdict; `why` names the first failing condition.
+ */
+export function decisionGate(row) {
+  const hold = why => ({ pass: false, why })
+  if (!(row.n >= GATE.minLabels)) return hold(`insufficient data (${row.n} < ${GATE.minLabels})`)
+  const m = row.modelRefit ?? row.model
+  const src = row.modelRefit === undefined ? '' : 'refit '
+  // A temperature never changes the answer, so the refit's accuracy is the raw accuracy measured on
+  // the holdout only: the full labelled set is the better estimate, and the one the rules are on.
+  const acc = row.model.accuracy
+  if (!(acc >= row.rules.accuracy)) return hold(`accuracy ${num(acc, row.rules.accuracy)} < rules ${num(row.rules.accuracy, acc)}`)
+  if (!(m.ece < row.rules.ece)) return hold(`${src}ECE ${num(m.ece, row.rules.ece)} not below rules ECE ${num(row.rules.ece, m.ece)}`)
+  if (!(m.ece <= GATE.maxEce)) return hold(`${src}ECE ${num(m.ece, GATE.maxEce)} > ${GATE.maxEce.toFixed(2)}`)
+  if (m.auroc === null || m.auroc === undefined) return hold('AUROC undefined (every answer right or every answer wrong)')
+  if (!(m.auroc >= GATE.minAuroc)) return hold(`${src}AUROC ${num(m.auroc, GATE.minAuroc)} < ${GATE.minAuroc.toFixed(2)}`)
+  return { pass: true, why: `n ${row.n}, accuracy ${acc.toFixed(2)} ≥ rules ${row.rules.accuracy.toFixed(2)}, ${src}ECE ${m.ece.toFixed(2)}, AUROC ${m.auroc.toFixed(2)}` }
+}

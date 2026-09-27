@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { accuracy, applyTemperature, auroc, ece, fitTemperature, nll, report, splitHoldout } from '../lib/calibration.mjs'
+import { GATE, accuracy, applyTemperature, auroc, decisionGate, ece, fitTemperature, nll, report, splitHoldout } from '../lib/calibration.mjs'
 import { ROUTING_QUESTIONS, optionHash, readAnswer } from '../lib/decisions.mjs'
 
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`)
@@ -121,4 +121,69 @@ test('readAnswer applies a matching temperature and keeps the raw confidence', (
   assert.equal(a.answer, 'frontier')
   const untouched = readAnswer(body, 'tier', q, { 'tier:deadbeef': { T: 2 } })
   assert.equal(untouched.confidence, 0.6)
+})
+
+/**
+ * A report row that passes every gate condition, with overrides.
+ * @param {object} [over] - fields to replace.
+ * @returns {object} the row.
+ */
+const gateRow = (over = {}) => ({
+  question: 'level', hash: 'h', n: 80,
+  model: { accuracy: 0.8, ece: 0.08, auroc: 0.75 },
+  rules: { accuracy: 0.7, ece: 0.3 },
+  ...over,
+})
+
+test('gate: a row meeting all five conditions passes', () => {
+  const g = decisionGate(gateRow())
+  assert.equal(g.pass, true)
+  assert.equal(typeof g.why, 'string')
+  assert.equal(GATE.minLabels, 50)
+  assert.equal(GATE.maxEce, 0.15)
+  assert.equal(GATE.minAuroc, 0.6)
+})
+
+test('gate: n = 49 is insufficient data', () => {
+  assert.deepEqual(decisionGate(gateRow({ n: 49 })), { pass: false, why: 'insufficient data (49 < 50)' })
+  assert.equal(decisionGate(gateRow({ n: 50 })).pass, true)
+})
+
+test('gate: model accuracy below the rules holds', () => {
+  const g = decisionGate(gateRow({ model: { accuracy: 0.6, ece: 0.08, auroc: 0.75 } }))
+  assert.equal(g.pass, false)
+  assert.equal(g.why, 'accuracy 0.60 < rules 0.70')
+  assert.equal(decisionGate(gateRow({ model: { accuracy: 0.7, ece: 0.08, auroc: 0.75 } })).pass, true, 'equal accuracy is enough')
+})
+
+test('gate: model ECE not below the rules ECE holds', () => {
+  const g = decisionGate(gateRow({ model: { accuracy: 0.95, ece: 0.05, auroc: 0.75 }, rules: { accuracy: 0.95, ece: 0.05 } }))
+  assert.equal(g.pass, false)
+  assert.equal(g.why, 'ECE 0.05 not below rules ECE 0.05')
+})
+
+test('gate: model ECE above 0.15 holds, even when better than the rules', () => {
+  const g = decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.31, auroc: 0.75 }, rules: { accuracy: 0.5, ece: 0.5 } }))
+  assert.deepEqual(g, { pass: false, why: 'ECE 0.31 > 0.15' })
+  assert.equal(decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.15, auroc: 0.75 } })).pass, true, '0.15 itself passes')
+  assert.equal(decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.1504, auroc: 0.75 } })).why, 'ECE 0.150 > 0.15', 'no rounding onto the threshold')
+})
+
+test('gate: AUROC below 0.6, or undefined, holds', () => {
+  assert.deepEqual(decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.08, auroc: 0.55 } })), { pass: false, why: 'AUROC 0.55 < 0.60' })
+  assert.equal(decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.08, auroc: 0.6 } })).pass, true)
+  const g = decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.08, auroc: null } }))
+  assert.equal(g.pass, false)
+  assert.match(g.why, /^AUROC undefined/)
+})
+
+test('gate: the held-out refit is judged when present', () => {
+  const raw = { accuracy: 0.8, ece: 0.3, auroc: 0.75 }
+  assert.equal(decisionGate(gateRow({ model: raw })).pass, false)
+  assert.equal(decisionGate(gateRow({ model: raw, modelRefit: { accuracy: 0.8, ece: 0.1, auroc: 0.75, n: 24 } })).pass, true)
+  const g = decisionGate(gateRow({ model: { accuracy: 0.8, ece: 0.05, auroc: 0.75 }, modelRefit: { accuracy: 0.8, ece: 0.2, auroc: 0.75 } }))
+  assert.deepEqual(g, { pass: false, why: 'refit ECE 0.20 > 0.15' })
+  // A temperature cannot change an answer: accuracy is judged on every label, not the smaller holdout.
+  const noisy = decisionGate(gateRow({ modelRefit: { accuracy: 0.6, ece: 0.1, auroc: 0.75 } }))
+  assert.equal(noisy.pass, true)
 })

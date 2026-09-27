@@ -9,7 +9,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { appendLabel, labelCounts, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
+import { ROUTING_QUESTIONS, optionHash } from '../lib/decisions.mjs'
+import { appendLabel, labelCounts, latestGate, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
 
 /** @param {(dir: string) => void} fn - body run against a fresh temp directory. */
 function inTemp(fn) {
@@ -72,3 +73,23 @@ test('matchRecords: an exact id wins; otherwise a case-insensitive task substrin
   assert.deepEqual(matchRecords(recs, 'nothing like this'), [])
   assert.deepEqual(matchRecords(recs, '   '), [])
 })
+
+test('latestGate: recomputed from the logs and labels; unlabelled questions hold', () => inTemp(dir => {
+  const hash = optionHash(ROUTING_QUESTIONS.level)
+  const lines = []
+  for (let i = 0; i < 60; i++) {
+    const right = i % 10 < 8
+    lines.push(JSON.stringify({
+      v: 2, id: `r${i}`, at: `2026-09-27T00:00:${String(i).padStart(2, '0')}Z`, task: `task ${i}`,
+      model: { level: { answer: 'simple', confidence: right ? 0.9 : 0.4, hash } },
+      rules: { level: right ? 'simple' : 'complex' },
+    }))
+    appendLabel(dir, { id: `r${i}`, question: 'level', label: right ? 'simple' : 'trivial' })
+  }
+  writeFileSync(join(dir, '2026-09-27.jsonl'), `${lines.join('\n')}\n`)
+  const g = latestGate(dir)
+  assert.deepEqual(Object.keys(g), Object.keys(ROUTING_QUESTIONS))
+  // level: accuracy .8 = rules .8; ECE = .8·.1 + .2·.4 = .16 < rules .2, but > .15.
+  assert.deepEqual({ pass: g.level.pass, why: g.level.why, n: g.level.n, hash: g.level.hash }, { pass: false, why: 'ECE 0.16 > 0.15', n: 60, hash })
+  assert.deepEqual({ pass: g.tier.pass, why: g.tier.why, n: g.tier.n }, { pass: false, why: 'insufficient data (0 < 50)', n: 0 })
+}))

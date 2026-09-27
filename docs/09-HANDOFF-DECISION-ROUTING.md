@@ -17,7 +17,7 @@ expensive intelligence is only invoked where cheap computation could not decide 
 | Substrate + profile + launcher | working | `./turn_on.cmd`, `scripts/verness.mjs` |
 | Local generative model (Qwen3 0.6B, HF GGUF) | working, `up`/`stats`/`down` | `scripts/model.mjs`, ADR-0007 |
 | Personas as files, teams, quick-tool registry | working (wired 2026-09-26) | `scripts/commands/`, `scripts/lib/` |
-| Decision layer | sidecar, shadow logging, blind labelling, calibration report and refit working (WS-E Tasks 1–3); the gate (T-223) is next, and needs 50+ labels per question (T-392) | `scripts/lib/decisions.mjs`, `docs/superpowers/plans/2026-09-26-05-decision-calibration-routing.md` |
+| Decision layer | sidecar, shadow logging, blind labelling, calibration report, refit and the gate as code working (WS-E Tasks 1–4; `/dd gate` reports only); the gate needs 50+ labels per question to pass (T-392) | `scripts/lib/decisions.mjs`, `docs/superpowers/plans/2026-09-26-05-decision-calibration-routing.md` |
 | Session-log reader (usage/telemetry) | working | `scripts/lib/sessions.mjs` |
 
 T-140 (REPL dispatch) and T-141 (`writePatch` honouring persona state), once prerequisites for
