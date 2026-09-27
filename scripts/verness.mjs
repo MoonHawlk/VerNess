@@ -15,7 +15,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadCommands, runCommand } from './lib/commands.mjs'
+import { commandList, loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { decisionDown } from './decision.mjs'
@@ -120,6 +120,19 @@ export const loadConfigForCli = () => loadConfig()
 async function loadActiveCommands(cfg) {
   const persona = loadPersonas(cfg).get(activePersonaId(cfg))
   return loadCommands({ persona, root: REPO })
+}
+
+/**
+ * `--list-commands`: print the active command list as JSON on stdout, and nothing else there.
+ * Loader warnings (a persona listing a missing command, ...) go to stderr so the JSON stays parseable.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ */
+async function printCommandList(cfg) {
+  const log = console.log
+  console.log = console.error
+  let commands
+  try { commands = await loadActiveCommands(cfg) } finally { console.log = log }
+  process.stdout.write(`${JSON.stringify(commandList(commands))}\n`)
 }
 
 /**
@@ -1076,6 +1089,8 @@ commands
   sync          regenerate profiles/<name>/cordis.patch.yml from verness.config.json
   graph         rebuild the Engram knowledge graph (no LLM calls)
   help          this text
+  --list-commands   every quick-tool as JSON (name, summary, usage, aliases, web); used by the
+                    web UI's commands bridge (packages/commands)
 
 everything is configured in verness.config.json (personas, tips, model, plugins)`
 
@@ -1093,6 +1108,8 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
  * @param {typeof DEFAULTS} cfg - configuration.
  */
 async function dispatch(first, rest, cfg) {
+  // A flag, never a command word, so it cannot collide with a quick-tool.
+  if (first === '--list-commands') { await printCommandList(cfg); return }
   // A bare word that names a quick-tool runs it; a quoted sentence never does, so
   // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
   const commands = await loadActiveCommands(cfg)
@@ -1100,6 +1117,14 @@ async function dispatch(first, rest, cfg) {
     const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
     const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands, convo))
     if (handled) { process.exitCode = code; return }
+    // A slash word is always meant as a command (the web bridge sends `/name`): an unknown one is
+    // an error, never a model task started by accident.
+    if (first.startsWith('/') && !first.includes(' ')) {
+      warn(`no such command: ${first}`)
+      info('list them with: help (or /help in the REPL)')
+      process.exitCode = 1
+      return
+    }
   }
 switch (first) {
   case 'up': process.exitCode = (await modelUp(cfg)) ? 0 : 1; break

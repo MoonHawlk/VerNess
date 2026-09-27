@@ -13,6 +13,8 @@ import { head, info, ok, table, warn } from '../lib/util.mjs'
 export default {
   name: 'new',
   aliases: ['clear', 'reset'],
+  // Switches the terminal REPL's conversation, not the web session's (see `--list-commands`).
+  web: false,
   group: 'core',
   summary: 'start a fresh session; the next task begins with no history',
   usage: '/new',
@@ -34,6 +36,7 @@ export default {
 export const resume = {
   name: 'resume',
   aliases: ['continue'],
+  web: false,
   group: 'core',
   summary: 'continue an earlier session by id prefix',
   usage: '/resume [<id-prefix>]',

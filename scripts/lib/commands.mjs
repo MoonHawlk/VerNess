@@ -104,6 +104,25 @@ export async function loadCommands({ persona, root = REPO } = {}) {
 }
 
 /**
+ * The machine-readable command list behind `verness.mjs --list-commands`: one entry per command,
+ * its aliases folded in, sorted by name. `web` is false for a command whose definition sets
+ * `web: false` (it only makes sense in the terminal), so the web commands bridge skips it.
+ * @param {Map<string, object>} commands - the registry, as `loadCommands` returns it.
+ * @returns {{name: string, summary: string, usage: string, aliases: string[], web: boolean}[]} the list.
+ */
+export function commandList(commands) {
+  return [...new Set(commands.values())]
+    .map(cmd => ({
+      name: cmd.name,
+      summary: cmd.summary ?? '',
+      usage: cmd.usage ?? `/${cmd.name}`,
+      aliases: [...(cmd.aliases ?? [])],
+      web: cmd.web !== false,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
  * Resolve and run one command line.
  * @param {string} input - the raw input, with or without a leading `/`.
  * @param {object} ctx - the command context (config, personas, helpers).
