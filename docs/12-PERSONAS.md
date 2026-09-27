@@ -21,6 +21,7 @@ fine (comments, trailing commas).
   "id": "qa-engineer",
   "name": "QA Engineer",
   "description": "Test strategy, test cases, regression suites and reproducible bug reports.",
+  "family": "engineering",                 // data | engineering | business | research
   "prompt": {
     "prefix": "You are a QA engineer working inside the VerNess harness.",
     "suffix": "Derive cases from the requirement, not from the code. Run the tests and quote real output."
@@ -40,6 +41,7 @@ fine (comments, trailing commas).
 | Field | What it does today |
 |---|---|
 | `id`, `name`, `description` | identity; shown by `/persona`, `/agents` |
+| `family` | **applied**: `data`, `engineering`, `business` or `research`; `/persona` and `/agents` group by it, and two-stage routing (T-396) will use it. Optional; a persona without one is listed under `other` |
 | `prompt.prefix` / `prompt.suffix` | **applied**: injected around the system prompt when the persona is active |
 | `tools.allow` / `deny` / `approval` | declared, validated (a tool cannot be both allowed and denied); enforced from M4 (T-042) |
 | `skills`, `evaluators` | declared free strings; checked from M5/M7 |

@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { loadCommands } from '../lib/commands.mjs'
-import { loadPersonas } from '../lib/personas.mjs'
+import { groupByFamily, loadPersonas } from '../lib/personas.mjs'
 import { REPO } from '../lib/util.mjs'
 
 const DIR = join(REPO, 'personas')
@@ -67,4 +67,18 @@ test('every persona command directory belongs to a persona that lists its comman
       assert.ok((p.commands ?? []).includes(f.replace(/\.mjs$/, '')), `personas/${d.name}/commands/${f} is not listed in "commands"`)
     }
   }
+})
+
+test('groupByFamily: fixed family order, unknown or missing family goes to other, empty groups dropped (T-395)', () => {
+  const m = new Map([
+    ['r', { id: 'r', family: 'research' }],
+    ['d', { id: 'd', family: 'data' }],
+    ['g', { id: 'g', family: 'other' }],
+    ['x', { id: 'x', family: 'mystery' }],
+  ])
+  assert.deepEqual(groupByFamily(m).map(([f, ps]) => [f, ps.map(p => p.id)]), [['data', ['d']], ['research', ['r']], ['other', ['g', 'x']]])
+})
+
+test('every persona file declares a family (T-395)', () => {
+  for (const f of files) assert.notEqual(personas.get(f.replace(/\.json$/, '')).family, 'other', `${f} has no family`)
 })

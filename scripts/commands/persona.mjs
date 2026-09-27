@@ -5,7 +5,7 @@
  * @module scripts/commands/persona
  */
 
-import { activePersonaId, describePersona, loadPersonas, writeState } from '../lib/personas.mjs'
+import { activePersonaId, describePersona, groupByFamily, loadPersonas, writeState } from '../lib/personas.mjs'
 import { head, info, ok, paint, warn } from '../lib/util.mjs'
 
 export default {
@@ -25,8 +25,11 @@ export default {
 
     if (args.length === 0 || args[0] === 'list') {
       head(`personas (active: ${active})`)
-      for (const p of personas.values()) {
-        console.log(`  ${p.id === active ? paint('green', '*') : ' '} ${p.id.padEnd(16)} ${p.description === '' ? p.name : p.description}`)
+      for (const [family, ps] of groupByFamily(personas)) {
+        console.log(`  ${paint('cyan', family)}`)
+        for (const p of ps) {
+          console.log(`    ${p.id === active ? paint('green', '*') : ' '} ${p.id.padEnd(19)} ${p.description === '' ? p.name : p.description}`)
+        }
       }
       info('switch with /persona <id>, inspect with /persona show <id>')
       return 0

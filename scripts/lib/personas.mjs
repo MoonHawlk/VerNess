@@ -96,6 +96,7 @@ function personaFromValidated(p, source) {
   return {
     name: p.identity.name,
     description: p.identity.description,
+    family: p.identity.family,
     prefix: p.prompt.prefix,
     suffix: p.prompt.suffix,
     tips: p.tips,
@@ -120,6 +121,7 @@ function normalize(id, p) {
     id,
     name: p.name ?? id,
     description: p.description ?? '',
+    family: p.family ?? 'other',
     prefix: p.prefix ?? p.prompt?.prefix ?? '',
     suffix: p.suffix ?? p.prompt?.suffix ?? '',
     tips: p.tips ?? [],
@@ -133,6 +135,21 @@ function normalize(id, p) {
     broken: p.broken,
     issues: p.issues,
   }
+}
+
+/** Catalog families in display order; `other` collects personas that declare none (T-395). */
+export const FAMILY_ORDER = ['data', 'engineering', 'business', 'research', 'other']
+
+/**
+ * Group personas by `family` for listings, in `FAMILY_ORDER`, keeping each group's load order.
+ * Empty groups are left out.
+ * @param {Map<string, object>} personas - from `loadPersonas`.
+ * @returns {[string, object[]][]} family and its personas.
+ */
+export function groupByFamily(personas) {
+  const groups = new Map(FAMILY_ORDER.map(f => [f, []]))
+  for (const p of personas.values()) (groups.get(p.family) ?? groups.get('other')).push(p)
+  return [...groups].filter(([, ps]) => ps.length > 0)
 }
 
 /**
