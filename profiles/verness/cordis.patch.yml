@@ -5,8 +5,6 @@
 - insert:
     - id: verness-spike
       name: '@verness/spike'
-    - id: dsh-web-ui
-      name: '@linxin666/dsh-web-all'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared
     # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and
     # catalog providers given only the variable their key is read from.

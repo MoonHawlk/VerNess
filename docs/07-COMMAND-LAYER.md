@@ -125,6 +125,21 @@ same weights, so "parallel" can be slower than sequential on a single machine.
 
 Priorities are a per-browser view, not a source of truth: to make one stick, reorder the backlog file.
 
+## Decision data: `/decide` and `/decisions-data` (WS-E)
+
+`/decide <task>` asks the decision model and the rules the three routing questions side by side, and
+logs the result. `/decisions-data` (alias `/dd`) turns those logs into evidence:
+
+| Command | Does |
+|---|---|
+| `/dd` | labels per question, against the 50 the gate needs |
+| `/dd label [--question q] [--limit N]` | blind labelling: the rules' and the model's answers shuffled and unmarked |
+| `/dd label --relabel <id or task words>` | fix a label; the newest one wins |
+| `/dd report [--write]` | accuracy, ECE and AUROC per question, model vs rules; `--write` publishes `docs/research/decision-calibration.md` |
+| `/dd refit` | keeps a temperature refit only with 50+ labels and a held-out improvement |
+
+Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
+
 ## Challenges, recorded before coding
 
 1. **Registry discipline** — if a command ever needs a second edit somewhere else, the design has

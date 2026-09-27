@@ -1,7 +1,16 @@
 # 08 — The decision layer, and Laya as its first provider
 
-> Task block **T-200..T-232**. Status: **planned, not implemented.** Nothing in this document is
-> wired yet; every claim here is sourced, and the ones we have not verified ourselves say so.
+> Task block **T-200..T-232**. Every claim here is sourced, and the ones we have not verified
+> ourselves say so.
+>
+> **Status (v0.3.0), launcher level:** built: the SystemOne client and rule baseline (T-200..T-203),
+> `/decide` (T-206), the sidecar lifecycle `/decision up|stats|down` (T-210..T-214), shadow logging
+> from the REPL and `/decide` with probabilities and option hashes, blind labelling
+> (`/decisions-data label`, `--relabel`; T-220), and the calibration report and held-out
+> temperature refit (`/decisions-data report | refit`; T-221, T-222). First numbers:
+> `docs/research/decision-calibration.md`. **Not built:** the gate as code (T-223), the composite
+> model (T-204), routing that applies anything (T-253, T-262), and the M3 plugin (T-030..T-036).
+> Nothing the model says steers the harness yet.
 
 ## Why this matters more than "another model"
 

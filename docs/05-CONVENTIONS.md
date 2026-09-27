@@ -26,6 +26,12 @@
   minor (`0.1.0` -> `0.2.0`); a release of fixes only bumps the patch.
 - Before merging `epic` into `main`, run the clean-clone check below on `epic`.
 
+## Finding things
+- Locate code and docs with `scripts/tools/` (skill `.claude/skills/verness-tools/`): `where.mjs` for
+  code (Engram graph) and docs, `backlog.mjs` for task IDs, `tests.mjs`, `docs.mjs`, `profiles.mjs`.
+  Rebuild the code graph after code changes (`graph.mjs --rebuild`). Tools are Node only, so they
+  behave the same on macOS and Windows.
+
 ## Code
 - TypeScript ESM, explicit `.ts` import specifiers (upstream convention).
 - Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`,

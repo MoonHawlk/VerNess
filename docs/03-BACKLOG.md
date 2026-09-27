@@ -256,7 +256,6 @@ deployment with another identity "leaves this package out and composes another p
 occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
 - [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
-- [ ] T-399 The `dsh-web-ui` plugin row (`@linxin666/dsh-web-all`, `settings.plugins` in `verness.config.json`) is enabled but not installed in the `verness-web` profile, whose UI comes from `@deepseek-ai/dsh-web-app`. Find out whether it warns or fails at boot and what it was meant to add, then install it properly or remove the row. Record the decision in `04-PROGRESS.md`
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5

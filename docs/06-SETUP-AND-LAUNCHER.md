@@ -105,6 +105,8 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
 | `tips` | standing guidance appended to the persona; every line costs tokens on every turn |
 | `settings.toolsMode` | `native` (default), `ptc`, or `both` |
 | `settings.plugins` | plugin rows: `{ id, package, path?, enabled? }` — `path` means a local package |
+| `settings.webBundles` | browser-UI bundles, added to the **web** profile only (`dsh plugin add`, then enabled in `dsh.profile.bundles`) so their own patch applies; today `@linxin666/dsh-web-all` |
+| `settings.allowBuilds` | `{ package: true \| false }`: whether a dependency's install script may run. pnpm 11 stops an install while any is undecided (`ERR_PNPM_IGNORED_BUILDS`); setup writes these into every profile's `pnpm-workspace.yaml` first, so macOS and Windows install the same way |
 | `settings.linkedSubstratePackages` | substrate packages our plugins import; linked, never copied |
 
 ### What personas do today, honestly

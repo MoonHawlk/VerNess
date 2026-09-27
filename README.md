@@ -134,8 +134,8 @@ This command:
 3. Fetches the `upstream/deepseek-harness` submodule
 4. Creates **two profiles** in `~/.dsh/profiles/`:
    - `verness` — headless/CLI profile
-   - `verness-web` — browser UI profile (dsh-web-ui)
-5. Installs all plugins (`@verness/spike`, `@linxin666/dsh-web-all`, etc.)
+   - `verness-web` — browser UI profile (`@deepseek-ai/dsh-web-app`)
+5. Installs the plugins listed in `verness.config.json` (`@verness/spike`, …)
 6. Starts Ollama and pulls the configured model
 
 ### Verify the installation
@@ -172,12 +172,19 @@ verness> /off
 ./turn_on.sh web
 ```
 
-Opens the `verness-web` profile — a full browser interface powered by **dsh-web-ui** with:
-- Kanban task board
-- Git graph and SCM panel
-- Plugin manager
-- Live token stats
-- Mobile remote access
+Opens the `verness-web` profile: the substrate's browser interface (`@deepseek-ai/dsh-web-app`), with:
+- chat and sessions, with tool calls, approvals and plans
+- side panels for files, a terminal, a browser and document previews
+- settings (models, shell, web search, agent loop), a plugin manager and the plugin inventory
+- goals, jobs, schedules, subagents and deliverables
+
+plus the **`@linxin666/dsh-web-all`** bundle (`settings.webBundles`): a task board, a Git graph, usage
+stats, session archive, model capabilities, a preset and skin center, its own settings and plugin
+manager, and a plugin market. SSH, the pet and a few low-use panels ship switched off; turn them on
+under Settings → Plugins → Plugin manager. Each panel is fault-isolated: one that breaks is listed at
+`GET /api/dsh-web-all/degraded` and the rest keep working.
+
+It still shows the DeepSeek Harness name and logo; replacing them with VerNess's is planned (T-398).
 
 `./turn_on.sh ui` is an alias. The persona, route/model and access mode are read when the server starts, so after changing any of them restart the UI: `./turn_on.sh off`, then `./turn_on.sh web`.
 
@@ -270,7 +277,7 @@ rules still make every real decision.
 | Feature | Status | Notes |
 |---------|--------|-------|
 | CLI / headless REPL | ✅ | `./turn_on.sh` |
-| Browser UI (dsh-web-ui) | ✅ | `./turn_on.sh web` |
+| Browser UI (`dsh-web-app`) | ✅ | `./turn_on.sh web`; VerNess branding planned (T-398) |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
 | Slash commands | ✅ | one file per command in `scripts/commands/`; `/help` lists them |
@@ -278,7 +285,8 @@ rules still make every real decision.
 | Teams / `/loop-task` | ✅ | several tasks under different personas; `teams/*.json` |
 | Contracts (`@verness/contracts`) | ✅ M2 | types only, zero dependencies |
 | Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands ([guide](docs/12-PERSONAS.md)) |
-| Decisions (shadow mode) | 🔄 M3 | Laya sidecar logs model-vs-rules; not yet authoritative |
+| Persona catalog | ✅ | 17 personas in four families, 11 persona-only zero-token commands ([catalog](docs/12-PERSONAS.md#5-the-catalog-and-choosing-between-personas)) |
+| Decisions (shadow mode) | ✅ shadow · 🔄 gate | Laya logs model-vs-rules; `/decisions-data` labels, reports and refits; nothing is applied until the gate (T-223) |
 | Persona system | 🔄 M4 | identity = skills + tools + model policy; persona files validated (M2) |
 | Skills | 🔄 M5 | procedural knowledge, trigger-based |
 | Decision model | 🔄 M3 | rules → small model → LLM escalation |
@@ -344,6 +352,9 @@ flowchart LR
     EV -->|escalate| HUM[Human]
 ```
 
+This is the **target design** (M3–M8). Today a task goes straight to the model you chose; the decision
+model runs in shadow mode only, and no deterministic engine is wired yet.
+
 **Budget shape example** for 500M rows:
 `500M rows → SQL → 100k rows → decision model → 5k rows → LLM → evaluator → report`
 
@@ -362,7 +373,7 @@ sequenceDiagram
     DSH->>CRD: load base bundle (headless | web)
     DSH->>CRD: apply cordis.patch.yml inserts
     CRD->>CRD: mount @verness/spike
-    CRD->>CRD: mount @linxin666/dsh-web-all
+    CRD->>CRD: mount the web bundle (dsh-web-app, web profile only)
     CRD->>CRD: mount @deepseek-ai/dsh-llm-pi-ai
     CRD-->>DSH: all fibers ACTIVE
     DSH-->>VJS: session ready
@@ -418,7 +429,8 @@ graph LR
 | `@deepseek-ai/cordis` `4.0.4` | Plugin container (peer dep, vendored in upstream) |
 | `@deepseek-ai/dsh-llm-pi-ai` | OpenAI-compatible LLM adapter (Ollama, cloud) |
 | `@deepseek-ai/dsh-tools` | Tool scheduling (linked to runtime copy) |
-| `@linxin666/dsh-web-all` | Browser UI panel collection (dsh-web-ui) |
+| `@deepseek-ai/dsh-web-app` | The browser UI bundle, part of `dsh` (web profile) |
+| `@linxin666/dsh-web-all` | Web bundle (`settings.webBundles`): task board, Git graph, usage, archive, skins, market; web profile only |
 | `@verness/spike` | M1 load-bearing spike plugin |
 
 ### Toolchain
@@ -448,7 +460,7 @@ Engram: install with `npm i -g @sentropic/engram`, then `engram install` to give
 | M0 | Foundation & plan | ✅ done |
 | M1 | Load-bearing spike (`@verness/spike`) | ✅ done |
 | M2 | Contracts (`@verness/contracts`) | ✅ done |
-| M3 | Decisions (`@verness/decisions`) | 🔜 next |
+| M3 | Decisions (`@verness/decisions`) | 🔜 next (the launcher-level shadow, labelling and calibration are built) |
 | M4 | Personas (`@verness/personas`) | 📋 todo |
 | M5 | Skills (`@verness/skills`) | 📋 todo |
 | M6 | Routing (`@verness/routing`) | 📋 todo |
