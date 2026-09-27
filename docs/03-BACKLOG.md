@@ -241,6 +241,7 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [ ] T-388 Owner: delete the inline `data-analyst` definition in `verness.config.json` (~line 83); it is shadowed by `personas/data-analyst.json`
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
+Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
 Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
 `node scripts/verness.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
 - [ ] T-374 Spike: confirm that registering on cordis `ready` leaves `/model` to the substrate, and that headless does not mount the plugin
@@ -256,6 +257,7 @@ deployment with another identity "leaves this package out and composes another p
 occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
 - [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
+- [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a VerNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the VerNess skin on a fresh profile, on macOS and Windows; the owner approves the look
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
