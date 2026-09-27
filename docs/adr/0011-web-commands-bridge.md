@@ -35,8 +35,11 @@ second implementation of any command.
    needs because pnpm installs it as a copy) is written only into the profile copies under
    `$DSH_HOME`, never into the committed `profiles/<name>/cordis.patch.yml`.
 5. **State changes need a restart.** `/persona`, `/api`, `/models` and `/access` update state and
-   the patch, but the running server read both at boot; the plugin appends
+   the patch, but the running server read both at boot; when they are called with arguments (a
+   bare call only shows state), the plugin appends
    `restart the web UI to apply (./turn_on.sh off, then web)` to their reply.
+6. **Replies keep the REPL's layout.** Leading blank lines and trailing whitespace are removed, but
+   indentation stays, so tables line up as in the terminal.
 
 ## Spike (T-374, 2026-09-27, Windows, dsh 0.1.7-rc.2, temporary `DSH_HOME`)
 A one-command version of the plugin was mounted in both profiles and probed through the web host's
@@ -66,4 +69,10 @@ own Remote API (`POST /api/session/create`, `POST /api/commands/list`, the calls
 - Arguments are split on whitespace, as in the REPL; quotes do not group words.
 - The reserved-name list must be re-checked when the substrate pin moves (`scripts/test/`
   compares it with the pinned upstream when the submodule is present).
-- A command that prompts would read EOF on stdin and end; no web-enabled command prompts today.
+- A command that prompts gets a closed stdin; `/dd label` refuses ("labelling needs a terminal").
+- Cancelling kills the launcher child; on Windows a grandchild it started (a `/team` dsh run) may
+  outlive it.
+- End to end (2026-09-27, temporary `DSH_HOME`, port 3181): the web session's `commands/list` held 33
+  VerNess entries (commands and aliases) beside the substrate's six host commands and no `model` of
+  ours; `/cost`, `/usage`, `/persona`
+  and `/agents` replied with the same text as the terminal launcher.
