@@ -52,8 +52,9 @@ own Remote API (`POST /api/session/create`, `POST /api/commands/list`, the calls
   registration threw "already registered" and was skipped). But the web `/model` is not a host
   command: it is a *client* contribution (`dsh-client-ui-model-selection`, likewise `/file` from
   `ui-conversation`). A host `model` registration therefore succeeds (it appeared in
-  `commands/list`), and the client's menu builder throws
-  `ui-commands: contribution /model collides with a host command`, which would break the `/` menu.
+  `commands/list`, observed), and the client's menu builder then throws
+  `ui-commands: contribution /model collides with a host command`, which would break the `/` menu
+  (read from `dsh-client-ui-commands` `service.ts`; no browser was driven in the spike).
   `compact` also registered without error (the substrate registers its own per agent, which shadows
   ours). Neither case is detectable from the host, so the design's fallback applies: the plugin
   never registers the reserved names `model`, `file`, `compact`, `export`, `feedback`, `goal`,

@@ -55,8 +55,10 @@ test('terminal-only commands are web: false, the quick-tools are web: true', () 
   const list = JSON.parse(launcher(['--list-commands']).stdout)
   const off = list.filter(c => !c.web).map(c => c.name)
   for (const n of TERMINAL_ONLY) assert.ok(off.includes(n), `${n} should be web: false`)
-  // `/exit` (alias `/quit`) is web: false wherever it exists; nothing else is.
-  assert.deepEqual(off.filter(n => !TERMINAL_ONLY.includes(n) && n !== 'exit'), [])
+  // `/exit` (alias `/quit`) must be web: false wherever it exists; nothing else is.
+  const exit = list.find(c => c.name === 'exit' || c.aliases.includes('exit'))
+  if (exit !== undefined) assert.equal(exit.web, false, '/exit must be web: false')
+  assert.deepEqual(off.filter(n => !TERMINAL_ONLY.includes(n) && n !== exit?.name), [])
   for (const n of ['cost', 'usage', 'persona', 'agents', 'decide', 'decisions-data']) {
     assert.equal(list.find(c => c.name === n)?.web, true, `${n} should be web: true`)
   }
