@@ -15,7 +15,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadCommands, runCommand } from './lib/commands.mjs'
+import { classifyLine, loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { decisionDown } from './decision.mjs'
@@ -950,7 +950,7 @@ async function cmdRun(cfg, task) {
     ? 'a new conversation starts with your first task; it is kept for every later turn'
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
-  info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
+  info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
   info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
@@ -973,13 +973,17 @@ async function cmdRun(cfg, task) {
     if (line === '') break
     history.push(line)
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
-    // be swallowed by the registry.
-    if (line.startsWith('/')) {
+    // be swallowed by the registry; `//` escapes it, sending the rest (one slash kept) to the model.
+    const parsed = classifyLine(line)
+    if (parsed.kind === 'command') {
       // Re-read the config: an earlier command may have switched persona or model.
       const cfgNow = loadConfig()
-      const { handled } = await runCommand(line, makeCtx(cfgNow, commands, convo))
-      const typedWord = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
-      if (handled && (typedWord === 'persona' || typedWord === 'p')) {
+      // `/exit` asks through `ctx.quit`; the loop then ends the same way an empty line does.
+      let quit = false
+      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true } })
+      if (quit) break
+      // `name` is the resolved one, so `/p` and a prefix like `/pers` reload too.
+      if (handled && name === 'persona') {
         // A persona switch may add or drop commands; reload in place so `makeSuggester` and
         // `makeCompleter` (which both hold this same Map) see the new registry with no further
         // plumbing - reassigning `commands` here would leave their closures pointed at the old one.
@@ -997,7 +1001,8 @@ async function cmdRun(cfg, task) {
       }
       continue
     }
-    await shadowRoute(cfg, line)
+    const task = parsed.text
+    await shadowRoute(cfg, task)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.
     const turn = await prepareRoute(loadConfig(), ready)
@@ -1007,7 +1012,7 @@ async function cmdRun(cfg, task) {
     // own history instead of meeting each question cold.
     const prior = convo.id()
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), line], { env })
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), task], { env })
     if (before !== undefined) {
       convo.capture(before)
       if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)

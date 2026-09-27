@@ -146,6 +146,15 @@ say who was right.
 
 Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 
+## REPL basics
+
+| Input | Does |
+|---|---|
+| `/exit` (alias `/quit`) | ends the prompt, like an empty line (T-148) |
+| `/pers` | a unique prefix of a name or alias runs that command; an exact name always wins; an ambiguous prefix (`/mo`: `/model`, `/models`) lists the candidates and runs nothing (T-182) |
+| `/config [<filter>]` | the resolved configuration and, for each value, its owner: built-in default, `verness.config.json`, `.verness/state.json`, a persona file or the environment; read-only, credentials masked (T-180) |
+| `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
+
 ## Challenges, recorded before coding
 
 1. **Registry discipline** — if a command ever needs a second edit somewhere else, the design has

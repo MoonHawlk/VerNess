@@ -104,16 +104,59 @@ export async function loadCommands({ persona, root = REPO } = {}) {
 }
 
 /**
- * Resolve and run one command line.
+ * Resolve a typed command word against the registry. An exact name or alias always wins; otherwise
+ * the word is a prefix, and it resolves only when the names and aliases starting with it all belong
+ * to one command (a command's name and its alias count once).
+ * @param {string} word - the typed word, without the leading `/`.
+ * @param {Map<string, object>} commands - the loaded registry (names and aliases).
+ * @returns {{name?: string, candidates: string[]}} the resolved command's canonical name, if any,
+ *   and every command name the word could mean (sorted; more than one means ambiguous).
+ */
+export function resolveCommand(word, commands) {
+  const typed = word.toLowerCase()
+  if (typed === '') return { candidates: [] }
+  const exact = commands.get(typed)
+  if (exact !== undefined) return { name: exact.name, candidates: [exact.name] }
+  const hits = new Set()
+  for (const [key, cmd] of commands) if (key.startsWith(typed)) hits.add(cmd.name)
+  const candidates = [...hits].sort()
+  return candidates.length === 1 ? { name: candidates[0], candidates } : { candidates }
+}
+
+/**
+ * Classify one REPL line. A leading `/` marks a command; a leading `//` escapes that, so the line is
+ * a task with one slash removed (`//etc/hosts is odd` sends `/etc/hosts is odd`); anything else is a
+ * task as typed.
+ * @param {string} line - the raw input line.
+ * @returns {{kind: 'empty'} | {kind: 'command' | 'task', text: string}} what the line is.
+ */
+export function classifyLine(line) {
+  const text = line.trim()
+  if (text === '') return { kind: 'empty' }
+  if (text.startsWith('//')) return { kind: 'task', text: text.slice(1) }
+  if (text.startsWith('/')) return { kind: 'command', text }
+  return { kind: 'task', text }
+}
+
+/**
+ * Resolve and run one command line. The command word may be a unique prefix (`/pers` runs
+ * `/persona`); an ambiguous prefix lists the candidates and runs nothing, and still counts as
+ * handled, so the line is never passed on to the model as a task.
  * @param {string} input - the raw input, with or without a leading `/`.
  * @param {object} ctx - the command context (config, personas, helpers).
- * @returns {Promise<{handled: boolean, code?: number}>} whether a command matched, and its status.
+ * @returns {Promise<{handled: boolean, code?: number, name?: string, ambiguous?: string[]}>} whether
+ *   a command matched, its status and canonical name, and the candidates of an ambiguous prefix.
  */
 export async function runCommand(input, ctx) {
   const words = input.trim().replace(/^\//, '').split(/\s+/).filter(w => w !== '')
   if (words.length === 0) return { handled: false }
-  const cmd = ctx.commands.get(words[0].toLowerCase())
+  const { name, candidates } = resolveCommand(words[0], ctx.commands)
+  if (name === undefined && candidates.length > 1) {
+    warn(`/${words[0].toLowerCase()} is ambiguous: ${candidates.map(n => `/${n}`).join(', ')} - type more of the name`)
+    return { handled: true, code: 1, ambiguous: candidates }
+  }
+  const cmd = name === undefined ? undefined : ctx.commands.get(name)
   if (cmd === undefined) return { handled: false }
   const code = await cmd.run(ctx, words.slice(1))
-  return { handled: true, code: code ?? 0 }
+  return { handled: true, code: code ?? 0, name }
 }
