@@ -39,12 +39,15 @@ const delegate = (name, group, summary, usage) => ({
 export default delegate('model', 'model', 'model status, or switch model: /model <id|source>', '/model [<id>]')
 export const up = delegate('up', 'model', 'start the engine, fetch weights, warm the model')
 export const down = delegate('down', 'model', 'unload weights, free memory, stop our engine', '/down [--force]')
-export const off = delegate('off', 'core', 'turn everything off: web UI, decision sidecar, local model', '/off [--force]')
+// `web: false` keeps a command out of the web UI (`--list-commands`): /off would kill the server that
+// renders its reply, and /web would start a second server from inside the first.
+export const off = { ...delegate('off', 'core', 'turn everything off: web UI, decision sidecar, local model', '/off [--force]'), web: false }
 export const stats = delegate('stats', 'telemetry', 'live engine telemetry: resident memory, tok/s, latency')
 export const doctor = delegate('doctor', 'core', 'what is installed and what is missing')
 export const sync = delegate('sync', 'core', 'regenerate the profile patch from the config')
 export const web = {
   ...delegate('web', 'core', 'open the browser UI: a chat window with a message bar instead of the terminal', '/web [--port <n>] [--no-open]'),
   aliases: ['ui'],
+  web: false,
 }
 export const graph = delegate('graph', 'telemetry', 'rebuild the Engram knowledge graph (no LLM calls)')

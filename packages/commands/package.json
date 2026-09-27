@@ -1,0 +1,9 @@
+{
+  "name": "@verness/commands",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Web commands bridge: registers the launcher's quick-tools as slash commands in the web UI.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": { ".": "./index.js" }
+}

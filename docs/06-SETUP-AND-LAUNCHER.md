@@ -57,9 +57,9 @@ the wrong shape for the work. It boots a **sibling profile**, `<profile.name>-we
 `profile.webName`), created from the upstream `web` template, so the terminal REPL keeps working
 unchanged beside it.
 
-- Same model, persona, tips and plugins. `sync` writes the one generated patch into both profiles,
-  because the rows it targets (`agent-default-model`, `system-prompt`, `tools`) are identical in the
-  headless and web templates.
+- Same model, persona, tips and plugins. `sync` renders the patch for each profile: the rows it
+  targets (`agent-default-model`, `system-prompt`, `tools`) are identical in the headless and web
+  templates, and only plugin rows limited to one surface (`"surfaces": ["web"]`) differ.
 - `setup` creates it, and the first `web` creates it if `setup` has not.
 - It boots through the same checks as the REPL (`prepareBoot` → `prepareRoute` in
   `scripts/verness.mjs`): a fresh patch, the route's API key present in `.env`, and for a local
@@ -72,6 +72,26 @@ unchanged beside it.
 - The server is token-gated. It opens the browser for you; otherwise open the printed URL, since
   it carries the login token. Pick the `VerNess` workspace, then type in the bar. Ctrl+C stops it. Launched as `/web` from
   the REPL, it also ends the REPL, which shares the console.
+
+### Quick-tools in the message bar (ADR-0011)
+Type `/` in the bar: the VerNess quick-tools are listed beside the substrate's own commands, and run
+without a model call, like in the REPL. The `@verness/commands` plugin (`packages/commands`, web
+profile only) reads `node scripts/verness.mjs --list-commands` once at server start and runs each
+command as `node scripts/verness.mjs /<name> <args>`; the reply is the same text the REPL prints.
+
+- **Works on the web:** every quick-tool, its aliases, and the active persona's own commands
+  (`/cost`, `/usage`, `/persona`, `/agents`, `/decide`, `/dd`, `/testplan`, ...).
+- **Terminal only** (`web: false` in the command file): `/new`, `/resume` (they steer the REPL's
+  conversation, not the web session), `/web` and `/off` (a second server, or killing the one that
+  would answer), `/help` (the web `/` menu is the list).
+- **The substrate keeps its names.** `/model`, `/file`, `/compact`, `/export`, `/feedback`, `/goal`,
+  `/permission` and `/plan` stay the web UI's own; VerNess's `/model` is a terminal command there. The
+  server log says so once: `verness-commands: /model left to the substrate`.
+- **Restart rule.** `/persona`, `/api`, `/models` and `/access` change state the server read at boot;
+  their reply ends with `restart the web UI to apply (./turn_on.sh off, then web)`. The command list
+  also follows the persona active at boot, so a persona's commands appear after that restart.
+- Arguments split on whitespace (quotes do not group words), each command costs about 0.2 s of Node
+  start, and cancelling in the UI stops the command.
 
 ## Stopping everything (`off`)
 `off` (alias `stop`; `/off` inside the REPL) turns off, in order:
@@ -104,7 +124,7 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
 | `personas` | `active` plus `definitions`: identity `prefix`/`suffix`, and forward-declared `tools`/`skills`. A `personas/<id>.json` file with the same id wins over an inline definition |
 | `tips` | standing guidance appended to the persona; every line costs tokens on every turn |
 | `settings.toolsMode` | `native` (default), `ptc`, or `both` |
-| `settings.plugins` | plugin rows: `{ id, package, path?, enabled? }` — `path` means a local package |
+| `settings.plugins` | plugin rows: `{ id, package, path?, enabled?, surfaces?, repoConfig? }` — `path` means a local package; `surfaces` (e.g. `["web"]`) limits the row to profiles of those templates; `repoConfig: true` passes the checkout path as `config.repo`, written only into the profile copies under `$DSH_HOME` |
 | `settings.webBundles` | browser-UI bundles, added to the **web** profile only (`dsh plugin add`, then enabled in `dsh.profile.bundles`) so their own patch applies; today `@linxin666/dsh-web-all` |
 | `settings.allowBuilds` | `{ package: true \| false }`: whether a dependency's install script may run. pnpm 11 stops an install while any is undecided (`ERR_PNPM_IGNORED_BUILDS`); setup writes these into every profile's `pnpm-workspace.yaml` first, so macOS and Windows install the same way |
 | `settings.linkedSubstratePackages` | substrate packages our plugins import; linked, never copied |
