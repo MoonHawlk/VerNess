@@ -22,13 +22,9 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
 Foundation
-- [ ] T-135 Registry conformance test: load every command file, assert shape, and assert no duplicate names or aliases
-- [ ] T-182 Unique-prefix match (`/mo` → `/model` when unambiguous) and the `//` escape (a line starting `//` is sent to the model as a literal task starting with `/`)
 - [ ] T-130 **`/btw <note>`**: append/show/clear/drop operator side notes in `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, 2000-character cap with a warning at 80%. Spec in `docs/07-COMMAND-LAYER.md`
-- [ ] T-148 `/exit` (alias `/quit`) for symmetry with `/help`
 
 Tier L — local, zero tokens
-- [ ] T-180 `/config`: print the resolved configuration, and for each value the file that owns it (built-in default, `verness.config.json`, `.verness/state.json`, persona file) *(was the Tier L T-141)*
 - [ ] T-181 `!<cmd>` shell prefix and `@path` file expansion in the REPL *(was the Tier L T-146)*
 - [ ] T-147 `#<note>`: append to a persistent project brief (`.verness/brief.md`) that is prefixed like `/btw` but survives sessions
 - [ ] T-137 `/usage` *(remaining part)*: add a `--by day` breakdown (tokens per route per day across sessions)
@@ -100,14 +96,12 @@ Cost control (Engram)
 ## WS-E — Decision layer: calibration, routing, first uses (plan `05-decision-calibration-routing.md`)
 Measurement, which gates everything else
 - [ ] T-392 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
-- [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE *and* accuracy beat the rule baseline it replaces. Encode the gate as `decisionGate(question)` reading the latest report
 
 Composition and routing
 - [ ] T-204 `CompositeDecisionModel` (launcher-level first): rules → decision model → LLM, with confidence bands and cost accounting
 - [ ] T-205 `JevProvider` proven by construction: the same client with a different `baseURL` and key env. If it needs code, the abstraction is wrong
 - [ ] T-253 Capability router: persona requirements + model capabilities → eligible → cost/latency/policy → model. Tier is an input, never a model id
 - [ ] T-254 Pipeline executor for `standard` (the other modes belong to M7)
-- [ ] T-255 `/routing`: last N routing decisions and the Laya-vs-rules agreement rate
 - [ ] T-262 Gated rollout, one question at a time, high-confidence band only: `pipeline`, then `level`, then `tier`
 
 First real uses
@@ -123,7 +117,6 @@ Deferred / investigate
 ## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
 Catalog-wide (do T-393 first)
 - [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
-- [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)
 
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions
@@ -234,20 +227,12 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 ## M2 follow-ups (deferred from the M2 final review, `@verness/contracts`)
 - [ ] T-382 Verify Node 22.19 exactly: `npx -y node@22.19 --test scripts/test/smoke.test.mjs`, and check whether the launcher path prints the type-stripping `ExperimentalWarning`; if it does, suppress that one class in the `turn_on.*` wrappers or document it
 - [ ] T-383 Friendly error on old Node: the static `.ts` import chain (`verness.mjs` → `lib/personas.mjs` → contracts) fails at link time before `nodeOk()` runs; make it a lazy `await import()` after the version check (or check the version in `turn_on.*`)
-- [ ] T-384 `packages/contracts/package.json` `files` still lists `lib/`, which is never built; drop it or add a build step
 - [ ] T-385 Enforce `<= 8` options when a decision validator lands (today only a comment in `decision.ts`)
-- [ ] T-386 A `.d.ts` for `scripts/lib/util.mjs` so `packages/contracts/test/persona.test.ts` can drop its `@ts-expect-error` on the `parseJsonc` import
-- [ ] T-387 Validator edge minors: `__proto__` keys in `tools.approval` / `decisions.apply` are dropped silently; `isObject` accepts non-plain objects; duplicate array entries are not flagged; `name: ''` is accepted
-- [ ] T-388 Owner: delete the inline `data-analyst` definition in `verness.config.json` (~line 83); it is shadowed by `personas/data-analyst.json`
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
+Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
 Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
 `node scripts/verness.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
-- [ ] T-374 Spike: confirm that registering on cordis `ready` leaves `/model` to the substrate, and that headless does not mount the plugin
-- [ ] T-375 `node scripts/verness.mjs --list-commands` emits the quick-tools as JSON; a quick-tool can opt out with `web: false`
-- [ ] T-376 `@verness/commands` dsh plugin: register each listed quick-tool with dsh-commands, and a handler that runs it through the launcher
-- [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
-- [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
 
 ## Web UI branding: VerNess logo and titles in the browser UI
 Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
@@ -256,7 +241,14 @@ deployment with another identity "leaves this package out and composes another p
 occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
 - [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
-- [ ] T-399 The `dsh-web-ui` plugin row (`@linxin666/dsh-web-all`, `settings.plugins` in `verness.config.json`) is enabled but not installed in the `verness-web` profile, whose UI comes from `@deepseek-ai/dsh-web-app`. Find out whether it warns or fails at boot and what it was meant to add, then install it properly or remove the row. Record the decision in `04-PROGRESS.md`
+- [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a VerNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the VerNess skin on a fresh profile, on macOS and Windows; the owner approves the look
+
+## Releases
+- [ ] T-431 `scripts/tools/release-notes.mjs`: draft the next `CHANGELOG.md` entry from the merges and task IDs since the last tag (`git log <tag>..epic`) and their `03-BACKLOG-DONE.md` lines, grouped Added / Changed / Fixed, with an Upgrade section when setup must be re-run. A human edits the draft; the rule that every release has notes is in `05-CONVENTIONS.md`
+
+## Launcher follow-ups from the web bridge (ADR-0011)
+- [ ] T-432 `setup` does not pick up an edited local plugin file: pnpm reuses its copy of a same-version `file:` package, so a changed `packages/commands` or `packages/spike` stays stale until a fresh `DSH_HOME`. Reinstall `path` plugins when their files changed (content hash in the profile), and fix the "edits are live" line in `06-SETUP-AND-LAUNCHER.md`
+- [ ] T-433 The web bridge's `config.repo` is whichever checkout last ran `sync`, so a worktree's `sync` makes the web UI run that worktree's launcher. Pin it to the main checkout (or warn when `sync` runs from a worktree); and on Windows, cancelling a command can leave a grandchild process (`/team` dsh run) behind: kill the process tree
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5

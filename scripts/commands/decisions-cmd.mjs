@@ -15,13 +15,13 @@ import { cpus, platform } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
-import { report } from '../lib/calibration.mjs'
+import { GATE, MIN_LABELS } from '../lib/calibration.mjs'
 import { ROUTING_QUESTIONS, decisionsDir, optionHash, temperaturesFile } from '../lib/decisions.mjs'
-import { appendLabel, labelCounts, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
+import {
+  appendLabel, currentReport, labelCounts, latestGate, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled,
+} from '../lib/labels.mjs'
 import { REPO, head, info, ok, paint, table, warn } from '../lib/util.mjs'
 
-/** Labels per question below which the gate refuses to judge (T-223). */
-const MIN_LABELS = 50
 /** What the handoff recommends for a stable measurement. */
 const GOOD_LABELS = 200
 
@@ -141,17 +141,6 @@ async function label(dir, questions, limit, relabel) {
 /** @param {number|null|undefined} v - a metric. @returns {string} two decimals, or `-`. */
 const fmt = v => (v === null || v === undefined || Number.isNaN(v) ? '-' : v.toFixed(2))
 
-/**
- * The calibration report for the current logs and labels.
- * @param {string} dir - the decisions directory.
- * @param {string[]} questions - the question keys.
- * @returns {object[]} the report rows.
- */
-function currentReport(dir, questions) {
-  const hashes = Object.fromEntries(questions.map(q => [q, optionHash(ROUTING_QUESTIONS[q])]))
-  return report(readShadow(dir), readLabels(dir), { questions, hashes })
-}
-
 const REPORT_HEAD = ['question', 'n', 'model acc', 'model ECE', 'AUROC', 'refit ECE', 'T', 'rules acc', 'rules ECE']
 
 /** @param {object} r - a report row. @returns {string[]} its table cells. */
@@ -238,6 +227,24 @@ function refit(dir, questions) {
   return 0
 }
 
+/**
+ * `/decisions-data gate`: one line per question, `PASS` or `HOLD — <why>` (T-223). It only reports:
+ * nothing is applied until the operator also turns a question on (T-262).
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} questions - the question keys.
+ * @returns {number} exit code (0 either way: a HOLD is an answer, not an error).
+ */
+function printGate(dir, questions) {
+  const gate = latestGate(dir, questions)
+  head('calibration gate: may the model steer this question? (report only - nothing is applied)')
+  const width = Math.max(...questions.map(q => q.length))
+  for (const q of questions) {
+    const g = gate[q]
+    console.log(`  ${q.padEnd(width)}  ${g.pass ? `${paint('green', 'PASS')} ${paint('dim', g.why)}` : `${paint('yellow', 'HOLD')} — ${g.why}`}`)
+  }
+  return 0
+}
+
 export default {
   name: 'decisions-data',
   aliases: ['dd'],
@@ -250,7 +257,7 @@ export default {
     '        --relabel <id | task words> re-asks matching records, labelled or not; the newest label wins',
     'report  accuracy, ECE and AUROC per question, model vs rules; --write publishes docs/research/decision-calibration.md',
     'refit   stores held-out temperature refits in .verness/decisions/temperatures.json (needs 50+ labels)',
-    'gate    comes with WS-E Task 4 (T-223)',
+    `gate    PASS or HOLD per question: n >= ${GATE.minLabels}, accuracy >= rules, ECE < rules ECE, ECE <= ${GATE.maxEce}, AUROC >= ${GATE.minAuroc}`,
   ],
   /**
    * @param {object} ctx - command context.
@@ -282,10 +289,7 @@ export default {
     if (sub === 'label') return label(dir, questions, limit, relabel)
     if (sub === 'report') return printReport(ctx, dir, questions, args.includes('--write'))
     if (sub === 'refit') return refit(dir, questions)
-    if (sub === 'gate') {
-      warn(`/decisions-data gate is not built yet (WS-E Task 4, T-223) - it needs ${MIN_LABELS} labels per question`)
-      return 1
-    }
+    if (sub === 'gate') return printGate(dir, questions)
     warn(`unknown subcommand: ${sub}`)
     info(this.usage)
     return 1

@@ -1,6 +1,6 @@
 # 07 — Command layer and quick-tools
 
-> Status (v0.3.0): **largely built.** The registry, `/help`, `/cost`, `/usage`, `/sessions`, `/resume`,
+> Status (v0.4.0): **largely built.** The registry, `/help`, `/cost`, `/usage`, `/sessions`, `/resume`,
 > `/tools`, `/agents`, `/persona`, `/team`, `/loop-task`, `/dashboard` and persona-scoped commands exist in
 > `scripts/commands/`. Open items stay in `docs/03-BACKLOG.md` (WS-A/WS-B). Capability survey: `docs/research/claude-code-capability-map.md`.
 
@@ -124,6 +124,59 @@ same weights, so "parallel" can be slower than sequential on a single machine.
   team runs.
 
 Priorities are a per-browser view, not a source of truth: to make one stick, reorder the backlog file.
+
+## Decision data: `/decide` and `/decisions-data` (WS-E)
+
+`/decide <task>` asks the decision model and the rules the three routing questions side by side, and
+logs the result. `/decisions-data` (alias `/dd`) turns those logs into evidence:
+
+| Command | Does |
+|---|---|
+| `/dd` | labels per question, against the 50 the gate needs |
+| `/dd label [--question q] [--limit N]` | blind labelling: the rules' and the model's answers shuffled and unmarked |
+| `/dd label --relabel <id or task words>` | fix a label; the newest one wins |
+| `/dd report [--write]` | accuracy, ECE and AUROC per question, model vs rules; `--write` publishes `docs/research/decision-calibration.md` |
+| `/dd refit` | keeps a temperature refit only with 50+ labels and a held-out improvement |
+| `/dd gate` | the calibration gate (T-223), one line per question: `PASS` or `HOLD — <why>`; reports only, applies nothing |
+
+`/routing [--limit N]` (T-255) reads the same log, zero tokens: the last N shadow records (default
+10) as `rules / model (confidence)` per question, then how often the model agrees with the rules per
+question over the whole log, with each question's gate line. Agreement is not accuracy; only labels
+say who was right.
+
+Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
+
+## REPL basics
+
+| Input | Does |
+|---|---|
+| `/exit` (alias `/quit`) | ends the prompt, like an empty line (T-148) |
+| `/pers`, `/mo` | a unique prefix (or one every candidate extends: `/mo` is `/model`, not `/models`) of a name or alias runs that command; an exact name always wins; an ambiguous prefix (`/d`: `/dashboard`, `/decide`, …) lists the candidates and runs nothing (T-182) |
+| `/config [<filter>]` | the resolved configuration and, for each value, its owner: built-in default, `verness.config.json`, `.verness/state.json`, a persona file or the environment; read-only, credentials masked (T-180) |
+| `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
+
+## On the web: the commands bridge (ADR-0011)
+
+The same command files answer in the web UI's message bar, with no second implementation. The
+`@verness/commands` plugin (`packages/commands`, web profile only) registers each command with the
+web UI's own slash-command registry and runs it as `node scripts/verness.mjs /<name> <args>`:
+exit 0 is a success reply, anything else an error reply, the text is what the REPL prints (ANSI
+stripped). User guide: `docs/06-SETUP-AND-LAUNCHER.md` (*Quick-tools in the message bar*).
+
+What a command file controls:
+
+- **`web: false`** keeps it off the web: it only makes sense in the terminal (`/new`, `/resume`,
+  `/web`, `/off`, `/help`, `/exit` today). Everything else, persona commands included, is on the web by default.
+- `summary` becomes the menu description and the part of `usage` after the name the input hint, so
+  write both. Aliases are registered too.
+- A command that prompts gets no terminal there: stdin is closed. Refuse cleanly, as
+  `/dd label` does ("labelling needs a terminal"), rather than waiting.
+
+The list comes from `node scripts/verness.mjs --list-commands` (JSON: `name`, `summary`, `usage`,
+`aliases`, `web`; the active persona's commands included). A name the web UI already owns
+(`/model`, `/file`, `/compact`, `/export`, `/feedback`, `/goal`, `/permission`, `/plan`) is never
+registered, so the substrate's version keeps working. From the command line, an unknown `/word` is now
+an error rather than a task, so a stale web entry can never start a model run.
 
 ## Challenges, recorded before coding
 

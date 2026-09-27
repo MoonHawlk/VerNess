@@ -582,3 +582,46 @@
   persona commands) and a new persona field (`family`).
 - Clean-clone check on `epic` before the merge: `node scripts/verness.mjs help` runs, `npm test`
   198/198, all 11 persona commands tracked.
+
+## 2026-09-27 — dsh-web-all as a web bundle (T-399); repo tools and the verness-tools skill
+- **dsh-web-all installed**, the way its README asks: as a bundle in the web profile only. Root cause
+  of the old silent failure: pnpm 11 exits 1 (`ERR_PNPM_IGNORED_BUILDS`) while any dependency's
+  install script is undecided, so setup's `pnpm add` counted as failed. The fix lives in the launcher,
+  so macOS and Windows install the same way: `settings.allowBuilds` (cloudflared, ssh2, cpu-features,
+  protobufjs and @google/genai decided `false`) is written into every profile's `pnpm-workspace.yaml`
+  before installing, and `settings.webBundles` is added with `dsh plugin add` and then enabled in
+  `dsh.profile.bundles`. The headless profile had undecided scripts too. The plain `dsh-web-ui` row
+  (which also landed in the headless profile) is removed.
+- Verified: `setup` clean on Windows; the web profile composes 19 `web-ui-*` rows and headless 0; a
+  real `web --no-open` boot shows no activation warning, and `/api/dsh-web-all/degraded` is `[]`.
+  Not yet run on macOS: the same `setup` there must show `ok web bundle @linxin666/dsh-web-all`.
+- **Repo tools** (`scripts/tools/`, Node only): `where` (code via the Engram graph, plus docs),
+  `backlog`, `repo`, `tests`, `docs`, `commands`, `graph`, `profiles`, with `scripts/test/tools.test.mjs`.
+  They already found the headless undecided builds and the unmounted bundle. The skill
+  `.claude/skills/verness-tools/` lists them. Policy: locate through the graph and these tools, and
+  do not run Engram's semantic doc extraction.
+
+## 2026-09-27 — round of four parallel branches, v0.4.0
+- Four subagents in separate git worktrees, each with disjoint files, merged into `epic` with
+  `--no-ff`: web commands bridge (T-374..T-378), REPL basics (T-148, T-182, T-180, T-135), the
+  decision gate and `/routing` (T-223, T-255), contracts and catalog hygiene (T-384, T-386, T-387,
+  T-388, T-397). The worktrees started from `v0.3.0` instead of `epic`; each agent noticed and
+  fast-forwarded itself before working.
+- Conflicts resolved by hand: `scripts/lib/commands.mjs` (prefix resolution and `commandList` side
+  by side), the import line in `scripts/verness.mjs`, and `docs/07-COMMAND-LAYER.md` (both sections).
+  Follow-up: `/mo` resolves to `/model` (a prefix every candidate extends picks the shortest), and
+  the REPL's shadowing `task` variable was renamed.
+- Deviations accepted: the gate uses raw accuracy, because a temperature never changes the answer;
+  the bridge uses `appReady` (cordis 4 has no `ready`), a reserved-name list (the web `/model` is a
+  client menu entry, and a clash would break the `/` menu) and `surfaces: ["web"]` (headless mounts
+  `commands` too).
+- **Incident:** one bridge-agent command ran without the throwaway `DSH_HOME` and re-rendered the
+  owner's real profile patches from its worktree (a missing `verness-commands` row, persona reset to
+  `generalist`). Repaired by `setup` from the main checkout: both patches have `data-scientist` again,
+  and the web profile has the plugin, pointing at the main checkout. Verified with a real `web` boot:
+  `verness-commands: /model left to the substrate`, no activation warning, the dsh-web-all degraded
+  list empty. The agent's one stray local session under `~/.dsh/sessions/` was left in place.
+- Release notes are now required for every release (`CHANGELOG.md`, rule in `05-CONVENTIONS.md`);
+  T-431 plans a tool to draft them. New follow-ups: T-430 (web skin), T-432 (setup and edited local
+  plugins), T-433 (bridge repo path and Windows process tree).
+- `npm test` 271/271 and typecheck clean on `epic` before the release.

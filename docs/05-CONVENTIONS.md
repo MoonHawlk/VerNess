@@ -19,17 +19,25 @@
 - `main` holds released versions only. Nothing is committed to it directly.
 - `epic` is the integration branch. Every feature or fix branch starts from `epic` and merges back
   into it with `git merge --no-ff`, so each branch stays visible as one unit in the history.
-- A release is `epic` merged into `main` (`--no-ff`), with `package.json` `version` bumped in the
-  same merge and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
+- A release is `epic` merged into `main` (`--no-ff`), with `package.json` `version` bumped **and the
+  release notes written** in the same merge (a new `CHANGELOG.md` entry: Added / Changed / Fixed /
+  Upgrade, each line with its task ID; plus a row in the README's Releases table), and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
   `git push origin main epic --follow-tags`.
 - Versions follow semver while pre-1.0: a release with new commands or config fields bumps the
   minor (`0.1.0` -> `0.2.0`); a release of fixes only bumps the patch.
 - Before merging `epic` into `main`, run the clean-clone check below on `epic`.
 
+## Finding things
+- Locate code and docs with `scripts/tools/` (skill `.claude/skills/verness-tools/`): `where.mjs` for
+  code (Engram graph) and docs, `backlog.mjs` for task IDs, `tests.mjs`, `docs.mjs`, `profiles.mjs`.
+  Rebuild the code graph after code changes (`graph.mjs --rebuild`). Tools are Node only, so they
+  behave the same on macOS and Windows.
+
 ## Code
 - TypeScript ESM, explicit `.ts` import specifiers (upstream convention).
-- Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`,
-  `main: lib/index.js`, `types: lib/types/index.d.ts`.
+- Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`. Plain-ESM plugins
+  (`packages/spike`) point `main` at their `.mjs`; `@verness/contracts` ships `src/*.ts` run by Node's
+  type stripping (no build, no `lib/`). A package that needs a build adds `lib/` and says so in its README.
 - `@deepseek-ai/cordis` in both `peerDependencies` and `devDependencies` with the same range.
 - Every registration must be an effect that disposes (`ctx.effect`, `ctx.on`, registry `.register`).
 - One service per package; augment `Context` with `declare module '@deepseek-ai/cordis'`.

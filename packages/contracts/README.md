@@ -9,8 +9,8 @@ launcher) can agree on the same types without importing each other.
 
 Source is plain, erasable-only TypeScript (`erasableSyntaxOnly` in `tsconfig.json`), so it runs
 directly under `node --test` and the launcher's `node --experimental-strip-types`-style resolution
-with no build step. `tsc` is dev-only, for typechecking (`pnpm typecheck`) and later for
-producing the published `lib/` output (`pnpm build`).
+with no build step. The package ships `src/` as is (`files`, `exports`); `tsc` is dev-only, for
+typechecking (`pnpm typecheck`).
 
 ## Contracts
 
@@ -26,9 +26,11 @@ producing the published `lib/` output (`pnpm build`).
   (`PersonaFile`, with `PERSONA_FIELDS` listing every allowed top-level field) and the normalised
   `Persona` every consumer reads (identity, prompt, model/decision/tool/memory/evaluation/security
   policies, tips, commands). `validatePersonaFile(v, { expectedId })` checks a parsed
-  `personas/<id>.json` — unknown fields with "did you mean", string and string-array types,
-  `tools.allow`/`tools.deny` overlap, approval modes, `models.requirements` via
-  `validateCapabilities`, command names — collecting every issue, and fills in the defaults
+  `personas/<id>.json` — unknown fields with "did you mean", string and string-array types
+  (no repeated entries), a non-empty `name` when given, plain objects only (no arrays, `Date`s or
+  class instances), `tools.allow`/`tools.deny` overlap, approval modes, a `__proto__` key in
+  `tools.approval`/`decisions.apply`, `models.requirements` via `validateCapabilities`, command
+  names — collecting every issue, and fills in the defaults
   (`version '1'`, `name` falls back to `id`, `memory.scope 'session'`, empty prompt parts, arrays
   and records). `personaToFile` turns a `Persona` back into a file that re-validates to the same
   value. v1 files (`id`, `name`, `description`, `prompt`, `tools`, `skills`, `evaluators`, `tips`)
@@ -43,8 +45,8 @@ producing the published `lib/` output (`pnpm build`).
   `requirements.tools`, `evaluators`, `version`), `SkillContext`/`SkillActivation` (what a skill
   contributes at run time: prompt sections, tools, evaluators, and on-demand `references` for
   3-tier disclosure), and the `Skill` interface (`activate`). `validateSkillMetadata(v)` checks a
-  parsed skill manifest — required non-empty `name`/`description`, string arrays for triggers,
-  tools and evaluators, unknown fields with "did you mean" at the top level and inside
+  parsed skill manifest — required non-empty `name`/`description`, string arrays (no repeated
+  entries) for triggers, tools and evaluators, unknown fields with "did you mean" at the top level and inside
   `activation`/`requirements` — collecting every issue and returning a normalised, alias-free
   copy with no defaults injected.
 - **Task** (`src/task.ts`) — `TaskMode`/`TaskStatus`/`TaskId`, `TaskBudget`/`TaskConstraints`,

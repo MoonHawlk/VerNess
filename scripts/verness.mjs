@@ -15,7 +15,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadCommands, runCommand } from './lib/commands.mjs'
+import { classifyLine, commandList, loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { decisionDown } from './decision.mjs'
@@ -24,6 +24,7 @@ import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, 
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
+import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
@@ -46,7 +47,7 @@ const DEFAULTS = {
   extraRoutes: {}, activeRoute: '',
   personas: { active: 'generalist', definitions: { generalist: { prefix: '', suffix: '' } } },
   tips: [],
-  settings: { toolsMode: 'native', plugins: [], linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
+  settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness' },
 }
 
@@ -119,6 +120,19 @@ export const loadConfigForCli = () => loadConfig()
 async function loadActiveCommands(cfg) {
   const persona = loadPersonas(cfg).get(activePersonaId(cfg))
   return loadCommands({ persona, root: REPO })
+}
+
+/**
+ * `--list-commands`: print the active command list as JSON on stdout, and nothing else there.
+ * Loader warnings (a persona listing a missing command, ...) go to stderr so the JSON stays parseable.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ */
+async function printCommandList(cfg) {
+  const log = console.log
+  console.log = console.error
+  let commands
+  try { commands = await loadActiveCommands(cfg) } finally { console.log = log }
+  process.stdout.write(`${JSON.stringify(commandList(commands))}\n`)
 }
 
 /**
@@ -318,12 +332,23 @@ function resolvePersona(cfg) {
 }
 
 /**
- * Render `profiles/<name>/cordis.patch.yml` from the configuration. The file stays committed so a
- * reviewer sees exactly what the runtime composes, but it is generated - edit the config instead.
- * @param {typeof DEFAULTS} cfg - configuration.
- * @returns {string} the path written.
+ * Whether a `settings.plugins` row belongs in a profile of the given surface. A row without
+ * `surfaces` goes everywhere; `"surfaces": ["web"]` keeps it out of the headless profile.
+ * @param {{surfaces?: string[]}} p - the plugin row.
+ * @param {string} surface - the profile's template (`headless`, `web`, ...).
+ * @returns {boolean} whether the row applies.
  */
-function writePatch(cfg) {
+export const pluginOnSurface = (p, surface) => p.surfaces === undefined || p.surfaces.includes(surface)
+
+/**
+ * Render a profile patch from the configuration, for one surface.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {{surface: string, repo?: string}} opts - the profile's surface, and the checkout path to
+ *   give rows with `"repoConfig": true` as `config.repo` (omitted in the committed copy, so no
+ *   machine path is ever committed).
+ * @returns {string} the patch text.
+ */
+function renderPatch(cfg, { surface, repo }) {
   const persona = resolvePersona(cfg)
   const routes = knownRoutes(cfg)
   const eff = effectiveRoute(cfg)
@@ -335,9 +360,14 @@ function writePatch(cfg) {
   L.push('')
   L.push('- insert:')
   for (const p of cfg.settings.plugins ?? []) {
+    if (!pluginOnSurface(p, surface)) continue
     L.push(`    - id: ${p.id}`)
     L.push(`      name: ${yq(p.package)}`)
     if (p.enabled === false) L.push('      disabled: true')
+    if (p.repoConfig === true && repo !== undefined) {
+      L.push('      config:')
+      L.push(`        repo: ${yq(repo)}`)
+    }
   }
   L.push('    # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared')
   L.push('    # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and')
@@ -387,10 +417,20 @@ function writePatch(cfg) {
   L.push('  config:')
   L.push(`    mode: ${cfg.settings.toolsMode ?? 'native'}`)
   L.push('')
+  return L.join('\n')
+}
+
+/**
+ * Write `profiles/<name>/cordis.patch.yml`, the main profile's patch. The file stays committed so a
+ * reviewer sees exactly what the runtime composes, but it is generated - edit the config instead.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {string} the path written.
+ */
+function writePatch(cfg) {
   const dir = join(REPO, 'profiles', cfg.profile.name)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, 'cordis.patch.yml')
-  writeFileSync(file, L.join('\n'), 'utf8')
+  writeFileSync(file, renderPatch(cfg, { surface: cfg.profile.template }), 'utf8')
   return file
 }
 
@@ -649,14 +689,17 @@ function cmdModel(cfg, args) {
  * @param {typeof DEFAULTS} cfg - configuration.
  */
 function syncPatch(cfg) {
-  const src = writePatch(cfg)
+  writePatch(cfg)
   const dir = profileDir(cfg.profile.name)
   if (!existsSync(dir)) die(`profile "${cfg.profile.name}" does not exist yet`, 'run: ./turn_on.sh setup')
-  // One patch serves both surfaces: the rows it targets (model, system prompt, tools) are identical
-  // in the headless and web templates, so a persona or model switch reaches the browser UI too.
-  for (const d of [dir, profileDir(webProfileName(cfg))]) {
+  // The rows the patch targets (model, system prompt, tools) are identical in the headless and web
+  // templates, so a persona or model switch reaches the browser UI too. Each profile gets its own
+  // render only so plugin rows limited to one surface (`surfaces`) stay out of the other, and the
+  // checkout path (`repoConfig`) lands here, never in the committed copy.
+  const targets = [[dir, cfg.profile.template], [profileDir(webProfileName(cfg)), 'web']]
+  for (const [d, surface] of targets) {
     if (!existsSync(d)) continue
-    writeFileSync(join(d, 'cordis.patch.yml'), readFileSync(src, 'utf8'), 'utf8')
+    writeFileSync(join(d, 'cordis.patch.yml'), renderPatch(cfg, { surface, repo: REPO }), 'utf8')
     ok(`patch synced -> ${join(d, 'cordis.patch.yml')}`)
   }
 }
@@ -687,6 +730,10 @@ function ensureProfile(cfg, name, template) {
   }
   ok(`profile ${dir}`)
 
+  // pnpm 11 aborts an install while any dependency's install script is undecided; the decisions
+  // live in the config so every machine (macOS or Windows) installs the same way.
+  if (applyAllowBuilds(dir, cfg.settings.allowBuilds)) ok('install-script decisions written (settings.allowBuilds)')
+
   step(`installing profile dependencies (${name})`)
   const piai = '@deepseek-ai/dsh-llm-pi-ai'
   sh('pnpm', ['add', `${piai}@${want}`], { cwd: dir, capture: true, allowFail: true })
@@ -709,6 +756,7 @@ function ensureProfile(cfg, name, template) {
   }
 
   for (const p of cfg.settings.plugins ?? []) {
+    if (!pluginOnSurface(p, template)) continue
     if (p.path === undefined) {
       sh('pnpm', ['add', p.package], { cwd: dir, capture: true, allowFail: true })
       if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package}`)
@@ -720,6 +768,23 @@ function ensureProfile(cfg, name, template) {
     sh('pnpm', ['add', `file:${abs}`], { cwd: dir, capture: true, allowFail: true })
     if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package} from ${p.path}`)
     else ok(`plugin ${p.package} <- ${p.path}`)
+  }
+
+  // Browser-UI bundles carry their own patch, so they are added as bundles (the way their authors
+  // ask), and only to the web profile: the headless REPL has no browser to render them.
+  if (template === 'web') {
+    for (const pkg of cfg.settings.webBundles ?? []) {
+      if (!profileBundles(dir).includes(pkg)) dsh(['plugin', '--profile', name, 'add', pkg], { capture: true })
+      // `plugin add` only enables a bundle it newly installs; one already present stays off.
+      enableBundle(dir, pkg)
+      if (profileBundles(dir).includes(pkg)) ok(`web bundle ${pkg}`)
+      else warn(`could not add the web bundle ${pkg} (see ${join(dir, '.plugin-manager', 'logs')})`)
+    }
+  }
+  const undecided = undecidedBuilds(dir)
+  if (undecided.length > 0) {
+    warn(`pnpm stopped on undecided install scripts: ${undecided.join(', ')}`)
+    info('decide each in verness.config.json settings.allowBuilds (false = never run it), then re-run setup')
   }
 }
 
@@ -928,7 +993,7 @@ async function cmdRun(cfg, task) {
     ? 'a new conversation starts with your first task; it is kept for every later turn'
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
-  info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
+  info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
   info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
@@ -951,13 +1016,17 @@ async function cmdRun(cfg, task) {
     if (line === '') break
     history.push(line)
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
-    // be swallowed by the registry.
-    if (line.startsWith('/')) {
+    // be swallowed by the registry; `//` escapes it, sending the rest (one slash kept) to the model.
+    const parsed = classifyLine(line)
+    if (parsed.kind === 'command') {
       // Re-read the config: an earlier command may have switched persona or model.
       const cfgNow = loadConfig()
-      const { handled } = await runCommand(line, makeCtx(cfgNow, commands, convo))
-      const typedWord = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
-      if (handled && (typedWord === 'persona' || typedWord === 'p')) {
+      // `/exit` asks through `ctx.quit`; the loop then ends the same way an empty line does.
+      let quit = false
+      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true } })
+      if (quit) break
+      // `name` is the resolved one, so `/p` and a prefix like `/pers` reload too.
+      if (handled && name === 'persona') {
         // A persona switch may add or drop commands; reload in place so `makeSuggester` and
         // `makeCompleter` (which both hold this same Map) see the new registry with no further
         // plumbing - reassigning `commands` here would leave their closures pointed at the old one.
@@ -975,7 +1044,8 @@ async function cmdRun(cfg, task) {
       }
       continue
     }
-    await shadowRoute(cfg, line)
+    const taskText = parsed.text
+    await shadowRoute(cfg, taskText)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.
     const turn = await prepareRoute(loadConfig(), ready)
@@ -985,7 +1055,7 @@ async function cmdRun(cfg, task) {
     // own history instead of meeting each question cold.
     const prior = convo.id()
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), line], { env })
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), taskText], { env })
     if (before !== undefined) {
       convo.capture(before)
       if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)
@@ -1054,6 +1124,8 @@ commands
   sync          regenerate profiles/<name>/cordis.patch.yml from verness.config.json
   graph         rebuild the Engram knowledge graph (no LLM calls)
   help          this text
+  --list-commands   every quick-tool as JSON (name, summary, usage, aliases, web); used by the
+                    web UI's commands bridge (packages/commands)
 
 everything is configured in verness.config.json (personas, tips, model, plugins)`
 
@@ -1071,6 +1143,8 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
  * @param {typeof DEFAULTS} cfg - configuration.
  */
 async function dispatch(first, rest, cfg) {
+  // A flag, never a command word, so it cannot collide with a quick-tool.
+  if (first === '--list-commands') { await printCommandList(cfg); return }
   // A bare word that names a quick-tool runs it; a quoted sentence never does, so
   // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
   const commands = await loadActiveCommands(cfg)
@@ -1078,6 +1152,14 @@ async function dispatch(first, rest, cfg) {
     const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
     const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands, convo))
     if (handled) { process.exitCode = code; return }
+    // A slash word is always meant as a command (the web bridge sends `/name`): an unknown one is
+    // an error, never a model task started by accident.
+    if (first.startsWith('/') && !first.includes(' ')) {
+      warn(`no such command: ${first}`)
+      info('list them with: help (or /help in the REPL)')
+      process.exitCode = 1
+      return
+    }
   }
 switch (first) {
   case 'up': process.exitCode = (await modelUp(cfg)) ? 0 : 1; break

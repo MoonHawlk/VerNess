@@ -9,6 +9,8 @@ import { head, info, line, paint } from '../lib/util.mjs'
 export default {
   name: 'help',
   aliases: ['?', 'commands'],
+  // Lists terminal commands; the web UI has its own `/` menu (see `--list-commands`).
+  web: false,
   group: 'core',
   summary: 'list every quick-tool',
   usage: '/help [command]',

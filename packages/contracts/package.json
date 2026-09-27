@@ -10,9 +10,8 @@
     ".": "./src/index.ts",
     "./src/*": "./src/*"
   },
-  "files": ["lib/index.js", "lib/**/*.js", "lib/types/**/*.d.ts"],
+  "files": ["src"],
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit false --outDir lib --declarationDir lib/types --declaration --rewriteRelativeImportExtensions",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": { "@deepseek-ai/cordis": "4.0.4" },

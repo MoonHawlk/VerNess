@@ -1,0 +1,37 @@
+{
+  "id": "feature-delivery",
+  "name": "Scope, build, test, document",
+  "description": "One small feature end to end: a product manager scopes it, an engineer builds it, QA tests it against the scope, a writer documents it. Each step runs after the one before and gets its output; QA and the writer also get the scope itself, so the builder is never the tester (law 4).",
+  "concurrency": 1,
+  "members": [
+    { "role": "pm", "persona": "product-manager" },
+    { "role": "engineer", "persona": "software-engineer" },
+    { "role": "qa", "persona": "qa-engineer" },
+    { "role": "writer", "persona": "technical-writer" }
+  ],
+  "tasks": [
+    {
+      "id": "scope",
+      "member": "pm",
+      "prompt": "Read the open tasks in docs/03-BACKLOG.md and pick the smallest open one that adds user-visible behaviour and has no unfinished prerequisite. Do not edit any file. Output a short scope: the task ID, the goal in one sentence, three to five testable acceptance criteria, the files most likely touched, and what is out of scope."
+    },
+    {
+      "id": "build",
+      "member": "engineer",
+      "dependsOn": ["scope"],
+      "prompt": "Implement the scope from the upstream task with the smallest correct change, following docs/05-CONVENTIONS.md. Run the existing tests that cover what you touched. Output the files you changed, one line per acceptance criterion saying how the change meets it, and the test command you ran with its result."
+    },
+    {
+      "id": "test",
+      "member": "qa",
+      "dependsOn": ["scope", "build"],
+      "prompt": "Check the upstream change against the scope's acceptance criteria with your own tools: read the diff (git diff), run the relevant tests, and add a test for any criterion no test covers. Output one line per criterion, PASS or FAIL with the evidence, and a reproducible report for every failure. Do not fix the implementation."
+    },
+    {
+      "id": "docs",
+      "member": "writer",
+      "dependsOn": ["scope", "test"],
+      "prompt": "Document the change the upstream tasks built and tested, from the code rather than from their summaries. If QA reported any FAIL, stop and say the change is not ready to document. Otherwise update the one doc a user would look in for this behaviour, and output the file you changed and a two-line release note."
+    }
+  ]
+}

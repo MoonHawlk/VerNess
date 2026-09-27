@@ -241,12 +241,12 @@ start. **Log both the raw and the refit confidence** (`confidenceRaw`, `confiden
 - `latestGate(dir): Record<question, {pass, why, hash}>` recomputes from the current logs and labels.
   It is called at REPL start and cached for the session.
 
-- [ ] **Step 1: Failing tests** (one per condition, plus an all-pass row, plus `n = 49` →
+- [x] **Step 1: Failing tests** (one per condition, plus an all-pass row, plus `n = 49` →
 `insufficient data (49 < 50)`).
-- [ ] **Step 2: Implement; `/decisions-data gate` prints one line per question: `PASS` or `HOLD — <why>`.**
-- [ ] **Step 3: Update `docs/08-DECISION-LAYER-LAYA.md`**: the gate paragraph now points at
+- [x] **Step 2: Implement; `/decisions-data gate` prints one line per question: `PASS` or `HOLD — <why>`.**
+- [x] **Step 3: Update `docs/08-DECISION-LAYER-LAYA.md`**: the gate paragraph now points at
 `decisionGate` and lists the five conditions and their numbers.
-- [ ] **Step 4: Commit** — `feat(decisions): the calibration gate as code (T-223)`
+- [x] **Step 4: Commit** — `feat(decisions): the calibration gate as code (T-223)`
 
 ---
 
