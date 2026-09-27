@@ -78,7 +78,8 @@ export function listCommands(repo, { run = spawnSync } = {}) {
 
 /**
  * Run one launcher command and map the outcome to a command result: exit 0 is `success`, anything
- * else `error`; stdout and stderr in the order they arrived, ANSI stripped, trimmed. The UI's abort
+ * else `error`; stdout and stderr in the order they arrived, ANSI stripped, blank edges removed
+ * (indentation kept). The UI's abort
  * signal kills the child; there is no fixed timeout (`/team` and `/loop-task` are long by design).
  * @param {object} opts - options.
  * @param {string} opts.repo - absolute path of the VerNess checkout.
@@ -113,7 +114,8 @@ export function runCommand({ repo, command, rawInput, signal, spawnImpl = spawn,
     }
     child.on('error', e => finish({ kind: 'error', text: `/${command} could not start: ${e.message}` }))
     child.on('close', code => {
-      const text = stripAnsi(out).trim()
+      // Leading blank lines and trailing whitespace go; indentation stays, so tables line up as in the REPL.
+      const text = stripAnsi(out).replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd()
       if (aborted) return finish({ kind: 'error', text: `/${command} cancelled` })
       if (code === 0) {
         const hint = RESTART_HINT.has(command) && args.length > 0 ? RESTART_LINE : ''

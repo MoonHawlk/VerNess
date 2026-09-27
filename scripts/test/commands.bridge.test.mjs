@@ -174,19 +174,19 @@ const [cmd, ...args] = process.argv.slice(2)
 if (args[0] === 'fail') { process.stdout.write('\\u001b[33m  !! \\u001b[0mbad input\\n'); process.exit(3) }
 if (args[0] === 'silent-fail') process.exit(2)
 if (args[0] === 'sleep') { setTimeout(() => {}, 60000) } else {
-  process.stdout.write('\\u001b[1mhello\\u001b[0m ' + cmd + ' ' + args.join(',') + '\\n')
+  process.stdout.write('\\n  \\n\\u001b[1mhello\\u001b[0m ' + cmd + ' ' + args.join(',') + '\\n')
   setTimeout(() => { process.stderr.write('then stderr\\n'); setTimeout(() => process.stdout.write('then stdout\\n'), 30) }, 30)
 }
 `)
 test.after(() => rmSync(dir, { recursive: true, force: true }))
 
-test('exit 0 is success: stdout and stderr in order, ANSI stripped, args split on whitespace', async () => {
+test('exit 0 is success: stdout and stderr in order, ANSI stripped, indentation kept, args split on whitespace', async () => {
   const r = await runCommand({ repo: dir, script, command: 'cost', rawInput: '  --week  --all' })
   assert.deepEqual(r, { kind: 'success', text: 'hello /cost --week,--all\nthen stderr\nthen stdout' })
 })
 
 test('a non-zero exit is an error with the output, or the exit code when there is none', async () => {
-  assert.deepEqual(await runCommand({ repo: dir, script, command: 'cost', rawInput: 'fail' }), { kind: 'error', text: '!! bad input' })
+  assert.deepEqual(await runCommand({ repo: dir, script, command: 'cost', rawInput: 'fail' }), { kind: 'error', text: '  !! bad input' })
   assert.deepEqual(await runCommand({ repo: dir, script, command: 'cost', rawInput: 'silent-fail' }), { kind: 'error', text: 'exit 2' })
 })
 
