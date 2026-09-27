@@ -582,3 +582,21 @@
   persona commands) and a new persona field (`family`).
 - Clean-clone check on `epic` before the merge: `node scripts/verness.mjs help` runs, `npm test`
   198/198, all 11 persona commands tracked.
+
+## 2026-09-27 — dsh-web-all as a web bundle (T-399); repo tools and the verness-tools skill
+- **dsh-web-all installed**, the way its README asks: as a bundle in the web profile only. Root cause
+  of the old silent failure: pnpm 11 exits 1 (`ERR_PNPM_IGNORED_BUILDS`) while any dependency's
+  install script is undecided, so setup's `pnpm add` counted as failed. The fix lives in the launcher,
+  so macOS and Windows install the same way: `settings.allowBuilds` (cloudflared, ssh2, cpu-features,
+  protobufjs and @google/genai decided `false`) is written into every profile's `pnpm-workspace.yaml`
+  before installing, and `settings.webBundles` is added with `dsh plugin add` and then enabled in
+  `dsh.profile.bundles`. The headless profile had undecided scripts too. The plain `dsh-web-ui` row
+  (which also landed in the headless profile) is removed.
+- Verified: `setup` clean on Windows; the web profile composes 19 `web-ui-*` rows and headless 0; a
+  real `web --no-open` boot shows no activation warning, and `/api/dsh-web-all/degraded` is `[]`.
+  Not yet run on macOS: the same `setup` there must show `ok web bundle @linxin666/dsh-web-all`.
+- **Repo tools** (`scripts/tools/`, Node only): `where` (code via the Engram graph, plus docs),
+  `backlog`, `repo`, `tests`, `docs`, `commands`, `graph`, `profiles`, with `scripts/test/tools.test.mjs`.
+  They already found the headless undecided builds and the unmounted bundle. The skill
+  `.claude/skills/verness-tools/` lists them. Policy: locate through the graph and these tools, and
+  do not run Engram's semantic doc extraction.
