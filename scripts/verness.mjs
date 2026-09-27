@@ -24,6 +24,7 @@ import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, 
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
+import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
@@ -46,7 +47,7 @@ const DEFAULTS = {
   extraRoutes: {}, activeRoute: '',
   personas: { active: 'generalist', definitions: { generalist: { prefix: '', suffix: '' } } },
   tips: [],
-  settings: { toolsMode: 'native', plugins: [], linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
+  settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness' },
 }
 
@@ -687,6 +688,10 @@ function ensureProfile(cfg, name, template) {
   }
   ok(`profile ${dir}`)
 
+  // pnpm 11 aborts an install while any dependency's install script is undecided; the decisions
+  // live in the config so every machine (macOS or Windows) installs the same way.
+  if (applyAllowBuilds(dir, cfg.settings.allowBuilds)) ok('install-script decisions written (settings.allowBuilds)')
+
   step(`installing profile dependencies (${name})`)
   const piai = '@deepseek-ai/dsh-llm-pi-ai'
   sh('pnpm', ['add', `${piai}@${want}`], { cwd: dir, capture: true, allowFail: true })
@@ -720,6 +725,23 @@ function ensureProfile(cfg, name, template) {
     sh('pnpm', ['add', `file:${abs}`], { cwd: dir, capture: true, allowFail: true })
     if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package} from ${p.path}`)
     else ok(`plugin ${p.package} <- ${p.path}`)
+  }
+
+  // Browser-UI bundles carry their own patch, so they are added as bundles (the way their authors
+  // ask), and only to the web profile: the headless REPL has no browser to render them.
+  if (template === 'web') {
+    for (const pkg of cfg.settings.webBundles ?? []) {
+      if (!profileBundles(dir).includes(pkg)) dsh(['plugin', '--profile', name, 'add', pkg], { capture: true })
+      // `plugin add` only enables a bundle it newly installs; one already present stays off.
+      enableBundle(dir, pkg)
+      if (profileBundles(dir).includes(pkg)) ok(`web bundle ${pkg}`)
+      else warn(`could not add the web bundle ${pkg} (see ${join(dir, '.plugin-manager', 'logs')})`)
+    }
+  }
+  const undecided = undecidedBuilds(dir)
+  if (undecided.length > 0) {
+    warn(`pnpm stopped on undecided install scripts: ${undecided.join(', ')}`)
+    info('decide each in verness.config.json settings.allowBuilds (false = never run it), then re-run setup')
   }
 }
 

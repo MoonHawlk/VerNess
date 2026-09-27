@@ -138,8 +138,22 @@
     // installed into the profile; omit it for a published package.
     "plugins": [
       { "id": "verness-spike", "package": "@verness/spike", "path": "packages/spike", "enabled": true },
-      { "id": "dsh-web-ui", "package": "@linxin666/dsh-web-all", "enabled": true },
     ],
+    // Browser-UI bundles, added to the WEB profile only with `dsh plugin add` so their own patch
+    // applies (a plain plugin row would skip it and also land in the headless profile).
+    // dsh-web-all: task board, Git graph, pet, usage, session archive, skins, plugin manager, ...
+    // It also brings remote-web-ui, ssh (off by default), update and a community-plugin market.
+    "webBundles": ["@linxin666/dsh-web-all"],
+    // pnpm 11 stops an install while any dependency's install script is undecided. Decide each one
+    // here; false = never run it. These five come with dsh-web-all: cloudflared would download a
+    // tunnel binary (remote access), ssh2/cpu-features compile native extras. Not needed locally.
+    "allowBuilds": {
+      "@google/genai": false,
+      "cloudflared": false,
+      "cpu-features": false,
+      "protobufjs": false,
+      "ssh2": false,
+    },
     // Substrate packages our plugins import. These are LINKED to the running
     // runtime's own copy, never installed as a second copy — two copies break
     // every tool call (see docs/RUNBOOK.md, module-identity fault).

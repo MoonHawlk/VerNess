@@ -178,6 +178,12 @@ Opens the `verness-web` profile: the substrate's browser interface (`@deepseek-a
 - settings (models, shell, web search, agent loop), a plugin manager and the plugin inventory
 - goals, jobs, schedules, subagents and deliverables
 
+plus the **`@linxin666/dsh-web-all`** bundle (`settings.webBundles`): a task board, a Git graph, usage
+stats, session archive, model capabilities, a preset and skin center, its own settings and plugin
+manager, and a plugin market. SSH, the pet and a few low-use panels ship switched off; turn them on
+under Settings → Plugins → Plugin manager. Each panel is fault-isolated: one that breaks is listed at
+`GET /api/dsh-web-all/degraded` and the rest keep working.
+
 It still shows the DeepSeek Harness name and logo; replacing them with VerNess's is planned (T-398).
 
 `./turn_on.sh ui` is an alias. The persona, route/model and access mode are read when the server starts, so after changing any of them restart the UI: `./turn_on.sh off`, then `./turn_on.sh web`.
@@ -424,7 +430,7 @@ graph LR
 | `@deepseek-ai/dsh-llm-pi-ai` | OpenAI-compatible LLM adapter (Ollama, cloud) |
 | `@deepseek-ai/dsh-tools` | Tool scheduling (linked to runtime copy) |
 | `@deepseek-ai/dsh-web-app` | The browser UI bundle, part of `dsh` (web profile) |
-| `@linxin666/dsh-web-all` | Listed in `settings.plugins`, but not installed in the web profile today; keep or remove is T-399 |
+| `@linxin666/dsh-web-all` | Web bundle (`settings.webBundles`): task board, Git graph, usage, archive, skins, market; web profile only |
 | `@verness/spike` | M1 load-bearing spike plugin |
 
 ### Toolchain
