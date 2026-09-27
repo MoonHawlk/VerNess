@@ -1001,8 +1001,8 @@ async function cmdRun(cfg, task) {
       }
       continue
     }
-    const task = parsed.text
-    await shadowRoute(cfg, task)
+    const taskText = parsed.text
+    await shadowRoute(cfg, taskText)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.
     const turn = await prepareRoute(loadConfig(), ready)
@@ -1012,7 +1012,7 @@ async function cmdRun(cfg, task) {
     // own history instead of meeting each question cold.
     const prior = convo.id()
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), task], { env })
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), taskText], { env })
     if (before !== undefined) {
       convo.capture(before)
       if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)

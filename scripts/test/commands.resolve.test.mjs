@@ -42,8 +42,13 @@ test('a unique prefix resolves, including through an alias and to a persona comm
   assert.deepEqual(resolveCommand('sess', commands), { name: 'sessions', candidates: ['sessions'] })
 })
 
+test('a prefix whose candidates all extend the shortest one resolves to it: /mo is /model', () => {
+  assert.deepEqual(resolveCommand('mo', commands), { name: 'model', candidates: ['model', 'models'] })
+  assert.equal(resolveCommand('mode', commands).name, 'model')
+})
+
 test('an ambiguous prefix resolves to nothing and lists every candidate', () => {
-  assert.deepEqual(resolveCommand('mo', commands), { candidates: ['model', 'models'] })
+  assert.deepEqual(resolveCommand('h', commands), { candidates: ['help', 'hypotheses'] })
   assert.deepEqual(resolveCommand('zz', commands), { candidates: [] })
   assert.deepEqual(resolveCommand('', commands), { candidates: [] })
 })
@@ -52,10 +57,10 @@ test('runCommand runs a unique prefix and refuses an ambiguous one without passi
   ran.length = 0
   assert.deepEqual(await runCommand('/pers show x', { commands }), { handled: true, code: 0, name: 'persona' })
   assert.deepEqual(ran, [['persona', 'show', 'x']])
-  const r = await runCommand('/mo', { commands })
+  const r = await runCommand('/h', { commands })
   assert.equal(r.handled, true, 'an ambiguous prefix must not fall through to the model')
   assert.equal(r.code, 1)
-  assert.deepEqual(r.ambiguous, ['model', 'models'])
+  assert.deepEqual(r.ambiguous, ['help', 'hypotheses'])
   assert.equal(ran.length, 1, 'nothing ran for the ambiguous prefix')
   assert.deepEqual(await runCommand('/nope', { commands }), { handled: false })
 })

@@ -120,7 +120,11 @@ export function resolveCommand(word, commands) {
   const hits = new Set()
   for (const [key, cmd] of commands) if (key.startsWith(typed)) hits.add(cmd.name)
   const candidates = [...hits].sort()
-  return candidates.length === 1 ? { name: candidates[0], candidates } : { candidates }
+  if (candidates.length === 1) return { name: candidates[0], candidates }
+  // A name that every other candidate extends is the one meant: `/mo` is `/model`, not `/models`.
+  const shortest = candidates.reduce((a, b) => (b.length < a.length ? b : a), candidates[0] ?? '')
+  if (candidates.length > 1 && candidates.every(c => c.startsWith(shortest))) return { name: shortest, candidates }
+  return { candidates }
 }
 
 /**
