@@ -332,12 +332,23 @@ function resolvePersona(cfg) {
 }
 
 /**
- * Render `profiles/<name>/cordis.patch.yml` from the configuration. The file stays committed so a
- * reviewer sees exactly what the runtime composes, but it is generated - edit the config instead.
- * @param {typeof DEFAULTS} cfg - configuration.
- * @returns {string} the path written.
+ * Whether a `settings.plugins` row belongs in a profile of the given surface. A row without
+ * `surfaces` goes everywhere; `"surfaces": ["web"]` keeps it out of the headless profile.
+ * @param {{surfaces?: string[]}} p - the plugin row.
+ * @param {string} surface - the profile's template (`headless`, `web`, ...).
+ * @returns {boolean} whether the row applies.
  */
-function writePatch(cfg) {
+export const pluginOnSurface = (p, surface) => p.surfaces === undefined || p.surfaces.includes(surface)
+
+/**
+ * Render a profile patch from the configuration, for one surface.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {{surface: string, repo?: string}} opts - the profile's surface, and the checkout path to
+ *   give rows with `"repoConfig": true` as `config.repo` (omitted in the committed copy, so no
+ *   machine path is ever committed).
+ * @returns {string} the patch text.
+ */
+function renderPatch(cfg, { surface, repo }) {
   const persona = resolvePersona(cfg)
   const routes = knownRoutes(cfg)
   const eff = effectiveRoute(cfg)
@@ -349,9 +360,14 @@ function writePatch(cfg) {
   L.push('')
   L.push('- insert:')
   for (const p of cfg.settings.plugins ?? []) {
+    if (!pluginOnSurface(p, surface)) continue
     L.push(`    - id: ${p.id}`)
     L.push(`      name: ${yq(p.package)}`)
     if (p.enabled === false) L.push('      disabled: true')
+    if (p.repoConfig === true && repo !== undefined) {
+      L.push('      config:')
+      L.push(`        repo: ${yq(repo)}`)
+    }
   }
   L.push('    # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared')
   L.push('    # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and')
@@ -401,10 +417,20 @@ function writePatch(cfg) {
   L.push('  config:')
   L.push(`    mode: ${cfg.settings.toolsMode ?? 'native'}`)
   L.push('')
+  return L.join('\n')
+}
+
+/**
+ * Write `profiles/<name>/cordis.patch.yml`, the main profile's patch. The file stays committed so a
+ * reviewer sees exactly what the runtime composes, but it is generated - edit the config instead.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {string} the path written.
+ */
+function writePatch(cfg) {
   const dir = join(REPO, 'profiles', cfg.profile.name)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, 'cordis.patch.yml')
-  writeFileSync(file, L.join('\n'), 'utf8')
+  writeFileSync(file, renderPatch(cfg, { surface: cfg.profile.template }), 'utf8')
   return file
 }
 
@@ -663,14 +689,17 @@ function cmdModel(cfg, args) {
  * @param {typeof DEFAULTS} cfg - configuration.
  */
 function syncPatch(cfg) {
-  const src = writePatch(cfg)
+  writePatch(cfg)
   const dir = profileDir(cfg.profile.name)
   if (!existsSync(dir)) die(`profile "${cfg.profile.name}" does not exist yet`, 'run: ./turn_on.sh setup')
-  // One patch serves both surfaces: the rows it targets (model, system prompt, tools) are identical
-  // in the headless and web templates, so a persona or model switch reaches the browser UI too.
-  for (const d of [dir, profileDir(webProfileName(cfg))]) {
+  // The rows the patch targets (model, system prompt, tools) are identical in the headless and web
+  // templates, so a persona or model switch reaches the browser UI too. Each profile gets its own
+  // render only so plugin rows limited to one surface (`surfaces`) stay out of the other, and the
+  // checkout path (`repoConfig`) lands here, never in the committed copy.
+  const targets = [[dir, cfg.profile.template], [profileDir(webProfileName(cfg)), 'web']]
+  for (const [d, surface] of targets) {
     if (!existsSync(d)) continue
-    writeFileSync(join(d, 'cordis.patch.yml'), readFileSync(src, 'utf8'), 'utf8')
+    writeFileSync(join(d, 'cordis.patch.yml'), renderPatch(cfg, { surface, repo: REPO }), 'utf8')
     ok(`patch synced -> ${join(d, 'cordis.patch.yml')}`)
   }
 }
@@ -727,6 +756,7 @@ function ensureProfile(cfg, name, template) {
   }
 
   for (const p of cfg.settings.plugins ?? []) {
+    if (!pluginOnSurface(p, template)) continue
     if (p.path === undefined) {
       sh('pnpm', ['add', p.package], { cwd: dir, capture: true, allowFail: true })
       if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package}`)

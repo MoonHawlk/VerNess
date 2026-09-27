@@ -135,9 +135,14 @@
     // Tool presentation: native (default) | ptc | both.
     "toolsMode": "native",
     // Extra plugin rows are generated from this list. `path` is a local package
-    // installed into the profile; omit it for a published package.
+    // installed into the profile; omit it for a published package. `surfaces`
+    // (e.g. ["web"]) limits a row to profiles of those templates; `repoConfig`
+    // passes the checkout path to the plugin as `config.repo`.
     "plugins": [
       { "id": "verness-spike", "package": "@verness/spike", "path": "packages/spike", "enabled": true },
+      // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
+      // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
+      { "id": "verness-commands", "package": "@verness/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },
     ],
     // Browser-UI bundles, added to the WEB profile only with `dsh plugin add` so their own patch
     // applies (a plain plugin row would skip it and also land in the headless profile).
