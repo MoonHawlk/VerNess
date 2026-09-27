@@ -950,7 +950,7 @@ async function cmdRun(cfg, task) {
     ? 'a new conversation starts with your first task; it is kept for every later turn'
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
-  info('anything without a leading slash is a task for the model; empty line or ctrl+c exits')
+  info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
   info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
@@ -977,7 +977,10 @@ async function cmdRun(cfg, task) {
     if (line.startsWith('/')) {
       // Re-read the config: an earlier command may have switched persona or model.
       const cfgNow = loadConfig()
-      const { handled } = await runCommand(line, makeCtx(cfgNow, commands, convo))
+      // `/exit` asks through `ctx.quit`; the loop then ends the same way an empty line does.
+      let quit = false
+      const { handled } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true } })
+      if (quit) break
       const typedWord = line.split(/\s+/)[0].replace(/^\//, '').toLowerCase()
       if (handled && (typedWord === 'persona' || typedWord === 'p')) {
         // A persona switch may add or drop commands; reload in place so `makeSuggester` and
