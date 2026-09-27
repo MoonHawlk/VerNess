@@ -140,6 +140,14 @@ logs the result. `/decisions-data` (alias `/dd`) turns those logs into evidence:
 
 Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 
+## REPL basics
+
+| Input | Does |
+|---|---|
+| `/exit` (alias `/quit`) | ends the prompt, like an empty line (T-148) |
+| `/pers` | a unique prefix of a name or alias runs that command; an exact name always wins; an ambiguous prefix (`/mo`: `/model`, `/models`) lists the candidates and runs nothing (T-182) |
+| `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
+
 ## Challenges, recorded before coding
 
 1. **Registry discipline** — if a command ever needs a second edit somewhere else, the design has
