@@ -277,3 +277,47 @@ test('family is optional, one of the known families, and round-trips (T-395)', (
   assert.match(issueAt(validatePersonaFile({ id: 'x', family: 'marketing' }), ['family']).message, /one of/)
   assert.ok(errors(validatePersonaFile({ id: 'x', family: 3 })).some(e => e.path[0] === 'family'))
 })
+
+test('a __proto__ key in tools.approval or decisions.apply is reported, not dropped (T-387)', () => {
+  // JSON.parse makes "__proto__" an own key; an object literal would set the prototype instead.
+  const r = validatePersonaFile(JSON.parse('{"id":"x","tools":{"approval":{"__proto__":"ask","bash":"ask"}},"decisions":{"apply":{"__proto__":true,"lint":true}}}'))
+  assert.equal(issueAt(r, ['tools', 'approval', '__proto__']).message, 'reserved key "__proto__" is not allowed')
+  assert.equal(issueAt(r, ['decisions', 'apply', '__proto__']).message, 'reserved key "__proto__" is not allowed')
+  assert.equal(errors(r).length, 2)
+})
+
+test('only plain objects count as objects (T-387)', () => {
+  class Box { id = 'x' }
+  for (const v of [new Date(), new Box(), new Map()]) {
+    assert.deepEqual(errors(validatePersonaFile(v)), [{ path: [], message: 'expected an object' }])
+    const r = validatePersonaFile({ id: 'x', prompt: v, tools: { approval: v }, decisions: { apply: v }, models: { requirements: v } })
+    for (const p of [['prompt'], ['tools', 'approval'], ['decisions', 'apply'], ['models', 'requirements']]) {
+      assert.equal(issueAt(r, p).message, 'expected an object')
+    }
+  }
+  const bare = Object.assign(Object.create(null) as Record<string, unknown>, { id: 'x' })
+  assert.equal(ok(validatePersonaFile(bare)).id, 'x')
+})
+
+test('duplicate entries in string arrays are flagged at the repeat (T-387)', () => {
+  const r = validatePersonaFile({
+    id: 'x',
+    tools: { allow: ['read', 'bash', 'read'], deny: ['net', 'net'] },
+    skills: ['sql', 'sql'],
+    evaluators: ['e', 'e'],
+    tips: ['t', 't'],
+    commands: ['a', 'b', 'a'],
+  })
+  assert.equal(issueAt(r, ['tools', 'allow', 2]).message, '"read" is listed more than once')
+  assert.equal(issueAt(r, ['tools', 'deny', 1]).message, '"net" is listed more than once')
+  assert.equal(issueAt(r, ['skills', 1]).message, '"sql" is listed more than once')
+  assert.equal(issueAt(r, ['evaluators', 1]).message, '"e" is listed more than once')
+  assert.equal(issueAt(r, ['tips', 1]).message, '"t" is listed more than once')
+  assert.equal(issueAt(r, ['commands', 2]).message, '"a" is listed more than once')
+  assert.equal(errors(r).length, 6)
+})
+
+test('name, when given, must not be empty (T-387)', () => {
+  assert.equal(issueAt(validatePersonaFile({ id: 'x', name: '' }), ['name']).message, 'must be a non-empty string')
+  assert.equal(valid({ id: 'x', description: '' }).identity.name, 'x')
+})

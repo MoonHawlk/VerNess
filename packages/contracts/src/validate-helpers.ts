@@ -4,8 +4,23 @@ import { closest } from './issue.ts'
 export type Path = (string | number)[]
 export type Obj = Record<string, unknown>
 
+/** A plain object: `{}` or `Object.create(null)`, never an array, `Date`, `Map` or class instance. */
 export function isObject(v: unknown): v is Obj {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
+  if (typeof v !== 'object' || v === null) return false
+  const proto: unknown = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
+/**
+ * The entries of a record at `path`, minus a `__proto__` key (which `JSON.parse` makes an own key
+ * but assigning it would set the prototype instead): that one is reported, not dropped silently.
+ */
+export function recordEntries(o: Obj | undefined, path: Path, errors: Issue[]): [string, unknown][] {
+  return Object.entries(o ?? {}).filter(([key]) => {
+    if (key !== '__proto__') return true
+    errors.push({ path: [...path, key], message: 'reserved key "__proto__" is not allowed' })
+    return false
+  })
 }
 
 /** An object at `path`, or `undefined` (with an issue unless the value is absent). */
@@ -25,9 +40,9 @@ export function expectString(v: unknown, path: Path, errors: Issue[]): string | 
 }
 
 /**
- * A copy of an array of non-empty strings at `path`. Each bad item is its own issue at
- * `[...path, i]`; `check` may reject a string with a message. Returns `undefined` when absent or
- * when anything was wrong.
+ * A copy of an array of distinct, non-empty strings at `path`. Each bad item is its own issue at
+ * `[...path, i]` (a repeat is flagged where it repeats); `check` may reject a string with a message.
+ * Returns `undefined` when absent or when anything was wrong.
  */
 export function expectStringArray(v: unknown, path: Path, errors: Issue[], check?: (s: string) => string | undefined): string[] | undefined {
   if (v === undefined) return undefined
@@ -36,11 +51,17 @@ export function expectStringArray(v: unknown, path: Path, errors: Issue[], check
     return undefined
   }
   const before = errors.length
+  const seen = new Set<string>()
   v.forEach((item: unknown, i) => {
     if (typeof item !== 'string' || item === '') {
       errors.push({ path: [...path, i], message: 'must be a non-empty string' })
       return
     }
+    if (seen.has(item)) {
+      errors.push({ path: [...path, i], message: `"${item}" is listed more than once` })
+      return
+    }
+    seen.add(item)
     const problem = check?.(item)
     if (problem !== undefined) errors.push({ path: [...path, i], message: problem })
   })

@@ -1,5 +1,6 @@
 import type { Issue, Result } from './issue.ts'
 import { closest } from './issue.ts'
+import { isObject } from './validate-helpers.ts'
 
 export const CAPABILITY_KEYS = ['code', 'reasoning', 'vision', 'structured_output', 'tool_calling'] as const
 export type CapabilityKey = typeof CAPABILITY_KEYS[number]
@@ -47,7 +48,7 @@ export function mergeRequirements(...rs: CapabilityRequirements[]): CapabilityRe
 export function validateCapabilities(v: unknown, path: (string | number)[] = []): Result<ModelCapabilities> {
   const errors: Issue[] = []
 
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+  if (!isObject(v)) {
     return { ok: false, errors: [{ path, message: 'expected an object' }] }
   }
 
