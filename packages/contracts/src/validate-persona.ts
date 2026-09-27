@@ -4,7 +4,7 @@ import type { ApprovalMode, DecisionPolicy, MemoryScope, ModelPolicy, Persona, P
 import type { Path } from './validate-helpers.ts'
 import { validateCapabilities } from './capabilities.ts'
 import { APPROVAL_MODES, MEMORY_SCOPES, PERSONA_FAMILIES, PERSONA_FIELDS } from './persona.ts'
-import { expectObject, expectString, expectStringArray, isObject, unknownFields } from './validate-helpers.ts'
+import { expectObject, expectString, expectStringArray, isObject, recordEntries, unknownFields } from './validate-helpers.ts'
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/
 
@@ -78,7 +78,7 @@ function validateTools(v: unknown, errors: Issue[]): Persona['tools'] {
   }
 
   const approval = expectObject(o['approval'], ['tools', 'approval'], errors)
-  for (const [tool, mode] of Object.entries(approval ?? {})) {
+  for (const [tool, mode] of recordEntries(approval, ['tools', 'approval'], errors)) {
     if (!(APPROVAL_MODES as readonly unknown[]).includes(mode)) {
       errors.push({ path: ['tools', 'approval', tool], message: oneOf(APPROVAL_MODES) })
       continue
@@ -109,7 +109,7 @@ function validateDecisions(v: unknown, errors: Issue[]): DecisionPolicy {
   const provider = expectString(o['provider'], ['decisions', 'provider'], errors)
   if (provider !== undefined) policy.provider = provider
   const apply = expectObject(o['apply'], ['decisions', 'apply'], errors)
-  for (const [key, on] of Object.entries(apply ?? {})) {
+  for (const [key, on] of recordEntries(apply, ['decisions', 'apply'], errors)) {
     if (typeof on !== 'boolean') {
       errors.push({ path: ['decisions', 'apply', key], message: 'expected a boolean' })
       continue
@@ -135,6 +135,7 @@ export function validatePersonaFile(v: unknown, opts: { expectedId?: string } = 
   expectString(v['$schema'], ['$schema'], errors)
   const version = expectString(v['version'], ['version'], errors) ?? '1'
   const name = expectString(v['name'], ['name'], errors)
+  if (name === '') errors.push({ path: ['name'], message: 'must be a non-empty string' })
   const description = expectString(v['description'], ['description'], errors) ?? ''
   const family = expectString(v['family'], ['family'], errors)
   if (family !== undefined && !(PERSONA_FAMILIES as readonly string[]).includes(family)) {

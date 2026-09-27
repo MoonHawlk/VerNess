@@ -81,6 +81,12 @@ test('validateCapabilities: rejects non-object', () => {
   assert.equal(arrResult.ok, false)
 })
 
+test('validateCapabilities: rejects non-plain objects (T-387)', () => {
+  for (const v of [new Date(), new Map()]) {
+    assert.deepEqual(validateCapabilities(v), { ok: false, errors: [{ path: [], message: 'expected an object' }] })
+  }
+})
+
 test('validateCapabilities: unknown key with did-you-mean', () => {
   const result = validateCapabilities({ codee: 'high' })
   assert.equal(result.ok, false)

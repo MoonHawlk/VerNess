@@ -97,6 +97,14 @@ test('evaluators is an array of non-empty strings', () => {
   assert.equal('evaluators' in valid({ name: 'n', description: 'd' }), false)
 })
 
+test('duplicate entries in string arrays are flagged at the repeat (T-387)', () => {
+  const r = validateSkillMetadata({ name: 'n', description: 'd', activation: { triggers: ['a', 'a'] }, requirements: { tools: ['t', 't'] }, evaluators: ['e', 'e'] })
+  assert.equal(issueAt(r, ['activation', 'triggers', 1]).message, '"a" is listed more than once')
+  assert.equal(issueAt(r, ['requirements', 'tools', 1]).message, '"t" is listed more than once')
+  assert.equal(issueAt(r, ['evaluators', 1]).message, '"e" is listed more than once')
+  assert.equal(errors(r).length, 3)
+})
+
 test('all issues are collected, not just the first', () => {
   const r = validateSkillMetadata({ description: '', evaluators: [1], activation: { trigers: [] } })
   assert.equal(errors(r).length, 4)
