@@ -4,6 +4,10 @@ import type { CapabilityRequirements } from './capabilities.ts'
 export type ApprovalMode = 'allow' | 'ask' | 'deny'
 export const APPROVAL_MODES = ['allow', 'ask', 'deny'] as const
 
+/** Which part of the catalog a persona belongs to; groups listings and routes in two stages (T-396). */
+export type PersonaFamily = 'data' | 'engineering' | 'business' | 'research'
+export const PERSONA_FAMILIES = ['data', 'engineering', 'business', 'research'] as const
+
 /** Where a persona's memory lives. */
 export type MemoryScope = 'none' | 'session' | 'project'
 export const MEMORY_SCOPES = ['none', 'session', 'project'] as const
@@ -15,6 +19,7 @@ export interface PersonaFile {
   version?: string                                   // semver-ish, default '1'
   name?: string
   description?: string
+  family?: PersonaFamily                             // catalog group; optional, no default
   prompt?: { prefix?: string, suffix?: string }
   model?: { id?: string, route?: string }            // explicit preference, enforced today
   models?: { requirements?: CapabilityRequirements } // for the capability router (T-253)
@@ -27,7 +32,7 @@ export interface PersonaFile {
   decisions?: { provider?: string, apply?: Record<string, boolean> }
 }
 
-export interface PersonaIdentity { name: string, description: string }
+export interface PersonaIdentity { name: string, description: string, family?: PersonaFamily }
 export interface ModelPolicy { preferred?: { id?: string, route?: string }, requirements: CapabilityRequirements }
 export interface DecisionPolicy { provider?: string, apply: Record<string, boolean> }
 export interface ToolPolicy { allow: string[], deny: string[], approval: Record<string, ApprovalMode> }
@@ -53,4 +58,4 @@ export interface Persona {
 }
 
 /** Every top-level field a persona file may carry, in canonical order. */
-export const PERSONA_FIELDS = ['$schema', 'id', 'version', 'name', 'description', 'prompt', 'model', 'models', 'tools', 'skills', 'evaluators', 'tips', 'commands', 'memory', 'decisions'] as const
+export const PERSONA_FIELDS = ['$schema', 'id', 'version', 'name', 'description', 'family', 'prompt', 'model', 'models', 'tools', 'skills', 'evaluators', 'tips', 'commands', 'memory', 'decisions'] as const

@@ -12,9 +12,10 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { applyTemperature } from './calibration.mjs'
 import { REPO } from './util.mjs'
 
 /** Where shadow-mode decisions are recorded (gitignored). */
@@ -138,12 +139,17 @@ export function optionHash(question) {
  *
  * With `question`, a choice outside its criteria is a provider bug: it comes back as
  * `{invalid: true}` with no answer, so the rules apply.
+ *
+ * With `temperatures` (from `/decisions-data refit`), an entry for `<key>:<option hash>` rescales
+ * the probabilities and `confidence` becomes the new top probability; `confidenceRaw` keeps what the
+ * model said, so the log holds both.
  * @param {any} body - the parsed response body.
  * @param {string} key - the question key.
  * @param {{criteria: Record<string, string>}} [question] - the question asked, to validate against.
- * @returns {{answer?: string, confidence?: number, probabilities?: Record<string, number>, invalid?: boolean}} the answer.
+ * @param {Record<string, {T: number}>} [temperatures] - refit temperatures by `<key>:<hash>`.
+ * @returns {{answer?: string, confidence?: number, confidenceRaw?: number, probabilities?: Record<string, number>, invalid?: boolean}} the answer.
  */
-export function readAnswer(body, key, question) {
+export function readAnswer(body, key, question, temperatures) {
   const a = body?.answers?.[key]
   if (a === undefined) return {}
   const answer = a.choice ?? a.answer ?? (typeof a.score === 'number' ? String(a.score) : undefined)
@@ -151,18 +157,37 @@ export function readAnswer(body, key, question) {
   if (question !== undefined && answer !== undefined && !Object.hasOwn(question.criteria, answer)) {
     return { invalid: true, probabilities: a.probabilities }
   }
+  const t = question === undefined ? undefined : temperatures?.[`${key}:${optionHash(question)}`]
+  if (t !== undefined && a.probabilities !== undefined) {
+    const probabilities = applyTemperature(a.probabilities, t.T)
+    return { answer, confidence: Math.max(...Object.values(probabilities)), confidenceRaw: confidence, probabilities, T: t.T }
+  }
   return { answer, confidence, probabilities: a.probabilities }
+}
+
+/** Where `/decisions-data refit` stores the kept temperatures. */
+export const temperaturesFile = (dir = decisionsDir()) => join(dir, 'temperatures.json')
+
+/**
+ * @param {string} [dir] - the decisions directory.
+ * @returns {Record<string, {T: number, n: number, at: string}>} refit temperatures by `<question>:<hash>`; empty when none.
+ */
+export function loadTemperatures(dir = decisionsDir()) {
+  const f = temperaturesFile(dir)
+  if (!existsSync(f)) return {}
+  try { return JSON.parse(readFileSync(f, 'utf8')) } catch { return {} }
 }
 
 /**
  * The model's side of a shadow record: every routing question's answer, confidence, full
  * probability map and option-set hash — what calibration (T-221, T-222) scores.
  * @param {any} body - the parsed SystemOne response body.
+ * @param {Record<string, {T: number}>} [temperatures] - refit temperatures (`loadTemperatures`).
  * @returns {Record<string, {answer?: string, confidence?: number, probabilities?: Record<string, number>, invalid?: boolean, hash: string}>} per question.
  */
-export function modelAnswers(body) {
+export function modelAnswers(body, temperatures) {
   const model = {}
-  for (const [k, q] of Object.entries(ROUTING_QUESTIONS)) model[k] = { ...readAnswer(body, k, q), hash: optionHash(q) }
+  for (const [k, q] of Object.entries(ROUTING_QUESTIONS)) model[k] = { ...readAnswer(body, k, q, temperatures), hash: optionHash(q) }
   return model
 }
 

@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
-  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, logShadowDecision, modelAnswers, ruleRoute,
+  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute,
 } from '../lib/decisions.mjs'
 import { head, info, paint, RUN_DIR, table, warn } from '../lib/util.mjs'
 
@@ -57,7 +57,7 @@ export default {
     if (!r.ok) { warn(`decision service error: ${r.error ?? `HTTP ${r.status}`}`); return 1 }
 
     const rows = []
-    const answers = modelAnswers(r.body)
+    const answers = modelAnswers(r.body, loadTemperatures())
     for (const key of Object.keys(ROUTING_QUESTIONS)) {
       const a = answers[key]
       const agree = a.answer === rules[key]

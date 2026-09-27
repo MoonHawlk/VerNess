@@ -81,6 +81,21 @@ export function unlabelled(records, labels, question) {
 }
 
 /**
+ * Find the records to relabel: an exact record id, or else every record whose task contains the
+ * query (case-insensitive). A blank query matches nothing, so `--relabel` alone cannot relabel all.
+ * @param {object[]} records - shadow records.
+ * @param {string} query - a record id or words from the task.
+ * @returns {object[]} the matching records, in input order.
+ */
+export function matchRecords(records, query) {
+  const q = String(query).trim().toLowerCase()
+  if (q === '') return []
+  const byId = records.filter(r => String(r.id).toLowerCase() === q)
+  if (byId.length > 0) return byId
+  return records.filter(r => String(r.task ?? '').toLowerCase().includes(q))
+}
+
+/**
  * @param {Map<string, Record<string, string>>} labels - from `readLabels`.
  * @param {string[]} questions - the question keys to count.
  * @returns {Record<string, {labelled: number, skipped: number}>} per question.

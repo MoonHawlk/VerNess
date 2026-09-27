@@ -43,7 +43,7 @@ function issueAt(r: Result<Persona>, path: (string | number)[]): Issue {
 }
 
 test('PERSONA_FIELDS lists every v2 field', () => {
-  assert.deepEqual([...PERSONA_FIELDS], ['$schema', 'id', 'version', 'name', 'description', 'prompt', 'model', 'models', 'tools', 'skills', 'evaluators', 'tips', 'commands', 'memory', 'decisions'])
+  assert.deepEqual([...PERSONA_FIELDS], ['$schema', 'id', 'version', 'name', 'description', 'family', 'prompt', 'model', 'models', 'tools', 'skills', 'evaluators', 'tips', 'commands', 'memory', 'decisions'])
 })
 
 test('every real persona file validates unchanged', () => {
@@ -270,4 +270,11 @@ test('normalising is idempotent through personaToFile', () => {
   for (const input of inputs) {
     valid(input)
   }
+})
+
+test('family is optional, one of the known families, and round-trips (T-395)', () => {
+  assert.equal(valid({ id: 'x' }).identity.family, undefined)
+  assert.equal(valid({ id: 'x', family: 'engineering' }).identity.family, 'engineering')
+  assert.match(issueAt(validatePersonaFile({ id: 'x', family: 'marketing' }), ['family']).message, /one of/)
+  assert.ok(errors(validatePersonaFile({ id: 'x', family: 3 })).some(e => e.path[0] === 'family'))
 })

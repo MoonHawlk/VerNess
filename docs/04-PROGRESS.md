@@ -544,3 +544,34 @@
   `docs/03-BACKLOG.md` CRLF endings, and `parseBacklog`/`markdownToHtml` split on `\n` only, so the
   dashboard showed 0 open tasks and `backlog.test.mjs` failed. The merge commit had been pushed
   before that failure was checked. Fixed by splitting on `\r?\n`, with a CRLF test. `npm test` 148/148.
+
+## 2026-09-26 — `--relabel`; calibration report and refit (T-221, T-222); web branding planned (T-398, T-399)
+- `/dd label --relabel <id | task words>`: re-asks matching records, shows the operator's own current
+  label, and the newest label wins.
+- **T-221 / T-222 done**: `scripts/lib/calibration.mjs` (pure), `/dd report [--write]`, `/dd refit`,
+  and temperatures applied in `readAnswer` with `confidenceRaw` logged. First published run
+  (`docs/research/decision-calibration.md`, n=20 per question): model vs rules accuracy is
+  level 0.15/0.35, tier 0.45/0.50, pipeline 0.50/0.50. Model ECE is lower on all three (0.30, 0.16,
+  0.18 vs 0.65, 0.50, 0.50). AUROC 0.82 / 0.55 / 0.81: on level and pipeline the model's confidence
+  does separate its right answers from its wrong ones. Too few labels to gate or refit (T-392).
+- **Web branding checked**: logo and name are replaceable slots (`sidebar.brand.*`,
+  `conversation.hero.brand.mark`) via a replacement for `dsh-client-ui-brand-official`. Tab title
+  and favicons are build-time in the prebuilt frontend, so only a runtime swap is possible. Planned as
+  T-398, which starts with a spike proving an out-of-tree browser plugin loads. Also found: the
+  `dsh-web-ui` row (`@linxin666/dsh-web-all`) is enabled in the config but not installed in the web
+  profile (T-399).
+
+## 2026-09-27 — persona catalog built: T-393, T-395, T-394, ten personas (T-400..T-409, T-420..T-429)
+- **T-393** `scripts/test/personas.catalog.test.mjs`: every persona file validates and is named after
+  its id; every persona command exists, clashes with no global command, and runs with no model.
+  Verified to fail on a probe file.
+- **Ten personas** from the WS-I specs, each with one zero-token command. Verified that each persona
+  loads only its own command, none leaks into another, and `/testplan login flow` runs through the
+  real registry. `/persona check`: 17 ok.
+- **T-395** `family` in the contracts (validated, round-trips), set in all 16 files; `/persona` and
+  `/agents` group by it. The inline `generalist` lists under `other`, because it is defined in
+  `verness.config.json` and was not edited.
+- **T-394** `docs/12-PERSONAS.md` section 5: the catalog table, generated from the files, and "which
+  persona do I pick?" for every overlapping pair.
+- `npm test` and `pnpm typecheck` clean. **Left in WS-I**: T-396 (two-stage routing, needed before
+  T-230) and T-397 (the feature-delivery team).

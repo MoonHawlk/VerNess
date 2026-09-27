@@ -2,8 +2,7 @@
 
 > Status: persona files and persona-scoped commands are **built** (M2, ADR-0008). Tool policy,
 > skills and evaluators are **declared, not enforced** until M4–M7. The planned catalog of new
-> personas is WS-I (`superpowers/plans/2026-09-26-09-persona-catalog.md`). T-394 adds the catalog
-> table to this file.
+> personas is WS-I (`superpowers/plans/2026-09-26-09-persona-catalog.md`); the catalog is section 5.
 
 A persona is **one JSON file** (who the agent is and what it may use) plus, optionally, **its own
 commands**: small `/commands` that exist only while that persona is active. A data scientist gets
@@ -21,6 +20,7 @@ fine (comments, trailing commas).
   "id": "qa-engineer",
   "name": "QA Engineer",
   "description": "Test strategy, test cases, regression suites and reproducible bug reports.",
+  "family": "engineering",                 // data | engineering | business | research
   "prompt": {
     "prefix": "You are a QA engineer working inside the VerNess harness.",
     "suffix": "Derive cases from the requirement, not from the code. Run the tests and quote real output."
@@ -40,6 +40,7 @@ fine (comments, trailing commas).
 | Field | What it does today |
 |---|---|
 | `id`, `name`, `description` | identity; shown by `/persona`, `/agents` |
+| `family` | **applied**: `data`, `engineering`, `business` or `research`; `/persona` and `/agents` group by it, and two-stage routing (T-396) will use it. Optional; a persona without one is listed under `other` |
 | `prompt.prefix` / `prompt.suffix` | **applied**: injected around the system prompt when the persona is active |
 | `tools.allow` / `deny` / `approval` | declared, validated (a tool cannot be both allowed and denied); enforced from M4 (T-042) |
 | `skills`, `evaluators` | declared free strings; checked from M5/M7 |
@@ -140,10 +141,50 @@ Guidelines:
    name clash.
 7. Record the task in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 
-## 5. Choosing between personas
+## 5. The catalog, and choosing between personas
 
-Every persona states in one line how it differs from its neighbours, so two personas never do the
-same job. The existing pairs to keep apart: `reviewer` checks work and never edits, while
-`software-engineer` changes code. The new catalog's boundaries (for example qa-engineer vs reviewer,
-csharp-developer vs software-engineer, product-manager vs researcher) are in the WS-I plan, and T-394
-turns them into the table in this file.
+Sixteen persona files, plus `generalist`, which is defined inline in `verness.config.json`. Tool
+lists are **declared** until M4 enforces them (T-042). "asks" means the tool needs your approval.
+
+| Family | Persona | Job | Tools (allow / deny, ask) | Own command |
+|---|---|---|---|---|
+| data | `data-analyst` | Descriptive analysis and reporting over structured data; reduces questions to queries. | - / shell.execute | - |
+| data | `data-engineer` | Pipelines, schemas, ingestion and the plumbing that moves data. | read, grep, glob, bash, sql.query, sql.write, spark.submit / pipeline.deploy | - |
+| data | `data-scientist` | Statistical analysis, experiment design, modelling and data investigation. | read, grep, glob, bash, python.execute, sql.query, data.profile, artifact.create / production.write, sql.write | `/hypotheses` |
+| engineering | `csharp-developer` | C#/.NET changes that build, pass `dotnet test` and follow the solution's conventions. | read, write, edit, grep, glob, bash / - | `/dotnet-check` |
+| engineering | `devops-engineer` | CI/CD pipelines, containers, infrastructure-as-code and releases. | read, write, edit, grep, glob, bash / pipeline.deploy, production.write; asks: bash | `/release-check` |
+| engineering | `frontend-developer` | Web UI in HTML/CSS/TypeScript: components, layout and accessibility. | read, write, edit, grep, glob, bash, web.fetch / - | `/a11y` |
+| engineering | `qa-engineer` | Test strategy, test cases, regression suites and reproducible bug reports. | read, write, edit, grep, glob, bash / production.write | `/testplan` |
+| engineering | `security-engineer` | Threat modelling, secure code review, and dependency/secret hygiene. | read, grep, glob, bash, web.fetch / write, edit | `/threats` |
+| engineering | `software-engineer` | Reads the codebase, makes the smallest correct change, and verifies it. | read, write, edit, grep, glob, bash / - | - |
+| business | `customer-support` | Ticket triage, reply drafts and known-issue summaries; drafts only, a human sends. | read, grep, glob, write / bash, edit, sql.write, production.write, web.fetch | `/triage` |
+| business | `hr-specialist` | Job descriptions, interview plans, HR policy drafts and onboarding checklists; never decides about real people. | read, grep, glob, write, edit / bash, shell.execute, web.fetch, sql.query, sql.write, production.write; asks: write | `/jd-check` |
+| business | `product-manager` | Requirements, PRDs, user stories and prioritisation; turns problems into testable scope. | read, grep, glob, write, edit, web.search / bash, sql.write, production.write | `/prd` |
+| business | `project-manager` | Plans, milestones, status reports and risk registers; tracks what is done against what was promised. | read, grep, glob, write, edit / bash, sql.write, production.write, pipeline.deploy | `/raid` |
+| business | `technical-writer` | Docs, READMEs, release notes and API reference, written from the code and verified against it. | read, grep, glob, write, edit, bash / sql.write, production.write, web.fetch; asks: bash | `/release-notes` |
+| research | `researcher` | Investigates open questions and reports findings with their sources. | read, grep, glob, web.search, web.fetch / write, edit, bash | - |
+| research | `reviewer` | Checks work it did not do; verifies claims; never edits. | read, grep, glob, bash / write, edit | - |
+
+### Which persona do I pick?
+
+Where two personas look alike, this is the line between them:
+
+| If you want to… | Pick | Not |
+|---|---|---|
+| change product code | `software-engineer` | `reviewer` (never edits) |
+| change C#/.NET code with `dotnet build`/`test` as proof | `csharp-developer` | `software-engineer` (same tools, no .NET focus) |
+| build or fix web UI, with accessibility checked | `frontend-developer` | `software-engineer` |
+| write tests and reproducible bug reports | `qa-engineer` | `reviewer` (checks, but never writes tests) |
+| check whether finished work is correct | `reviewer` | `qa-engineer` (writes new tests) |
+| check whether something is exploitable | `security-engineer` (read-only) | `reviewer` (correctness, not threats) |
+| find out what is true, with sources | `researcher` | `product-manager` |
+| decide what to build and write testable scope | `product-manager` | `researcher` |
+| track who delivers what by when, and the risks | `project-manager` | `product-manager` (scope, not delivery) |
+| write or fix docs and release notes | `technical-writer` | `reviewer` |
+| pipelines, containers, releases | `devops-engineer` | `data-engineer` (data pipelines) |
+| draft a customer reply | `customer-support` (drafts only) | — |
+| draft a job description or HR policy | `hr-specialist` (never judges real people) | — |
+
+The full spec of each new persona, including its prompt, is in
+`superpowers/plans/2026-09-26-09-persona-catalog.md`. A new persona adds its row here and, if it
+overlaps an existing one, a line in the table above.

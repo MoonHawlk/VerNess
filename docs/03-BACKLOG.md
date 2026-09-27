@@ -15,7 +15,7 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 
 > **Priority (owner, 2026-09-26): WS-E — the Laya decision layer — goes first.** Start with WS-E
 > Task 1 in `05-decision-calibration-routing.md` (log probabilities, option-set hash and record id in
-> shadow records; **done 2026-09-26**), then T-220 (**done 2026-09-26**) → T-221 → T-222 → T-223. Other workstreams wait unless they block it.
+> shadow records; **done 2026-09-26**), then T-220 (**done 2026-09-26**) → T-221 and T-222 (**done 2026-09-26**) → T-223. Other workstreams wait unless they block it.
 
 ---
 
@@ -100,8 +100,6 @@ Cost control (Engram)
 ## WS-E — Decision layer: calibration, routing, first uses (plan `05-decision-calibration-routing.md`)
 Measurement, which gates everything else
 - [ ] T-392 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
-- [ ] T-221 `/decisions report`: accuracy, ECE (10 bins) and AUROC per question for the model and for the rule baseline; publish to `docs/research/decision-calibration.md`
-- [ ] T-222 / T-261 Temperature refit per (question, option count) on the labelled set, stored in `.verness/decisions/temperatures.json`, applied in `readAnswer`; re-measure
 - [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE *and* accuracy beat the rule baseline it replaces. Encode the gate as `decisionGate(question)` reading the latest report
 
 Composition and routing
@@ -124,35 +122,8 @@ Deferred / investigate
 
 ## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
 Catalog-wide (do T-393 first)
-- [ ] T-393 Persona conformance test `scripts/test/personas.catalog.test.mjs`: every real `personas/*.json` validates with zero issues, `id` equals the file name, every `commands` entry has its file, and no persona command clashes with a global command or alias
-- [ ] T-394 Add to `docs/12-PERSONAS.md` (the how-to guide exists): the catalog table (id, family, job, tool policy, command) and "which persona do I pick?" for the overlapping pairs (reviewer / qa / security; software-engineer / csharp / frontend; researcher / product-manager)
-- [ ] T-395 Optional persona `family` (`data | engineering | business | research`) in the contract and validator, set in every file; `/persona list` and `/agents` group by it
 - [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
 - [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)
-
-Engineering personas
-- [ ] T-400 `personas/qa-engineer.json`: test strategy, cases, regression, bug reports; allow read/write/edit/grep/glob/bash, deny `production.write`. Done: `/persona check` ok and `/agents` lists it
-- [ ] T-401 qa-engineer `/testplan <feature>`: prints a fixed test-plan checklist, zero tokens, only while qa-engineer is active
-- [ ] T-402 `personas/csharp-developer.json`: a .NET specialisation of software-engineer (same tool policy; C#/dotnet prompt and skills). Done: `/persona check` ok
-- [ ] T-403 csharp-developer `/dotnet-check`: prints the restore/build/test/format/vulnerable-package sequence and runs nothing
-- [ ] T-404 `personas/devops-engineer.json`: CI/CD, containers, IaC, release; deny `pipeline.deploy` and `production.write`, `bash` approval `ask`. Done: `/persona check` ok and `/agents` shows the approval as recorded
-- [ ] T-405 devops-engineer `/release-check`: prints a fixed pre-release and rollback checklist, zero tokens
-- [ ] T-406 `personas/security-engineer.json`: a read-only security specialisation of reviewer (deny write/edit; `web.fetch` for advisories). Done: `/persona check` ok
-- [ ] T-407 security-engineer `/threats <component>`: prints a STRIDE plus secrets/dependency checklist, zero tokens
-- [ ] T-408 `personas/frontend-developer.json`: web UI, components, accessibility. Done: `/persona check` ok and `/agents` lists it
-- [ ] T-409 frontend-developer `/a11y`: prints a WCAG AA quick checklist, zero tokens
-
-Business personas
-- [ ] T-420 `personas/hr-specialist.json`: JDs, interview plans, policies, onboarding; the prompt forbids decisions about real individuals, `write` is `ask`, shell and SQL are denied. Done: `/persona check` ok
-- [ ] T-421 hr-specialist `/jd-check`: prints a static job-description checklist, zero tokens
-- [ ] T-422 `personas/product-manager.json`: requirements, PRDs, user stories, prioritisation. Done: `/persona check` ok
-- [ ] T-423 product-manager `/prd [title]`: prints a PRD skeleton, zero tokens
-- [ ] T-424 `personas/technical-writer.json`: docs, READMEs, release notes, API docs; `bash` is `ask` (it only runs examples). Done: `/persona check` ok
-- [ ] T-425 technical-writer `/release-notes`: prints the Added/Changed/Fixed/Deprecated/Breaking/Upgrade template, each line naming its task ID
-- [ ] T-426 `personas/project-manager.json`: plans, milestones, status reports, risk registers. Done: `/persona check` ok
-- [ ] T-427 project-manager `/raid`: prints an empty RAID register, zero tokens
-- [ ] T-428 `personas/customer-support.json`: triage, reply drafts, known-issue summaries; drafts only (no edit, no production, no send). Done: `/persona check` ok
-- [ ] T-429 customer-support `/triage`: prints the S1–S4 severity rubric and escalation rules, zero tokens
 
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions
@@ -277,6 +248,15 @@ Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-comman
 - [ ] T-376 `@verness/commands` dsh plugin: register each listed quick-tool with dsh-commands, and a handler that runs it through the launcher
 - [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
 - [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
+
+## Web UI branding: VerNess logo and titles in the browser UI
+Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
+conversation-hero mark are **slots** that `dsh-client-ui-brand-official` occupies; its README says a
+deployment with another identity "leaves this package out and composes another package that
+occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
+(`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
+- [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
+- [ ] T-399 The `dsh-web-ui` plugin row (`@linxin666/dsh-web-all`, `settings.plugins` in `verness.config.json`) is enabled but not installed in the `verness-web` profile, whose UI comes from `@deepseek-ai/dsh-web-app`. Find out whether it warns or fails at boot and what it was meant to add, then install it properly or remove the row. Record the decision in `04-PROGRESS.md`
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
