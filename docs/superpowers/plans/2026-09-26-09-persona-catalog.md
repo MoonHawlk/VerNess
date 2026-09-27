@@ -5,7 +5,7 @@
 > Pattern to copy: `personas/data-scientist.json` + `personas/data-scientist/commands/hypotheses.mjs`.
 
 **Status (v0.3.0):** done: T-393, T-394, T-395 and all ten personas with their commands
-(T-400..T-409, T-420..T-429). Open: T-396 (two-stage routing) and T-397 (feature-delivery team).
+(T-400..T-409, T-420..T-429). T-397 (feature-delivery team) done 2026-09-27. Open: T-396 (two-stage routing).
 
 **Goal:** Grow the catalog from 7 personas (6 files + inline `generalist`) to 17, without two
 personas doing the same job, and without breaking the decision layer's 8-option limit.

@@ -34,8 +34,9 @@
 
 ## Code
 - TypeScript ESM, explicit `.ts` import specifiers (upstream convention).
-- Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`,
-  `main: lib/index.js`, `types: lib/types/index.d.ts`.
+- Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`. Plain-ESM plugins
+  (`packages/spike`) point `main` at their `.mjs`; `@verness/contracts` ships `src/*.ts` run by Node's
+  type stripping (no build, no `lib/`). A package that needs a build adds `lib/` and says so in its README.
 - `@deepseek-ai/cordis` in both `peerDependencies` and `devDependencies` with the same range.
 - Every registration must be an effect that disposes (`ctx.effect`, `ctx.on`, registry `.register`).
 - One service per package; augment `Context` with `declare module '@deepseek-ai/cordis'`.
