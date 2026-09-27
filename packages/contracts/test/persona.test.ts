@@ -7,7 +7,6 @@ import type { Issue, Result } from '../src/issue.ts'
 import type { Persona } from '../src/persona.ts'
 import { PERSONA_FIELDS } from '../src/persona.ts'
 import { personaToFile, validatePersonaFile } from '../src/validate-persona.ts'
-// @ts-expect-error - the launcher module has no type declarations
 import { parseJsonc } from '../../../scripts/lib/util.mjs'
 
 const PERSONAS_DIR = join(import.meta.dirname, '..', '..', '..', 'personas')
