@@ -137,6 +137,12 @@ logs the result. `/decisions-data` (alias `/dd`) turns those logs into evidence:
 | `/dd label --relabel <id or task words>` | fix a label; the newest one wins |
 | `/dd report [--write]` | accuracy, ECE and AUROC per question, model vs rules; `--write` publishes `docs/research/decision-calibration.md` |
 | `/dd refit` | keeps a temperature refit only with 50+ labels and a held-out improvement |
+| `/dd gate` | the calibration gate (T-223), one line per question: `PASS` or `HOLD — <why>`; reports only, applies nothing |
+
+`/routing [--limit N]` (T-255) reads the same log, zero tokens: the last N shadow records (default
+10) as `rules / model (confidence)` per question, then how often the model agrees with the rules per
+question over the whole log, with each question's gate line. Agreement is not accuracy; only labels
+say who was right.
 
 Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 
