@@ -70,7 +70,7 @@ export function listCommands(repo, { run = spawnSync } = {}) {
   if (r.error !== undefined) return { error: r.error.message }
   if (r.status !== 0) return { error: `exit ${r.status}: ${stripAnsi(`${r.stderr ?? ''}`).trim().split('\n')[0]}` }
   try {
-    const list = JSON.parse(r.stdout)
+    const list = JSON.parse(`${r.stdout}`.replace(/^﻿/, ''))
     if (!Array.isArray(list)) return { error: 'the command list is not a JSON array' }
     return { list }
   } catch (e) { return { error: `the command list is not JSON: ${e.message}` } }
