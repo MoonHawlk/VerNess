@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { REPO } from '../lib/util.mjs'
@@ -37,7 +37,10 @@ test('docs --problems: no broken links or outdated status versions', () => {
   assert.equal(r.code, 0, r.out)
 })
 
-test('where finds a known function in the code graph and in the docs', { skip: !readdirSync(join(REPO, '.engram'), { withFileTypes: true }).length && 'no graph' }, () => {
+// A fresh clone has no .engram/ (gitignored): the graph half is skipped there, not failed.
+const hasGraph = existsSync(join(REPO, '.engram', 'graph.json'))
+
+test('where finds a known function in the code graph and in the docs', { skip: !hasGraph && 'no Engram graph in this checkout' }, () => {
   const r = run([join(DIR, 'where.mjs'), 'optionHash', '--limit', '2'])
   assert.equal(r.code, 0, r.out)
   assert.match(r.out, /docs: \d+ line/)
