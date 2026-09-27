@@ -9,12 +9,15 @@ Built on the **DeepSeek Harness (dsh)** / Cordis substrate. VerNess adds the sev
 ## Table of Contents
 
 - [What is VerNess?](#what-is-verNess)
+- [VerNess, explained simply](#verness-explained-simply)
 - [Setup](#setup)
 - [Usage](#usage)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Dependencies](#dependencies)
 - [Roadmap](#roadmap)
+- [Releases](#releases)
+- [Development](#development)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 
@@ -25,6 +28,82 @@ Built on the **DeepSeek Harness (dsh)** / Cordis substrate. VerNess adds the sev
 VerNess treats an LLM as one node in a multi-compute pipeline. A task first passes through cheap deterministic engines (SQL, Polars, DuckDB), then a decision model (rules or a small classifier), and only reaches a generative LLM if cheaper computation cannot resolve it.
 
 The system is fully plugin-native: every capability — models, tools, skills, sessions, the UI — is a Cordis plugin. VerNess adds plugins on top of `dsh` without touching the substrate.
+
+---
+
+## VerNess, explained simply
+
+> For a curious 12-year-old, or anyone who has used a chatbot but never written code.
+
+VerNess is an AI helper that runs on your own computer. You type a job, and an AI does it. The big
+idea is to **save effort**: most jobs do not need a giant, expensive AI brain, so VerNess wants to
+try the cheapest way that works first (a simple rule, a small quick helper, a plain calculation)
+and only call a big AI when it has to. **That is the goal, not today's reality.** Today VerNess is a
+place to type, a set of AI "job hats", lots of free quick-commands, and a small helper called Laya
+that is still *practising*. It is built on top of another program, the **DeepSeek Harness**, which
+talks to the AI, runs its tools and saves conversations.
+
+### The main parts
+
+| Part | Think of it as... |
+|---|---|
+| **The prompt (REPL)**: `verness>`, where you type | The front desk of a school |
+| **The model**: the AI brain that writes answers, either local (free, through Ollama) or hosted (a company's servers, costs money) | The student who does the homework |
+| **Personas**: 17 job hats (data scientist, QA engineer, HR specialist, ...) that change the AI's instructions | Same student, different hat |
+| **Persona commands**: free checklists that appear only while one hat is on | A tool that hangs on one hat |
+| **Teams**: several personas working through a task list; one makes, another checks | A group project with a separate checker |
+| **Laya**: a small model that only answers multiple-choice questions ("how hard is this job?"). It runs in *shadow mode*: its guess is logged, never used | A trainee referee writing calls in a notebook |
+| **Labelling**: you grade Laya's past guesses without seeing them first, so it can be measured and its confidence corrected (*calibration*) | A teacher grading a quiz |
+| **The gate**: Laya may only decide once it beats the simple rules, after 50+ graded tasks per question (20 so far). **Not built yet** | A driving test |
+| **Dashboard**: a local web page with the to-do list, sessions and Laya's guesses | The school noticeboard |
+| **Ness, the pet**: a text-art face showing what is running; happy, sleepy or worried | A school mascot |
+| **Web UI**: the same chat in your browser | The front door instead of the side door |
+
+### What you can type
+
+Anything that is not a command goes to the AI as a task. Commands start with `/`, and most cost
+nothing because the AI is not involved.
+
+- **core**: `/help` list commands · `/doctor` what is missing · `/new` fresh conversation ·
+  `/resume` pick up an old one · `/loop-task` keep working on one goal over several rounds ·
+  `/pet` Ness's status · `/sync` apply config edits · `/web` browser chat · `/off` turn everything off
+- **model**: `/up` start the model · `/down` free its memory · `/model` show or switch ·
+  `/models` install or search local models · `/api` use a hosted AI (key in `.env`) ·
+  `/access` how far the AI may reach: read-only, workspace (default) or full
+- **decisions**: `/decision up|stats|down` Laya's switch · `/decide <task>` Laya vs the rules,
+  side by side · `/dd` count, grade (`label`), score (`report`) and tune (`refit`) Laya's guesses
+- **personas**: `/persona` list or switch hats · `/agents` every persona and team
+- **teams**: `/team run <id>` run a team of personas over a task list
+- **telemetry**: `/cost` money per route (zero on a local model) · `/usage` tokens ·
+  `/sessions` past conversations · `/tools` tools the AI was offered · `/stats` engine speed and
+  memory · `/dashboard` the noticeboard page · `/graph` rebuild the code map (no AI)
+- **hat-only checklists** (free, no AI): `/hypotheses` (data scientist) · `/testplan` (QA) ·
+  `/dotnet-check` (C#; prints the steps, does not run them) · `/release-check` (DevOps) ·
+  `/threats` (security) · `/a11y` (frontend) · `/jd-check` (HR) · `/prd` (product) ·
+  `/release-notes` (writer) · `/raid` (project manager) · `/triage` (support)
+- **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`) followed by nothing to start ·
+  `"a task"` for one task · `setup` · `doctor` · `up` · `down` · `off` · `web` · `sync` ·
+  `decision up`
+
+### A day with VerNess
+
+Start with `.\turn_on.cmd` and Ness says hello. Put on a hat with `/persona qa-engineer`, and
+`/testplan` appears. Get a free checklist with `/testplan login page`. Ask the AI to write the
+tests; a grey line shows Laya's practice guess next to the rules' guess, and nothing changes
+because of it. `/cost` shows zero on a local model. Grade Laya with `/dd label`, look at
+`/dashboard`, then `/off`.
+
+### Not built yet, honestly
+
+- Picking the cheapest way automatically is still a plan (milestones M3, M6 and M8). Today you
+  pick the model yourself.
+- Laya does not decide anything, and its gate is not built.
+- Each hat's list of allowed tools is written down but not enforced until M4.
+- The VerNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look, and
+  quick-commands do not appear in its `/` menu yet.
+- `/btw`, `/config`, `/exit` and other planned commands are in `docs/03-BACKLOG.md`.
+
+The full version: [docs/13-EXPLAINED-SIMPLY.md](docs/13-EXPLAINED-SIMPLY.md).
 
 ---
 
@@ -121,6 +200,20 @@ Opens the `verness-web` profile — a full browser interface powered by **dsh-we
 
 `off` (alias `stop`, `/off` in the REPL) stops all three in one go. Add `--force` to also stop servers VerNess did not start.
 
+### Task dashboard
+
+```sh
+verness> /dashboard           # alias /dash, inside the REPL
+node scripts/dashboard.mjs    # same, from a plain shell
+```
+
+Builds a static HTML page at `.verness/dashboard.html` (no server, no network) and opens it:
+- **Backlog** — every open task in `docs/03-BACKLOG.md`, with a P0–P3 priority picker (kept in your browser), filters, sort, and *copy as markdown*; the backlog file itself is rendered below.
+- **Sessions** — turns, tool calls, tokens and wall time; click a row for its full timeline.
+- **Decisions and teams** — shadow decisions (model vs. rules agreement, latency) and per-task team outcomes.
+
+Add `--no-open` to only write the file, `--limit N` to cap the session list.
+
 ### Configuration
 
 All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh sync` to push changes to both profiles without a full re-setup.
@@ -137,12 +230,27 @@ All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh 
 }
 ```
 
+### Personas and their own commands
+
+```sh
+/persona                        # list personas; the active one is marked
+/persona data-scientist         # switch; the prompt, policy and command bar follow
+/hypotheses <question>          # exists only while data-scientist is active
+```
+
+A persona is one file, `personas/<id>.json`. It can also bring **commands that only it has**:
+`personas/<id>/commands/<name>.mjs`, listed in the file's `commands`. These are offered only while
+that persona is active, and they usually cost zero tokens (checklists, templates, local
+computations). Global commands always win on a name clash. How to write one:
+[docs/12-PERSONAS.md](docs/12-PERSONAS.md).
+
 ### Decision model (Laya)
 
 ```sh
 ./turn_on.sh decision up       # start the Laya sidecar (first run installs laya[serve])
 /decide <task text>            # in the REPL: Laya vs the rules, side by side
 /decisions-data label          # label logged decisions (blind); /decisions-data shows the count
+/dd label --relabel <words>    # fix a label: re-asks records by id or task words; newest label wins
 ```
 
 Laya runs in **shadow mode**. It answers three routing questions for each task (`level`, `tier`,
@@ -165,6 +273,12 @@ rules still make every real decision.
 | Browser UI (dsh-web-ui) | ✅ | `./turn_on.sh web` |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
+| Slash commands | ✅ | one file per command in `scripts/commands/`; `/help` lists them |
+| Task dashboard + backlog | ✅ | `/dashboard`: prioritise open tasks, inspect sessions and costs |
+| Teams / `/loop-task` | ✅ | several tasks under different personas; `teams/*.json` |
+| Contracts (`@verness/contracts`) | ✅ M2 | types only, zero dependencies |
+| Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands ([guide](docs/12-PERSONAS.md)) |
+| Decisions (shadow mode) | 🔄 M3 | Laya sidecar logs model-vs-rules; not yet authoritative |
 | Persona system | 🔄 M4 | identity = skills + tools + model policy; persona files validated (M2) |
 | Skills | 🔄 M5 | procedural knowledge, trigger-based |
 | Decision model | 🔄 M3 | rules → small model → LLM escalation |
@@ -346,6 +460,30 @@ Each milestone is independently runnable. See `docs/02-ROADMAP.md` for exit crit
 
 ---
 
+## Releases
+
+| Tag | Contents |
+|-----|----------|
+| `v0.3.0` | Decision layer measured: shadow records with probabilities, blind labelling (`/decisions-data label`, `--relabel`), calibration report and held-out temperature refit (`report`, `refit`). Ten new personas with their own zero-token commands, persona `family`, the catalog in `docs/12-PERSONAS.md`. Dashboard backlog with priorities. Windows: no terminal windows flashing at boot. Docs: persona guide, and the project explained simply |
+| `v0.2.0` | M2: `@verness/contracts`, persona files validated at load (`/persona check`), `data-analyst` and `reviewer` personas, persona-scoped commands |
+| `v0.1.0` | M0/M1: launcher, local model lifecycle, web UI, load-bearing spike plugin |
+
+Open work (not yet released) lives on `epic`; the prioritised list is in `docs/03-BACKLOG.md` and on the dashboard.
+
+---
+
+## Development
+
+```sh
+pnpm install      # dev tooling only (TypeScript); runtime deps come from ./turn_on.sh setup
+pnpm test         # node --test: scripts/test/*.test.mjs + packages/*/test/*.test.ts
+pnpm typecheck    # tsc -p packages/contracts
+```
+
+Adding a slash command means adding one file in `scripts/commands/` (see `docs/07-COMMAND-LAYER.md`).
+
+---
+
 ## Project Structure
 
 ```
@@ -355,13 +493,18 @@ VerNess/
 ├── scripts/
 │   ├── verness.mjs                          # launcher entry point
 │   ├── model.mjs                            # model lifecycle (up/down/stats)
-│   └── lib/                                 # REPL, personas, decisions, pet…
+│   ├── dashboard.mjs                        # builds .verness/dashboard.html
+│   ├── commands/                            # one file per slash command
+│   ├── lib/                                 # REPL, personas, decisions, backlog, pet…
+│   └── test/                                # node:test suites (pnpm test)
 ├── packages/
+│   ├── contracts/                           # @verness/contracts (M2, types only)
 │   └── spike/                               # @verness/spike (M1 proof-of-concept)
 ├── profiles/
 │   └── verness/cordis.patch.yml             # generated — do not edit by hand
-├── personas/                                # persona JSON definitions
+├── personas/                                # persona JSON files (+ <id>/commands/*.mjs)
 ├── teams/                                   # multi-agent team configs
+├── .claude/skills/terse/                     # agent skill: terse, low-token replies
 ├── upstream/
 │   └── deepseek-harness/                    # git submodule, READ-ONLY
 └── docs/                                    # architecture, roadmap, backlog, ADRs
@@ -380,3 +523,4 @@ VerNess/
 
 - Feature and fix branches start from `epic` and merge back into it; `main` only receives tagged releases (`vX.Y.Z`). See "Branches and versions" in `docs/05-CONVENTIONS.md`.
 - Commits carry no co-author or tool trailers; the rest of the commit rules are in the same file.
+- Agents working in this repo can load the `terse` skill (`.claude/skills/terse/SKILL.md`) to keep replies short and cut token cost.

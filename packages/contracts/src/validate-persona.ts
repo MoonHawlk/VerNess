@@ -1,9 +1,9 @@
 import type { ModelCapabilities } from './capabilities.ts'
 import type { Issue, Result } from './issue.ts'
-import type { ApprovalMode, DecisionPolicy, MemoryScope, ModelPolicy, Persona, PersonaFile } from './persona.ts'
+import type { ApprovalMode, DecisionPolicy, MemoryScope, ModelPolicy, Persona, PersonaFamily, PersonaFile } from './persona.ts'
 import type { Path } from './validate-helpers.ts'
 import { validateCapabilities } from './capabilities.ts'
-import { APPROVAL_MODES, MEMORY_SCOPES, PERSONA_FIELDS } from './persona.ts'
+import { APPROVAL_MODES, MEMORY_SCOPES, PERSONA_FAMILIES, PERSONA_FIELDS } from './persona.ts'
 import { expectObject, expectString, expectStringArray, isObject, unknownFields } from './validate-helpers.ts'
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/
@@ -136,6 +136,10 @@ export function validatePersonaFile(v: unknown, opts: { expectedId?: string } = 
   const version = expectString(v['version'], ['version'], errors) ?? '1'
   const name = expectString(v['name'], ['name'], errors)
   const description = expectString(v['description'], ['description'], errors) ?? ''
+  const family = expectString(v['family'], ['family'], errors)
+  if (family !== undefined && !(PERSONA_FAMILIES as readonly string[]).includes(family)) {
+    errors.push({ path: ['family'], message: oneOf(PERSONA_FAMILIES) })
+  }
 
   const prompt = { prefix: '', suffix: '' }
   const promptObj = expectObject(v['prompt'], ['prompt'], errors)
@@ -163,7 +167,7 @@ export function validatePersonaFile(v: unknown, opts: { expectedId?: string } = 
     value: {
       id,
       version,
-      identity: { name: name ?? id, description },
+      identity: { name: name ?? id, description, ...(family === undefined ? {} : { family: family as PersonaFamily }) },
       prompt,
       modelPolicy,
       decisionPolicy,
@@ -199,6 +203,7 @@ export function personaToFile(p: Persona): PersonaFile {
     memory: { scope: p.memory.scope },
     decisions: { apply: { ...p.decisionPolicy.apply } },
   }
+  if (p.identity.family !== undefined) file.family = p.identity.family
   if (p.modelPolicy.preferred !== undefined) file.model = { ...p.modelPolicy.preferred }
   if (p.decisionPolicy.provider !== undefined) file.decisions = { provider: p.decisionPolicy.provider, apply: { ...p.decisionPolicy.apply } }
   return file

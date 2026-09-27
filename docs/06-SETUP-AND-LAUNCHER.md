@@ -24,6 +24,7 @@ shell on Windows and quotes every argument itself).
 ./turn_on.sh sync           # regenerate the profile patch from the config
 ./turn_on.sh graph          # rebuild the Engram knowledge graph (no LLM calls)
 ./turn_on.sh help
+node scripts/dashboard.mjs  # task dashboard: prioritise the backlog, inspect sessions (also /dashboard)
 
 ./turn_on.sh models add <hf url | org/repo[:quant]> --use   # install a local model and switch to it
 ./turn_on.sh api use <provider> <model>                     # run the agent on a hosted model (key in .env)
@@ -117,6 +118,7 @@ Since M2, persona files (`personas/<id>.json`, JSONC) are **validated at load** 
 `node scripts/verness.mjs persona check`) prints each issue as `personas/x.json:line:column path: message`.
 A persona can also add its own commands (`personas/<id>/commands/<name>.mjs`, e.g. `/hypotheses`);
 global commands win on a name clash. Inline `verness.config.json` definitions are not validated.
+Step-by-step guide: `docs/12-PERSONAS.md`.
 
 ### Developing the launcher and contracts
 `pnpm install` once, then `pnpm test` (launcher tests plus `packages/*/test/*.test.ts` via Node type

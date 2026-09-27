@@ -10,11 +10,15 @@
  * @module scripts/commands/decisions-cmd
  */
 
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { cpus, platform } from 'node:os'
+import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
-import { ROUTING_QUESTIONS, decisionsDir, optionHash } from '../lib/decisions.mjs'
-import { appendLabel, labelCounts, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
-import { head, info, ok, paint, table, warn } from '../lib/util.mjs'
+import { report } from '../lib/calibration.mjs'
+import { ROUTING_QUESTIONS, decisionsDir, optionHash, temperaturesFile } from '../lib/decisions.mjs'
+import { appendLabel, labelCounts, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled } from '../lib/labels.mjs'
+import { REPO, head, info, ok, paint, table, warn } from '../lib/util.mjs'
 
 /** Labels per question below which the gate refuses to judge (T-223). */
 const MIN_LABELS = 50
@@ -78,18 +82,24 @@ async function askLabel(lines, options) {
  * @param {string} dir - the decisions directory.
  * @param {string[]} questions - which questions to label.
  * @param {number} limit - at most this many records.
+ * @param {string} [relabel] - relabel the records matching this id or task text, labelled or not.
  * @returns {Promise<number>} exit code.
  */
-async function label(dir, questions, limit) {
+async function label(dir, questions, limit, relabel) {
   if (process.stdin.isTTY !== true) { warn('labelling needs a terminal'); return 1 }
   const labels = readLabels(dir)
-  const pending = readShadow(dir)
-    .map(rec => ({ rec, qs: questions.filter(q => labels.get(rec.id)?.[q] === undefined && sameOptions(rec, q)) }))
+  const records = relabel === undefined ? readShadow(dir) : matchRecords(readShadow(dir), relabel)
+  const pending = records
+    .map(rec => ({ rec, qs: questions.filter(q => (relabel !== undefined || labels.get(rec.id)?.[q] === undefined) && sameOptions(rec, q)) }))
     .filter(p => p.qs.length > 0)
     .slice(0, limit)
-  if (pending.length === 0) { ok('nothing to label - every shadow record already has a label'); printStatus(dir, questions); return 0 }
+  if (pending.length === 0) {
+    if (relabel !== undefined) { warn(`no shadow record matches "${relabel}" - use a record id or words from the task`); return 1 }
+    ok('nothing to label - every shadow record already has a label'); printStatus(dir, questions); return 0
+  }
 
-  head(`labelling ${pending.length} record(s): the right answer for each question, in your judgement`)
+  head(`${relabel === undefined ? 'labelling' : 'relabelling'} ${pending.length} record(s): the right answer for each question, in your judgement`)
+  if (relabel !== undefined) info('your current label is shown; the newest label wins, so nothing is lost')
   info('the two suggestions are the rules and the model, shuffled and unmarked - pick what is right, not who')
   info('s skips a task no option fits (it is not asked again); q stops - every label is saved as you go')
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: false })
@@ -114,6 +124,8 @@ async function label(dir, questions, limit) {
         const seen = [...new Set([rec.rules?.[q], rec.model?.[q]?.answer].filter(a => options.includes(a)))]
         if (Math.random() < 0.5) seen.reverse()
         if (seen.length > 0) info(`suggested: ${seen.join(' · ')}`)
+        const current = labels.get(rec.id)?.[q]
+        if (current !== undefined) info(`your current label: ${current}  (id ${rec.id})`)
         const p = await askLabel(lines, options)
         if ('quit' in p) { ok(`stopped - ${written} label(s) saved`); printStatus(dir, questions); return 0 }
         appendLabel(dir, { id: rec.id, question: q, label: p.label })
@@ -126,16 +138,119 @@ async function label(dir, questions, limit) {
   return 0
 }
 
+/** @param {number|null|undefined} v - a metric. @returns {string} two decimals, or `-`. */
+const fmt = v => (v === null || v === undefined || Number.isNaN(v) ? '-' : v.toFixed(2))
+
+/**
+ * The calibration report for the current logs and labels.
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} questions - the question keys.
+ * @returns {object[]} the report rows.
+ */
+function currentReport(dir, questions) {
+  const hashes = Object.fromEntries(questions.map(q => [q, optionHash(ROUTING_QUESTIONS[q])]))
+  return report(readShadow(dir), readLabels(dir), { questions, hashes })
+}
+
+const REPORT_HEAD = ['question', 'n', 'model acc', 'model ECE', 'AUROC', 'refit ECE', 'T', 'rules acc', 'rules ECE']
+
+/** @param {object} r - a report row. @returns {string[]} its table cells. */
+const reportCells = r => [
+  r.question, String(r.n), fmt(r.model.accuracy), fmt(r.model.ece), fmt(r.model.auroc),
+  fmt(r.modelRefit?.ece), r.T === undefined ? '-' : String(r.T), fmt(r.rules.accuracy), fmt(r.rules.ece),
+]
+
+/**
+ * A factual one-paragraph reading of the report, in the plain style of `08-DECISION-LAYER-LAYA.md`.
+ * @param {object[]} rows - the report rows.
+ * @returns {string} the paragraph.
+ */
+function reading(rows) {
+  const parts = rows.map(r => {
+    const acc = r.model.accuracy > r.rules.accuracy ? 'more accurate than' : r.model.accuracy < r.rules.accuracy ? 'less accurate than' : 'as accurate as'
+    const cal = r.model.ece < r.rules.ece ? 'better calibrated' : 'no better calibrated'
+    return `on \`${r.question}\` the model is ${acc} the rules (${fmt(r.model.accuracy)} vs ${fmt(r.rules.accuracy)}) and ${cal} (ECE ${fmt(r.model.ece)} vs ${fmt(r.rules.ece)})`
+  })
+  const small = rows.some(r => r.n < MIN_LABELS)
+  return (parts.length === 0 ? 'No labelled records yet.' : `With these labels, ${parts.join('; ')}.`)
+    + ' The rules have no confidence and are scored as always sure, so their ECE is 1 − accuracy.'
+    + (small ? ` Some questions have fewer than ${MIN_LABELS} labels: these numbers move a lot with each new label, and such a question cannot pass the gate (T-223).` : '')
+}
+
+/**
+ * `/decisions-data report [--write]`.
+ * @param {object} ctx - command context.
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} questions - the question keys.
+ * @param {boolean} write - also publish `docs/research/decision-calibration.md`.
+ * @returns {number} exit code.
+ */
+function printReport(ctx, dir, questions, write) {
+  const rows = currentReport(dir, questions)
+  if (rows.length === 0) { warn('no labelled records yet - run /decisions-data label first'); return 1 }
+  head('calibration: the model vs the rules, against your labels')
+  for (const l of table(REPORT_HEAD, rows.map(reportCells))) console.log(`  ${l}`)
+  info('ECE: lower is better calibrated. AUROC: does confidence separate right from wrong (0.5 = no)')
+  info(`refit ECE and T appear only when a held-out temperature refit helped (needs ${MIN_LABELS}+ labels)`)
+  if (rows.some(r => r.n < MIN_LABELS)) info(`below ${MIN_LABELS} labels a question cannot pass the gate - keep labelling`)
+  if (!write) return 0
+  const out = join(REPO, 'docs', 'research', 'decision-calibration.md')
+  mkdirSync(join(REPO, 'docs', 'research'), { recursive: true })
+  const md = [
+    '# Decision calibration: the model vs the rules',
+    '',
+    `Generated by \`/decisions-data report --write\` on ${new Date().toISOString().slice(0, 10)}.`,
+    `Machine: ${platform()}, ${cpus()[0]?.model?.trim() ?? 'unknown CPU'}. Checkpoint: \`${ctx.cfg?.decisions?.checkpoint ?? 'unknown'}\`.`,
+    `Labelled records per question: ${rows.map(r => `${r.question} ${r.n}`).join(', ')}.`,
+    '',
+    `| ${REPORT_HEAD.join(' | ')} |`,
+    `|${REPORT_HEAD.map(() => '---').join('|')}|`,
+    ...rows.map(r => `| ${reportCells(r).join(' | ')} |`),
+    '',
+    reading(rows),
+    '',
+  ].join('\n')
+  writeFileSync(out, md, 'utf8')
+  ok(`written: ${out}`)
+  return 0
+}
+
+/**
+ * `/decisions-data refit`: store the temperatures whose held-out refit was kept. Entries that no
+ * longer qualify are dropped, so the file always matches the current evidence.
+ * @param {string} dir - the decisions directory.
+ * @param {string[]} questions - the question keys.
+ * @returns {number} exit code.
+ */
+function refit(dir, questions) {
+  const rows = currentReport(dir, questions)
+  const at = new Date().toISOString()
+  const kept = Object.fromEntries(rows.filter(r => r.T !== undefined).map(r => [`${r.question}:${r.hash}`, { T: r.T, n: r.n, at }]))
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(temperaturesFile(dir), `${JSON.stringify(kept, null, 2)}\n`, 'utf8')
+  if (Object.keys(kept).length === 0) {
+    warn(`no refit kept: each question needs ${MIN_LABELS}+ labelled records with probabilities, and a held-out improvement`)
+    for (const r of rows) info(`${r.question}: ${r.n} labelled`)
+    return 0
+  }
+  for (const [k, v] of Object.entries(kept)) ok(`${k.split(':')[0]}: T = ${v.T} (n ${v.n})`)
+  info('applied to shadow decisions from the next REPL start (/decide applies it now); raw confidence is logged too')
+  return 0
+}
+
 export default {
   name: 'decisions-data',
   aliases: ['dd'],
   group: 'decisions',
   summary: 'label shadow decisions so the decision model can be measured: /decisions-data label',
-  usage: '/decisions-data [status] | label [--question level|tier|pipeline] [--limit N] | report | refit | gate',
+  usage: '/decisions-data [status] | label [--question level|tier|pipeline] [--limit N] [--relabel <id | task words>] | report [--write] | refit | gate',
   details: [
     'status  labels per question against the 50 the gate needs (200 is better)',
     'label   blind labelling loop over unlabelled shadow records; saved as you go',
-    'report, refit, gate  come with WS-E Tasks 3 and 4',
+    '        --relabel <id | task words> re-asks matching records, labelled or not; the newest label wins',
+    'report  accuracy, ECE and AUROC per question, model vs rules; --write publishes docs/research/decision-calibration.md',
+    'refit   stores held-out temperature refits in .verness/decisions/temperatures.json (needs 50+ labels)',
+    'gate    comes with WS-E Task 4 (T-223)',
   ],
   /**
    * @param {object} ctx - command context.
@@ -156,9 +271,19 @@ export default {
     if (!(limit > 0)) { warn('--limit takes a positive number'); return 1 }
 
     if (sub === 'status') { printStatus(dir, questions); return 0 }
-    if (sub === 'label') return label(dir, questions, limit)
-    if (sub === 'report' || sub === 'refit' || sub === 'gate') {
-      warn(`/decisions-data ${sub} is not built yet (WS-E Tasks 3-4) - label first, it needs ${MIN_LABELS} per question`)
+    const rAt = args.indexOf('--relabel')
+    let relabel
+    if (rAt >= 0) {
+      // The query runs until the next flag, so task words need no quoting.
+      const end = args.findIndex((a, i) => i > rAt && a.startsWith('--'))
+      relabel = args.slice(rAt + 1, end < 0 ? undefined : end).join(' ')
+      if (relabel.trim() === '') { warn('--relabel takes a record id or words from the task'); return 1 }
+    }
+    if (sub === 'label') return label(dir, questions, limit, relabel)
+    if (sub === 'report') return printReport(ctx, dir, questions, args.includes('--write'))
+    if (sub === 'refit') return refit(dir, questions)
+    if (sub === 'gate') {
+      warn(`/decisions-data gate is not built yet (WS-E Task 4, T-223) - it needs ${MIN_LABELS} labels per question`)
       return 1
     }
     warn(`unknown subcommand: ${sub}`)

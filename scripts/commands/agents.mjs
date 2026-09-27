@@ -4,7 +4,7 @@
  * @module scripts/commands/agents
  */
 
-import { activePersonaId, loadPersonas } from '../lib/personas.mjs'
+import { activePersonaId, groupByFamily, loadPersonas } from '../lib/personas.mjs'
 import { loadTeams, validateTeam } from '../lib/teams.mjs'
 import { head, info, paint, table } from '../lib/util.mjs'
 
@@ -25,9 +25,10 @@ export default {
 
     head(`personas (${personas.size})`)
     for (const l of table(
-      ['', 'id', 'name', 'model', 'tools', 'skills', 'source'],
-      [...personas.values()].map(p => [
+      ['', 'family', 'id', 'name', 'model', 'tools', 'skills', 'source'],
+      groupByFamily(personas).flatMap(([, ps]) => ps).map(p => [
         p.id === active ? paint('green', '*') : ' ',
+        p.family,
         p.id,
         p.name,
         p.model.id ?? 'active route',

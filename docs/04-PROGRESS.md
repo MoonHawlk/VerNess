@@ -439,6 +439,21 @@
   it now covers `packages/contracts/src/*`.
 - **Next**: M3 / T-030 — the decisions plugin.
 
+## 2026-09-26 — v0.2.0 released; dashboard backlog; terse skill (T-389..T-391)
+- **Release**: `epic` merged into `main` (`13c94d4`), tagged `v0.2.0` and pushed; `epic` re-created
+  from it for further work.
+- **Dashboard backlog** (T-389): `/dashboard` now opens on a Backlog section built from
+  `docs/03-BACKLOG.md` — each open task gets a P0–P3 picker (kept in the browser's localStorage under
+  `verness.backlog.priority`), with filters by workstream/priority, sort, and copy-as-markdown; the
+  file itself is rendered below. Parser and renderer: `scripts/lib/backlog.mjs`, no dependency.
+- **Wall-time fix** (T-390): session wall time starts at the first timed event, not at an untimed
+  header, so it is no longer inflated.
+- **Terse skill** (T-391): `.claude/skills/terse/SKILL.md` — agents drop filler and hedging, use
+  plain short phrasing, and keep code, paths, commands and errors exact, to cut token cost.
+- **Docs**: README (dashboard, features, releases, development, structure), docs index, 07, 06.
+- **Tests**: `pnpm test` 130/130; `pnpm typecheck` clean.
+
+
 ## 2026-09-26 — priority change: WS-E (Laya decision layer) first
 - The owner moved WS-E ahead of M3/T-030. **Next**: WS-E Task 1 (shadow records gain `id`, `v: 2`,
   per-question `probabilities` and option-set `hash`), then T-220 labelling.
@@ -476,9 +491,9 @@
 - Verified by driving the loop with piped input and a faked TTY (junk rejected; number, name, `s`,
   `q`; resume at the first unlabelled question; EOF and SIGINT exit cleanly and remove the handler).
   Those test labels were deleted. `npm test` 139/139.
-- **Next**: operator labelling (T-389, ≥ 50 per question), and in parallel Task 3 (metrics + refit, T-221/T-222).
+- **Next**: operator labelling (T-392, ≥ 50 per question), and in parallel Task 3 (metrics + refit, T-221/T-222).
 
-## 2026-09-26 — first labelled set (T-389 in progress)
+## 2026-09-26 — first labelled set (T-392 in progress; logged as T-389 before the merge with epic, which already used T-389)
 - The owner labelled every shadow record: **20 per question** (60 labels, 0 skipped). The gate needs 50.
 - Unofficial first look (n=20, too small to gate on): correct vs label, model / rules:
   level 3 / 7, tier 9 / 10, pipeline 10 / 10. Laya's `level` leans on `standard` and trails the rules.
@@ -504,3 +519,66 @@
   equal to the live `laya-serve.exe`. `npm test` 142/142 (quoting tests in `util.background.test.mjs`).
 - Also: boot ran `dsh --version` twice in a row; it now reuses the first result.
 - Not ours: `docker.exe context ls` processes seen during boot come from Docker Desktop.
+
+## 2026-09-26 — epic updated; WS-I persona catalog planned (T-393..T-397, T-400..T-409, T-420..T-429)
+- `main` merged into `epic` and pushed (`06c3c18`). The labelling operator step moved from T-389 to
+  **T-392**, because epic had already used T-389 for the dashboard backlog. Also fixed: the dashboard
+  counted `labels.jsonl` lines as decisions (80 instead of 20).
+- New branch `persona-tasks-and-calibration` from epic.
+- **WS-I planned**: ten personas drafted by two parallel subagents with disjoint scopes and ID ranges
+  (engineering: qa, csharp, devops, security, frontend; business: hr, product, technical-writer,
+  project, customer-support), merged and checked here. Every tool name they use already exists in a
+  shipped persona file, and none of the ten command names clashes with a global command. Each
+  persona states its boundary against the existing six. Full specs are in
+  `docs/superpowers/plans/2026-09-26-09-persona-catalog.md`.
+- Found while planning: the catalog would reach 17 personas, which breaks the 8-option limit
+  (T-385) that T-230's single-choice persona router assumes. T-396 (two-stage routing) fixes the
+  design, and the T-230 line now points to it.
+
+## 2026-09-26 — persona guide; branch merged; CRLF fix for the dashboard backlog
+- `docs/12-PERSONAS.md`: how to write a persona file, and persona-scoped commands (loaded only for
+  the active persona, globals win including aliases, and the scoping limits what is offered; it is
+  not a security boundary). Linked from the README, the docs index, 06 and 07.
+- `persona-tasks-and-calibration` merged into `epic` and deleted (it was never pushed).
+- **Bug found after that merge**: with `core.autocrlf=true`, a Windows checkout gives
+  `docs/03-BACKLOG.md` CRLF endings, and `parseBacklog`/`markdownToHtml` split on `\n` only, so the
+  dashboard showed 0 open tasks and `backlog.test.mjs` failed. The merge commit had been pushed
+  before that failure was checked. Fixed by splitting on `\r?\n`, with a CRLF test. `npm test` 148/148.
+
+## 2026-09-26 — `--relabel`; calibration report and refit (T-221, T-222); web branding planned (T-398, T-399)
+- `/dd label --relabel <id | task words>`: re-asks matching records, shows the operator's own current
+  label, and the newest label wins.
+- **T-221 / T-222 done**: `scripts/lib/calibration.mjs` (pure), `/dd report [--write]`, `/dd refit`,
+  and temperatures applied in `readAnswer` with `confidenceRaw` logged. First published run
+  (`docs/research/decision-calibration.md`, n=20 per question): model vs rules accuracy is
+  level 0.15/0.35, tier 0.45/0.50, pipeline 0.50/0.50. Model ECE is lower on all three (0.30, 0.16,
+  0.18 vs 0.65, 0.50, 0.50). AUROC 0.82 / 0.55 / 0.81: on level and pipeline the model's confidence
+  does separate its right answers from its wrong ones. Too few labels to gate or refit (T-392).
+- **Web branding checked**: logo and name are replaceable slots (`sidebar.brand.*`,
+  `conversation.hero.brand.mark`) via a replacement for `dsh-client-ui-brand-official`. Tab title
+  and favicons are build-time in the prebuilt frontend, so only a runtime swap is possible. Planned as
+  T-398, which starts with a spike proving an out-of-tree browser plugin loads. Also found: the
+  `dsh-web-ui` row (`@linxin666/dsh-web-all`) is enabled in the config but not installed in the web
+  profile (T-399).
+
+## 2026-09-27 — persona catalog built: T-393, T-395, T-394, ten personas (T-400..T-409, T-420..T-429)
+- **T-393** `scripts/test/personas.catalog.test.mjs`: every persona file validates and is named after
+  its id; every persona command exists, clashes with no global command, and runs with no model.
+  Verified to fail on a probe file.
+- **Ten personas** from the WS-I specs, each with one zero-token command. Verified that each persona
+  loads only its own command, none leaks into another, and `/testplan login flow` runs through the
+  real registry. `/persona check`: 17 ok.
+- **T-395** `family` in the contracts (validated, round-trips), set in all 16 files; `/persona` and
+  `/agents` group by it. The inline `generalist` lists under `other`, because it is defined in
+  `verness.config.json` and was not edited.
+- **T-394** `docs/12-PERSONAS.md` section 5: the catalog table, generated from the files, and "which
+  persona do I pick?" for every overlapping pair.
+- `npm test` and `pnpm typecheck` clean. **Left in WS-I**: T-396 (two-stage routing, needed before
+  T-230) and T-397 (the feature-delivery team).
+
+## 2026-09-27 — v0.3.0 released
+- `epic` merged into `main` (`--no-ff`) with `package.json` 0.2.0 → 0.3.0 in the merge commit, tagged
+  `v0.3.0`; `epic` fast-forwarded to the release. Minor bump: new commands (`/decisions-data`, ten
+  persona commands) and a new persona field (`family`).
+- Clean-clone check on `epic` before the merge: `node scripts/verness.mjs help` runs, `npm test`
+  198/198, all 11 persona commands tracked.

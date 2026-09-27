@@ -15,14 +15,13 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 
 > **Priority (owner, 2026-09-26): WS-E — the Laya decision layer — goes first.** Start with WS-E
 > Task 1 in `05-decision-calibration-routing.md` (log probabilities, option-set hash and record id in
-> shadow records; **done 2026-09-26**), then T-220 (**done 2026-09-26**) → T-221 → T-222 → T-223. Other workstreams wait unless they block it.
+> shadow records; **done 2026-09-26**), then T-220 (**done 2026-09-26**) → T-221 and T-222 (**done 2026-09-26**) → T-223. Other workstreams wait unless they block it.
 
 ---
 
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
 Foundation
-- [ ] T-183 Make `npm test` real: replace the dead `vitest run` / `tsc -b` scripts with `node --test` over `scripts/test/`; convert the two existing test scripts to `node:test`
 - [ ] T-135 Registry conformance test: load every command file, assert shape, and assert no duplicate names or aliases
 - [ ] T-182 Unique-prefix match (`/mo` → `/model` when unambiguous) and the `//` escape (a line starting `//` is sent to the model as a literal task starting with `/`)
 - [ ] T-130 **`/btw <note>`**: append/show/clear/drop operator side notes in `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, 2000-character cap with a warning at 80%. Spec in `docs/07-COMMAND-LAYER.md`
@@ -51,22 +50,21 @@ Launcher lifecycle
 - [ ] T-167 *(remaining part)* Failure policy per team and per task: `onFailure: stop | skip | retry-once`, default `stop`; dependents of a failed task are marked `skipped`, never run
 - [ ] T-170 *(remaining part)* `/team status [<id>]`: read the newest `.verness/runs/<team>/<stamp>/` and print per-task status, exit, seconds; write a machine-readable `summary.json` next to `summary.md`
 - [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`: a one-task ad-hoc team run
-- [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E)
+- [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
 
 ## WS-C — Pet (plan `03-pet-animation.md`)
-> **In flight (2026-09-26):** two drawings exist. `main`'s working tree (uncommitted) has a circle
-> with moods `happy | curious | sad`, `petAnimFrames` and a one-shot boot animation `animatePet`.
-> Branch `epic` (5338fd4) has a baby sheep with moods `happy | sleepy | worried` and a matching
-> render test. In `main`, `scripts/test/pet.render.mjs` fails until one drawing is chosen (T-338).
-> The tasks below are written against frame lists and an exported `PET_MOODS`, not a drawing.
+> **State (v0.2.0):** one drawing — Ness is a baby sheep from the block sprite, moods
+> `happy | sleepy | worried`, with `petAnimFrames` and a one-shot boot animation `animatePet`
+> (`scripts/lib/pet.mjs`). `scripts/test/pet.render.mjs` passes but is still a plain script, not
+> `node:test` (T-338). The tasks below are written against frame lists, not a drawing.
 - [ ] T-338 Rewrite `scripts/test/pet.render.mjs` as a mood-agnostic `node:test` suite over `PET_MOODS` (every frame the same size, ASCII only, broken > idle > ok)
 - [ ] T-335 Animations. Frames stay ASCII and minimal
   - [ ] T-335a Frame model *(remaining part)*: `petAnimFrames(mood)` exists; add a per-frame timing (`{lines, ms}`) and a `loop` vs `once` flag per mood
   - [ ] T-335b Blink: happy eyes → closed for ~150 ms every few seconds, at a randomised interval
-  - [ ] T-335c Idle loop for `curious`: the `?` mark drifts, then restarts
+  - [ ] T-335c Idle loop for `sleepy`: a `z` drifts up, then restarts
   - [ ] T-335d Talking *(blocked)*: `dsh` streams straight to stdout during a turn, so nothing may draw then. Re-scoped: a one-line status spinner once the REPL reads the `--json` event stream, as `/loop-task` already does
-  - [ ] T-335e `sad`: the `!` pulses until the problem it names is fixed
+  - [ ] T-335e `worried`: the `!` pulses until the problem it names is fixed
   - [ ] T-335f Safe redraw: repaint only the art's rows in place (cursor save/restore), never while the line editor is drawing its dropdown; one timer, cleared on exit and on ctrl+c
   - [ ] T-335g Off switch: `pet.animate` (default true), forced off when stdout is not a TTY, when `NO_COLOR`/`CI` is set, or when the terminal is narrower than the side-by-side layout
   - [ ] T-335h Simulated-terminal test: fake clock, frames advance, timers stop, nothing written off a TTY
@@ -101,9 +99,7 @@ Cost control (Engram)
 
 ## WS-E — Decision layer: calibration, routing, first uses (plan `05-decision-calibration-routing.md`)
 Measurement, which gates everything else
-- [ ] T-389 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
-- [ ] T-221 `/decisions report`: accuracy, ECE (10 bins) and AUROC per question for the model and for the rule baseline; publish to `docs/research/decision-calibration.md`
-- [ ] T-222 / T-261 Temperature refit per (question, option count) on the labelled set, stored in `.verness/decisions/temperatures.json`, applied in `readAnswer`; re-measure
+- [ ] T-392 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
 - [ ] T-223 **Gate**: a decision path ships enabled only when its measured ECE *and* accuracy beat the rule baseline it replaces. Encode the gate as `decisionGate(question)` reading the latest report
 
 Composition and routing
@@ -123,6 +119,11 @@ Deferred / investigate
 - [ ] T-241 `laya-ts` in-process provider over the split ONNX export (not on npm; vendor or build)
 - [ ] T-242 Fine-tune on our labelled decisions once T-220 has a set
 - [ ] T-243 Guardrail/moderation question on inbound tasks (one more question in an existing call)
+
+## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
+Catalog-wide (do T-393 first)
+- [ ] T-396 Two-stage persona routing for T-230: family, then persona within the family, as two `choice` questions in one call (each ≤ 8 options; 17 personas would break T-385's limit), shadow first as in WS-E
+- [ ] T-397 `teams/feature-delivery.json`: product-manager → software-engineer → qa-engineer → technical-writer (after T-400, T-422, T-424)
 
 ## WS-G — Substrate plugins M3–M9 (plan `07-substrate-plugins-m3-m9.md`)
 M3 Decisions
@@ -247,6 +248,15 @@ Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-comman
 - [ ] T-376 `@verness/commands` dsh plugin: register each listed quick-tool with dsh-commands, and a handler that runs it through the launcher
 - [ ] T-377 Tests: the `--list-commands` shape, `web: false` filtering, plugin registration and disposal (HMR-safety), the handler's exit-code/output path
 - [ ] T-378 ADR-0011 for the bridge, and docs (`06-SETUP-AND-LAUNCHER.md`, `07-COMMAND-LAYER.md`)
+
+## Web UI branding: VerNess logo and titles in the browser UI
+Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
+conversation-hero mark are **slots** that `dsh-client-ui-brand-official` occupies; its README says a
+deployment with another identity "leaves this package out and composes another package that
+occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
+(`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
+- [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
+- [ ] T-399 The `dsh-web-ui` plugin row (`@linxin666/dsh-web-all`, `settings.plugins` in `verness.config.json`) is enabled but not installed in the `verness-web` profile, whose UI comes from `@deepseek-ai/dsh-web-app`. Find out whether it warns or fails at boot and what it was meant to add, then install it properly or remove the row. Record the decision in `04-PROGRESS.md`
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
