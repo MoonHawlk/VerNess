@@ -64,6 +64,14 @@
   // stored here — never a key itself. Switch with "activeRoute" below.
   "extraRoutes": {},
 
+  // Price table for `/cost` (T-362). Operator-written, never guessed: copy the rates
+  // from your provider's price page. Key = route name, or "route/model" (wins over
+  // the route). Fields: inputPer1M, outputPer1M (per million tokens), currency
+  // (default "USD"). Example:
+  //   "pricing": { "openai/gpt-x": { "inputPer1M": 0.27, "outputPer1M": 1.1 } }
+  // A hosted route with no entry shows tokens only and "price not configured".
+  "pricing": {},
+
   // Route the agent actually uses. Empty string = the `model` route above.
   "activeRoute": "",
 

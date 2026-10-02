@@ -143,6 +143,16 @@ export async function askDecision(dc, state, questions, opts = {}) {
 }
 
 /**
+ * One-line reason for a failed `askDecision` result. A question we refused to send (T-385) is a
+ * caller bug and says "invalid question"; only a transport or HTTP failure is "unavailable" (T-435).
+ * @param {{error?: string, status?: number}} r - a result with `ok: false`.
+ * @returns {string} the reason.
+ */
+export function decisionFailure(r) {
+  return r.error?.startsWith('invalid question') ? r.error : `decision service unavailable (${r.error ?? r.status})`
+}
+
+/**
  * Identify a question's option set, so calibration never mixes records logged under different
  * options (someone edits a criteria key). Only the keys count; rewording a description does not.
  * @param {{criteria: Record<string, string>}} question - a typed question.

@@ -37,7 +37,9 @@ surface can reuse the same modules.
 
 Every command in the L tier runs **entirely in the launcher and costs zero tokens**. A slash command
 that quietly calls the model defeats its purpose. If a command needs the model, it says so in its
-summary and asks for confirmation.
+summary and asks for confirmation. `/api test [provider]` is the example: it says the one-token probe
+is billed and sends nothing until re-run with `--yes`. `/cost` prices only routes the operator listed
+under `pricing` in `finess.config.json`; any other route shows tokens and "price not configured".
 
 ## `/btw` — side notes (T-130, built)
 

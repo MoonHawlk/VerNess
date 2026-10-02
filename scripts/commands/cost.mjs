@@ -17,7 +17,8 @@ export default {
   usage: '/cost [--all] [--limit N]',
   details: [
     'add rates in finess.config.json: "pricing": { "<route>": { "inputPer1M": 0.27, "outputPer1M": 1.1 } }',
-    'a route with tokens but no rate is reported as unpriced rather than assumed free',
+    '"<route>/<model>" keys win over "<route>"; add "currency" to change USD',
+    'a route with tokens but no rate shows tokens only ("price not configured"), never an assumed price',
   ],
   /**
    * @param {object} ctx - command context.
@@ -41,17 +42,17 @@ export default {
         r.provider, r.model,
         r.reported ? num(r.inputTokens) : '—',
         r.reported ? num(r.outputTokens) : '—',
-        r.priced ? r.cost.toFixed(4) : (r.reported ? 'unpriced' : '0.0000'),
+        r.priced ? r.cost.toFixed(4) : (r.reported ? 'price not configured' : '0.0000'),
       ]),
     )) console.log(`  ${l}`)
-    console.log(`  ${'total'.padEnd(20)} ${total.toFixed(4)} ${currency}`)
+    console.log(`  ${(unpriced.length > 0 ? 'total (priced routes only)' : 'total').padEnd(20)} ${total.toFixed(4)} ${currency}`)
 
     if (!anyReported) {
       info('every route here is local: no tokens billed, no accounting reported — cost is zero by construction')
     }
     if (unpriced.length > 0) {
-      warn(`no rate configured for: ${unpriced.join(', ')}`)
-      info('add it under "pricing" in finess.config.json to price those tokens')
+      warn(`price is not configured for: ${unpriced.join(', ')} - showing tokens only, no cost is guessed`)
+      info('write the rate under "pricing" in finess.config.json (key: route, or route/model); see the comment there')
     }
     return 0
   },

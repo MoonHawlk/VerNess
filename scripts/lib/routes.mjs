@@ -134,6 +134,38 @@ export async function keyEnvFor(cfg, provider) {
 }
 
 /**
+ * One-token probe (T-358): ask the provider's model for a single token, to confirm key and model
+ * before a long task. This spends real tokens; callers confirm first.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {string} provider - catalog provider id.
+ * @param {string} model - model id.
+ * @param {{complete?: Function}} [opts] - `complete(model, context, options)`; defaults to the adapter's
+ *   `completeSimple`. Tests pass a stub, so no network is touched.
+ * @returns {Promise<{ok: boolean, ms: number, inputTokens?: number, outputTokens?: number, error?: string}>} outcome.
+ */
+export async function probeModel(cfg, provider, model, opts = {}) {
+  const t0 = Date.now()
+  try {
+    let complete = opts.complete
+    let spec = { provider, id: model }
+    if (complete === undefined) {
+      const mod = await import(pathToFileURL(join(adapterDist(cfg), 'compat.js')).href)
+      complete = mod.completeSimple
+      spec = mod.getModel(provider, model)
+      if (spec === undefined) return { ok: false, ms: 0, error: `the adapter has no model ${provider}/${model}` }
+    }
+    const keyEnv = await keyEnvFor(cfg, provider)
+    const apiKey = keyEnv === undefined ? undefined : process.env[keyEnv]
+    const msg = await complete(spec, { messages: [{ role: 'user', content: 'Reply with the single word: ok', timestamp: Date.now() }] }, { maxTokens: 1, apiKey })
+    const ms = Date.now() - t0
+    if (msg?.stopReason === 'error' || msg?.stopReason === 'aborted') return { ok: false, ms, error: msg.errorMessage ?? msg.stopReason }
+    return { ok: true, ms, inputTokens: msg?.usage?.input ?? 0, outputTokens: msg?.usage?.output ?? 0 }
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, error: String(e.message ?? e) }
+  }
+}
+
+/**
  * Every route the configuration and state know about, by name.
  * @param {object} cfg - the FiNess configuration.
  * @param {{state?: object}} [opts] - the launcher state; `.finess/state.json` unless a test passes one.
