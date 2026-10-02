@@ -90,10 +90,14 @@ export function summarizeSession(dir) {
     toolCalls: 0,
     prompts: 0,
     routes: new Map(), // "provider/model" -> { inputTokens, outputTokens, calls, reported }
+    days: new Map(), // local "YYYY-MM-DD" -> Map("provider/model" -> same row shape), for `/usage --by day`
     reportedUsage: false,
   }
   let currentRoute
+  // An event without its own `time` falls back to the session's creation time, then the log's mtime.
+  let fallbackTime = s.at.getTime()
   for (const e of events) {
+    if (e.type === 'session' && Number.isFinite(e.createdAt)) fallbackTime = e.createdAt
     switch (e.type) {
       case 'session/title': s.title = e.data?.title ?? s.title; break
       case 'turn/start': s.turns++; break
@@ -113,14 +117,19 @@ export function summarizeSession(dir) {
         const u = e.data?.usage
         const k = currentRoute ?? keyFor(s, 'unknown', 'unknown')
         const row = s.routes.get(k)
-        row.calls++
-        if (u !== undefined) {
+        const day = localDay(Number.isFinite(e.time) ? e.time : fallbackTime)
+        if (!s.days.has(day)) s.days.set(day, new Map())
+        const dayRoutes = s.days.get(day)
+        if (!dayRoutes.has(k)) dayRoutes.set(k, emptyRow(row.provider, row.model))
+        for (const r of [row, dayRoutes.get(k)]) {
+          r.calls++
+          if (u === undefined) continue
           s.reportedUsage = true
-          row.reported = true
-          row.inputTokens += Number(u.inputTokens ?? 0)
-          row.outputTokens += Number(u.outputTokens ?? 0)
-          row.cacheReadTokens += Number(u.cacheReadTokens ?? 0)
-          row.reasoningTokens += Number(u.reasoningTokens ?? 0)
+          r.reported = true
+          r.inputTokens += Number(u.inputTokens ?? 0)
+          r.outputTokens += Number(u.outputTokens ?? 0)
+          r.cacheReadTokens += Number(u.cacheReadTokens ?? 0)
+          r.reasoningTokens += Number(u.reasoningTokens ?? 0)
         }
         break
       }
@@ -139,10 +148,40 @@ export function summarizeSession(dir) {
  */
 function keyFor(s, provider, model) {
   const k = `${provider ?? 'unknown'}/${model ?? 'unknown'}`
-  if (!s.routes.has(k)) {
-    s.routes.set(k, { provider, model, calls: 0, reported: false, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, reasoningTokens: 0 })
-  }
+  if (!s.routes.has(k)) s.routes.set(k, emptyRow(provider, model))
   return k
+}
+
+/**
+ * A zeroed per-route accounting row.
+ * @param {string} provider - route name.
+ * @param {string} model - model id.
+ * @returns {object} the row.
+ */
+const emptyRow = (provider, model) => ({ provider, model, calls: 0, reported: false, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, reasoningTokens: 0 })
+
+/**
+ * The calendar day of a timestamp in the machine's LOCAL time zone (whatever `TZ` / the OS clock
+ * says), not UTC: a day of work is the operator's day. Same rule on macOS and Windows.
+ * @param {number} ms - epoch milliseconds.
+ * @returns {string} `YYYY-MM-DD`.
+ */
+export function localDay(ms) {
+  const d = new Date(ms)
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/**
+ * The local time zone's UTC offset at an instant, for labelling day buckets (e.g. `UTC-03:00`).
+ * @param {Date} [at] - the instant whose offset to report.
+ * @returns {string} the label.
+ */
+export function localOffsetLabel(at = new Date()) {
+  const m = -at.getTimezoneOffset()
+  const a = Math.abs(m)
+  const p = n => String(n).padStart(2, '0')
+  return `UTC${m < 0 ? '-' : '+'}${p(Math.floor(a / 60))}:${p(a % 60)}`
 }
 
 /**
@@ -206,6 +245,35 @@ export function aggregateUsage(sessions) {
     }
   }
   return { routes: [...routes.values()].sort((a, b) => b.calls - a.calls), totals, anyReported }
+}
+
+/**
+ * Aggregate usage across sessions per local day and route (`/usage --by day`). Each model call is
+ * dated by its own `assistant/message` event time, so a session spanning midnight splits across days.
+ * @param {object[]} sessions - summaries from {@link listSessions}.
+ * @returns {{rows: object[], anyReported: boolean}} rows newest day first, then by calls; each row is
+ *   `{ day, provider, model, calls, inputTokens, outputTokens, reported, sessions }`.
+ */
+export function aggregateUsageByDay(sessions) {
+  const rows = new Map()
+  let anyReported = false
+  for (const s of sessions) {
+    for (const [day, routes] of s.days ?? []) {
+      for (const [k, r] of routes) {
+        const key = `${day} ${k}`
+        const row = rows.get(key) ?? { day, provider: r.provider, model: r.model, calls: 0, inputTokens: 0, outputTokens: 0, reported: false, sessions: 0 }
+        row.calls += r.calls
+        row.inputTokens += r.inputTokens
+        row.outputTokens += r.outputTokens
+        row.reported = row.reported || r.reported
+        row.sessions++
+        rows.set(key, row)
+        anyReported = anyReported || r.reported
+      }
+    }
+  }
+  const sorted = [...rows.values()].sort((a, b) => (a.day === b.day ? b.calls - a.calls : a.day < b.day ? 1 : -1))
+  return { rows: sorted, anyReported }
 }
 
 /**
