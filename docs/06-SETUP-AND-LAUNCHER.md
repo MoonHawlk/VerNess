@@ -106,7 +106,8 @@ command as `node scripts/verness.mjs /<name> <args>`; the reply is the same text
   (`/cost`, `/usage`, `/persona`, `/agents`, `/decide`, `/dd`, `/testplan`, ...).
 - **Terminal only** (`web: false` in the command file): `/new`, `/resume` (they steer the REPL's
   conversation, not the web session), `/web` and `/off` (a second server, or killing the one that
-  would answer), `/help` (the web `/` menu is the list).
+  would answer), `/help` (the web `/` menu is the list), `/btw` (its notes are composed only into the
+  terminal REPL's next task).
 - **The substrate keeps its names.** `/model`, `/file`, `/compact`, `/export`, `/feedback`, `/goal`,
   `/permission` and `/plan` stay the web UI's own; VerNess's `/model` is a terminal command there. The
   server log says so once: `verness-commands: /model left to the substrate`.

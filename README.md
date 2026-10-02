@@ -73,7 +73,7 @@ nothing because the AI is not involved.
 - **decisions**: `/decision up|stats|down` Laya's switch · `/decide <task>` Laya vs the rules,
   side by side · `/dd` count, grade (`label`), score (`report`) and tune (`refit`) Laya's guesses
 - **personas**: `/persona` list or switch hats · `/agents` every persona and team
-- **teams**: `/team run <id>` run a team of personas over a task list
+- **teams**: `/team run <id>` run a team of personas over a task list · `/team status [<id>]` per-task results of the latest run
 - **telemetry**: `/cost` money per route (zero on a local model) · `/usage` tokens ·
   `/sessions` past conversations · `/tools` tools the AI was offered · `/stats` engine speed and
   memory · `/dashboard` the noticeboard page · `/graph` rebuild the code map (no AI)

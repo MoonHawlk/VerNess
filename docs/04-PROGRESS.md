@@ -625,3 +625,34 @@
   T-431 plans a tool to draft them. New follow-ups: T-430 (web skin), T-432 (setup and edited local
   plugins), T-433 (bridge repo path and Windows process tree).
 - `npm test` 271/271 and typecheck clean on `epic` before the release.
+
+## 2026-10-01 — round of ten parallel branches (after v0.4.0)
+- Ten subagents in separate git worktrees from `epic`, each on quick tasks with disjoint files,
+  merged into `epic` with `--no-ff` one at a time, the suite run after each merge.
+- **REPL:** `/btw <note>` side notes, sent once with the next task as context, not tasks (T-130).
+  `#<note>` adds to the durable project brief `.verness/brief.md`: the whole brief goes on each new
+  session's first task, only new lines on a continuing one; `#` shows it, `##` escapes it (T-147).
+  Plain input suggests recent tasks from the persisted input history `.verness/history.jsonl`, not
+  the session logs (too slow per keystroke, and they hold composed briefs) (T-303).
+- **Commands:** `/usage --by day`, with local dates and each call dated by its own event, so a
+  session crossing midnight splits (T-137). `/team status [<id>]`, plus a `summary.json` beside every
+  run's `summary.md`; the newest run is chosen by folder name, not mtime (T-170).
+- **Launcher:** one `verness` command through the new entry `scripts/cli.mjs` (package.json `bin`;
+  `turn_on.*` and npm scripts use it too). It checks Node before any `.ts` import, so old Node gets
+  a plain error (T-380, T-383). A startup warning names any `scripts/lib` module the launcher imports
+  that git does not track (T-312). Node 22.19.0 verified: smoke 37/37, no type-stripping warning (T-382).
+- **Hygiene:** `scripts/check-clean-clone.mjs` and an opt-in `pre-push` hook (T-311). Route and
+  `.env` tests (T-365) found a real bug: `.env` values kept trailing blanks, so `KEY=sk-… ` sent the
+  space. A `choice` with more than 8 options is now refused before any request (T-385), so T-230's
+  single 17-persona question needs T-396's two stages. `scripts/tools/release-notes.mjs` drafts the
+  next CHANGELOG entry (T-431). The pet render test is a mood-agnostic `node:test` suite (T-338), and
+  `pet.animate` plus `animationAllowed` form the animation off switch (T-335g).
+- Conflicts resolved by hand: `scripts/verness.mjs` (DEFAULTS `pet` + `notes`; the input history
+  now loaded at start instead of `const history = []`; the notes and node-version imports) and the
+  `package.json` scripts (`cli.mjs` entries plus `check:clean-clone`).
+- Worktrees have no `node_modules`, so their suites counted 269, not 271 (two smoke tests need the
+  upstream submodule). Typecheck was run on `epic` after the merges: clean.
+- Follow-ups opened: T-434 (resting sheep is block characters, not ASCII), T-435 (`shadowRoute`
+  words a refused question as "unavailable"), T-436 (live REPL check of `/btw` and `#`), T-437 (a
+  real push through the hook).
+- `npm test` 382/382 and typecheck clean on `epic`; `node scripts/check-clean-clone.mjs` ok on HEAD.

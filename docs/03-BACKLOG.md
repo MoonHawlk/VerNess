@@ -21,30 +21,21 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
-Foundation
-- [ ] T-130 **`/btw <note>`**: append/show/clear/drop operator side notes in `.verness/run/notes-<session>.json`, prefixed onto the next task as a delimited "context, not tasks" block, 2000-character cap with a warning at 80%. Spec in `docs/07-COMMAND-LAYER.md`
-
 Tier L — local, zero tokens
 - [ ] T-181 `!<cmd>` shell prefix and `@path` file expansion in the REPL *(was the Tier L T-146)*
-- [ ] T-147 `#<note>`: append to a persistent project brief (`.verness/brief.md`) that is prefixed like `/btw` but survives sessions
-- [ ] T-137 `/usage` *(remaining part)*: add a `--by day` breakdown (tokens per route per day across sessions)
 
 TUI
 - [ ] T-302 Wrap long input lines in the editor; today the dropdown is suppressed when input exceeds the terminal width
-- [ ] T-303 History-backed task suggestions: recent prompts from the session logs as completions
-
-Repo hygiene
-- [ ] T-311 Clean-clone check as a `pre-push` git hook (`scripts/check-clean-clone.mjs`)
-- [ ] T-312 At startup, warn when a `./lib/*.mjs` the launcher imports is not tracked by git
 
 Launcher lifecycle
 - [ ] T-123 `stats --watch` for continuous telemetry, and record probe results over time for regression tracking
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (only Windows has been measured)
+- [ ] T-436 Live REPL check of `/btw` and `#` from the main checkout (only unit-tested so far): pipe the lines `/btw use metric units`, `/btw`, `# amounts in EUR`, `#` into `node scripts/verness.mjs`, then send one real task and confirm both blocks reach the model
+- [ ] T-437 Exercise the `pre-push` hook through a real `git push` with `core.hooksPath scripts/hooks`, on Windows (Git for Windows `sh`) and macOS
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
 - [ ] T-171 Measure before promising parallelism: time the same team at concurrency 1 and 2 on the local model and record the numbers in `04-PROGRESS.md`
 - [ ] T-167 *(remaining part)* Failure policy per team and per task: `onFailure: stop | skip | retry-once`, default `stop`; dependents of a failed task are marked `skipped`, never run
-- [ ] T-170 *(remaining part)* `/team status [<id>]`: read the newest `.verness/runs/<team>/<stamp>/` and print per-task status, exit, seconds; write a machine-readable `summary.json` next to `summary.md`
 - [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`: a one-task ad-hoc team run
 - [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
@@ -52,9 +43,9 @@ Launcher lifecycle
 ## WS-C — Pet (plan `03-pet-animation.md`)
 > **State (v0.2.0):** one drawing — Ness is a baby sheep from the block sprite, moods
 > `happy | sleepy | worried`, with `petAnimFrames` and a one-shot boot animation `animatePet`
-> (`scripts/lib/pet.mjs`). `scripts/test/pet.render.mjs` passes but is still a plain script, not
-> `node:test` (T-338). The tasks below are written against frame lists, not a drawing.
-- [ ] T-338 Rewrite `scripts/test/pet.render.mjs` as a mood-agnostic `node:test` suite over `PET_MOODS` (every frame the same size, ASCII only, broken > idle > ok)
+> (`scripts/lib/pet.mjs`). `scripts/test/pet.render.test.mjs` is a mood-agnostic `node:test` suite over
+> `PET_MOODS` (T-338); the off switch `animationAllowed` + `pet.animate` exists (T-335g), but nothing
+> animates after boot yet. The tasks below are written against frame lists, not a drawing.
 - [ ] T-335 Animations. Frames stay ASCII and minimal
   - [ ] T-335a Frame model *(remaining part)*: `petAnimFrames(mood)` exists; add a per-frame timing (`{lines, ms}`) and a `loop` vs `once` flag per mood
   - [ ] T-335b Blink: happy eyes → closed for ~150 ms every few seconds, at a randomised interval
@@ -62,8 +53,8 @@ Launcher lifecycle
   - [ ] T-335d Talking *(blocked)*: `dsh` streams straight to stdout during a turn, so nothing may draw then. Re-scoped: a one-line status spinner once the REPL reads the `--json` event stream, as `/loop-task` already does
   - [ ] T-335e `worried`: the `!` pulses until the problem it names is fixed
   - [ ] T-335f Safe redraw: repaint only the art's rows in place (cursor save/restore), never while the line editor is drawing its dropdown; one timer, cleared on exit and on ctrl+c
-  - [ ] T-335g Off switch: `pet.animate` (default true), forced off when stdout is not a TTY, when `NO_COLOR`/`CI` is set, or when the terminal is narrower than the side-by-side layout
   - [ ] T-335h Simulated-terminal test: fake clock, frames advance, timers stop, nothing written off a TTY
+- [ ] T-434 The resting sheep (`petArt`) is drawn in block characters, which breaks the plan's "ASCII only" rule on legacy Windows consoles; T-338 enforces ASCII only on animation frames. Owner decides: redraw in ASCII, or relax the rule for the resting art
 - [ ] T-334 Show running `/loop-task` and `/team` runs as live workers (pid + heartbeat file per run)
 - [ ] T-336 A boot from a second checkout overwrites the shared `~/.dsh` profile patch; stamp the patch with the checkout path and warn (or refuse) when another checkout wrote it
 
@@ -107,6 +98,7 @@ Composition and routing
 First real uses
 - [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice
 - [ ] T-232 Decision accounting in `/cost`: decision calls counted separately; LLM calls avoided reported
+- [ ] T-435 `shadowRoute` reports a question `askDecision` refused (T-385) as "decision service unavailable (invalid question: …)"; say "invalid question" instead, since it is a caller bug, not an outage
 
 Deferred / investigate
 - [ ] T-240 MCP path (`laya[mcp]`, stdio only): register as a loader row; complements, never replaces, harness-side control
@@ -217,17 +209,10 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [ ] T-363 `/workspace <dir>` — point the agent's working directory (and so the `workspace` sandbox root) at another project instead of this repo
 - [ ] T-364 Stop reading the adapter's `env-api-keys.js` by file path once the substrate exposes provider key names through a public seam (ADR-0010 consequence)
 - [ ] T-366 Windows: sandboxed PowerShell runs in ConstrainedLanguage (restricted token), so .NET type creation fails — including the substrate's own UTF-8 preamble. Measure what an API model can still do under `workspace`, and report upstream if the preamble should degrade gracefully
-- [ ] T-365 Tests: `parseRef`, `effectiveRoute` precedence, catalog-route patch rendering, `.env` parsing — plain node scripts under `scripts/test/`
 
 ## Launcher & branch integration
 - [ ] T-372 Boot the REPL and the web UI from the merged `epic` tree, then run `off` against a real running web UI; also exercise `off` through the Windows PowerShell wrapper. A second checkout must not be booted until T-336 is fixed
-- [ ] T-380 Single `verness` command: expose the launcher as a `bin` (package.json `"bin": {"verness": "scripts/verness.mjs"}` + shebang; `pnpm link -g` / install doc) so `verness <subcommand>` replaces calling turn_on.sh/.ps1/.cmd; keep turn_on.* as thin shims (Node-on-PATH check) and update 06-SETUP-AND-LAUNCHER + RUNBOOK
 - [ ] T-381 Model-less start: `verness --no-model` (alias `--no-start`) enters the REPL without booting a model/substrate — settings, /persona, /config, /help and other Tier L commands only; model-requiring commands and free-text tasks print a hint to restart without the flag. Default start unchanged (with model)
-
-## M2 follow-ups (deferred from the M2 final review, `@verness/contracts`)
-- [ ] T-382 Verify Node 22.19 exactly: `npx -y node@22.19 --test scripts/test/smoke.test.mjs`, and check whether the launcher path prints the type-stripping `ExperimentalWarning`; if it does, suppress that one class in the `turn_on.*` wrappers or document it
-- [ ] T-383 Friendly error on old Node: the static `.ts` import chain (`verness.mjs` → `lib/personas.mjs` → contracts) fails at link time before `nodeOk()` runs; make it a lazy `await import()` after the version check (or check the version in `turn_on.*`)
-- [ ] T-385 Enforce `<= 8` options when a decision validator lands (today only a comment in `decision.ts`)
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
 Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
@@ -242,9 +227,6 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
 - [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
 - [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a VerNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the VerNess skin on a fresh profile, on macOS and Windows; the owner approves the look
-
-## Releases
-- [ ] T-431 `scripts/tools/release-notes.mjs`: draft the next `CHANGELOG.md` entry from the merges and task IDs since the last tag (`git log <tag>..epic`) and their `03-BACKLOG-DONE.md` lines, grouped Added / Changed / Fixed, with an Upgrade section when setup must be re-run. A human edits the draft; the rule that every release has notes is in `05-CONVENTIONS.md`
 
 ## Launcher follow-ups from the web bridge (ADR-0011)
 - [ ] T-432 `setup` does not pick up an edited local plugin file: pnpm reuses its copy of a same-version `file:` package, so a changed `packages/commands` or `packages/spike` stays stale until a fresh `DSH_HOME`. Reinstall `path` plugins when their files changed (content hash in the profile), and fix the "edits are live" line in `06-SETUP-AND-LAUNCHER.md`

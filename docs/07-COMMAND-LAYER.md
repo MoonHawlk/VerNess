@@ -39,7 +39,7 @@ Every command in the L tier runs **entirely in the launcher and costs zero token
 that quietly calls the model defeats its purpose. If a command needs the model, it says so in its
 summary and asks for confirmation.
 
-## `/btw` — the first command to build (T-130)
+## `/btw` — side notes (T-130, built)
 
 `/btw <note>` is "by the way": a side note that steers the next task without becoming a task.
 
@@ -54,13 +54,32 @@ what the launcher chooses to resend. `/btw` makes that explicit and bounded.
 | `/btw drop <n>` | remove one note |
 
 - Buffer persists at `.verness/run/notes-<sessionId>.json` so a crash does not lose it.
-- The next dispatched task is prefixed with a clearly delimited block:
-  `Side notes from the operator (context, not tasks):` followed by the notes.
-- Hard cap (default 2000 characters, configurable) with a warning at 80%: notes ride on *every*
-  subsequent turn, so an unbounded buffer is a silent, growing token bill.
+- A note is sent **once**, prefixed onto the next task as a delimited block
+  (`Side notes from the operator (context, not tasks):`), then marked `sent` (only when the run exits 0).
+  Every REPL turn continues one substrate session, so the model already has it in history; resending
+  would duplicate it. `/btw` lists sent notes as `(sent)` until cleared. `/new` carries the kept notes
+  to the new session, unsent, so its first task gets them again.
+- Notes written before the first turn creates a session (or before a `/resume`) are filed under
+  `notes-new.json` and join the session on the next turn.
+- Hard cap `notes.maxChars` (default 2000) with a warning at 80%: it bounds the block a session receives.
+- Terminal only (`web: false`): only the REPL composes notes into a task. The web UI, one-shot
+  `turn_on "<task>"`, `/team` and `/loop-task` do not receive them.
 - `/btw` is a **resend**, which is a deliberate compromise. The substrate's invariant is
   "model-visible means logged", so the correct end state is a durable `SessionEvent` contributed by a
   plugin (T-161). Until then the launcher owns it and the docs say so.
+
+### `#` — the project brief (T-147)
+
+| Input | Does |
+|---|---|
+| `#<note>` | append `- <note>` to `.verness/brief.md` (cap `notes.briefMaxChars`, default 4000, warning at 80%) |
+| `#` | show the brief |
+| `##…` | escape: send the line as a task with one `#` removed (`##123 is broken` sends `#123 is broken`) |
+
+The brief is standing context that survives sessions. It is prefixed before any `/btw` notes as
+`Project brief from the operator (standing context, not tasks):`. A new session's first task gets the
+whole brief; a continuing session gets only the lines added since its last task. Edit or empty
+`.verness/brief.md` by hand to change or clear it. REPL only: `turn_on "#x"` is a task.
 
 ## Personas as files (T-140..T-143, built in M2 as T-162..T-165)
 
@@ -106,6 +125,16 @@ by default (`--parallel N` overlaps independent tasks since T-144),
 each in its own `dsh` session under its own persona, collecting per-task status, artifacts and usage
 into `.verness/runs/<timestamp>/`. That is a launcher loop, and it will be labelled as one — the real
 implementation belongs on `ctx.subagents` and `ctx.jobs` (T-154), which already exist upstream.
+
+`/team status [<id>]` (T-170) prints the newest run of team `<id>`, or of any team: one row per task
+with persona, status (`ok` / `failed` / `not-run`), exit and seconds, then an `n/m ok` line with the
+source and the run folder. "Newest" is the last folder name in alphabetical order (ISO stamps), not
+the modification time. It does not need `teams/<id>.json`, so old runs stay readable after a team is
+removed. It reads `summary.json` when present, otherwise the `- persona / - exit / - seconds` headers
+of each `<task>.md`, and marks the run `(incomplete)` when there is no `summary.md`. Exit 0 when a run
+is shown (even if tasks failed), 1 when there is none. `/team run` writes `summary.json` next to
+`summary.md`: `{ v: 1, team, name, stamp, finishedAt, concurrency, ok, tasks: [{ id, member, persona,
+dependsOn, status, exit, seconds, file }] }`, tasks in definition order, `file` a file name only.
 
 Before any parallelism: measure. One local model serving two concurrent sessions contends for the
 same weights, so "parallel" can be slower than sequential on a single machine.
@@ -154,6 +183,10 @@ Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 | `/pers`, `/mo` | a unique prefix (or one every candidate extends: `/mo` is `/model`, not `/models`) of a name or alias runs that command; an exact name always wins; an ambiguous prefix (`/d`: `/dashboard`, `/decide`, …) lists the candidates and runs nothing (T-182) |
 | `/config [<filter>]` | the resolved configuration and, for each value, its owner: built-in default, `verness.config.json`, `.verness/state.json`, a persona file or the environment; read-only, credentials masked (T-180) |
 | `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
+| `/btw <note>` | a side note for the next task (see `/btw` above) (T-130) |
+| `#<note>`, `#`, `##…` | append to / show the project brief; `##` escapes a leading `#` (T-147) |
+| plain text, 3+ characters | the dropdown suggests up to 6 earlier tasks that start with it (case-insensitive), newest first, labelled `recent`, from the persisted input history `.verness/history.jsonl` (cap 500; credential-looking lines are never written); lines starting with `/` or `#` are never suggested; Up/Down reaches earlier runs (T-303) |
+| `/usage --by day` | tokens per local day and route across counted sessions (with `--all` / `--limit N`): day, route, model, sessions, calls, input and output tokens, newest day first. Each call is dated by its `assistant/message` event time (fallback: session `createdAt`, then log mtime) and bucketed by the local calendar date, never UTC; the header prints the offset. Any other `--by` value exits 1 (T-137) |
 
 ## On the web: the commands bridge (ADR-0011)
 
@@ -166,7 +199,7 @@ stripped). User guide: `docs/06-SETUP-AND-LAUNCHER.md` (*Quick-tools in the mess
 What a command file controls:
 
 - **`web: false`** keeps it off the web: it only makes sense in the terminal (`/new`, `/resume`,
-  `/web`, `/off`, `/help`, `/exit` today). Everything else, persona commands included, is on the web by default.
+  `/btw`, `/web`, `/off`, `/help`, `/exit` today). Everything else, persona commands included, is on the web by default.
 - `summary` becomes the menu description and the part of `usage` after the name the input hint, so
   write both. Aliases are registered too.
 - A command that prompts gets no terminal there: stdin is closed. Refuse cleanly, as
