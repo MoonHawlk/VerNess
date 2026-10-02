@@ -4,6 +4,7 @@
  *
  *   up      install the engine if missing, start it, fetch the model (from Hugging Face), warm it
  *   stats   telemetry: what is loaded, how much memory it holds, latency, who owns the process
+ *           (--watch repeats it; every probe is appended to .finess/probes.jsonl)
  *   down    unload the model, stop the engine if we started it, free the memory, clean run state
  *
  * The engine is Ollama, which ships native builds for Windows, macOS and Linux and can pull any GGUF
@@ -16,7 +17,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -62,18 +63,19 @@ const apiRoot = baseURL => String(baseURL).replace(/\/v1\/?$/, '')
  * GET a JSON endpoint of the engine.
  * @param {string} url - absolute URL.
  * @param {number} [ms] - timeout in milliseconds.
+ * @param {typeof fetch} [fetchFn] - injectable for tests.
  * @returns {Promise<unknown|undefined>} the parsed body, or undefined when unreachable.
  */
-async function getJson(url, ms = 3000) {
+async function getJson(url, ms = 3000, fetchFn = fetch) {
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(ms) })
+    const r = await fetchFn(url, { signal: AbortSignal.timeout(ms) })
     return r.ok ? await r.json() : undefined
   } catch { return undefined }
 }
 
 /** @param {string} baseURL - route base URL. @returns {Promise<string|undefined>} the engine version. */
-async function engineVersion(baseURL) {
-  const v = await getJson(`${apiRoot(baseURL)}/api/version`)
+async function engineVersion(baseURL, fetchFn = fetch) {
+  const v = await getJson(`${apiRoot(baseURL)}/api/version`, 3000, fetchFn)
   return v?.version
 }
 
@@ -187,15 +189,108 @@ export async function modelUp(cfg, model) {
   return true
 }
 
+/** Append-only probe history: one JSON object per line, for regression tracking over time. */
+export const PROBE_LOG = join(REPO, '.finess', 'probes.jsonl')
+
 /**
- * Print model telemetry: loaded models with their memory, catalogue, latency, and ownership.
+ * Time one generation against the engine.
+ * @param {string} base - the route base URL.
+ * @param {string} ref - the model to probe.
+ * @param {typeof fetch} [fetchFn] - injectable for tests.
+ * @param {AbortSignal} [signal] - aborts the request (watch shutdown).
+ * @returns {Promise<object>} the probe record; `ok` is false when the model did not answer.
+ */
+export async function runProbe(base, ref, fetchFn = fetch, signal) {
+  const t0 = Date.now()
+  const at = new Date(t0).toISOString()
+  try {
+    const timeout = AbortSignal.timeout(120000)
+    const r = await fetchFn(`${apiRoot(base)}/api/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: ref, prompt: 'ping', stream: false, options: { num_predict: 8 } }),
+      signal: signal === undefined ? timeout : AbortSignal.any([timeout, signal]),
+    })
+    if (!r.ok) return { at, model: ref, ok: false, ms: Date.now() - t0 }
+    const p = await r.json()
+    const ms = Date.now() - t0
+    const tokens = Number(p.eval_count ?? 0)
+    const evalNs = Number(p.eval_duration ?? 0)
+    return {
+      at, model: ref, ok: true, ms, tokens,
+      tokPerSec: evalNs > 0 && tokens > 0 ? Number((tokens / (evalNs / 1e9)).toFixed(1)) : undefined,
+      promptEvalMs: Math.round(Number(p.prompt_eval_duration ?? 0) / 1e6),
+      loadMs: Math.round(Number(p.load_duration ?? 0) / 1e6),
+    }
+  } catch { return { at, model: ref, ok: false, ms: Date.now() - t0 } }
+}
+
+/**
+ * @param {object} rec - a probe record.
+ * @param {string} [file] - the history file.
+ */
+export function appendProbe(rec, file = PROBE_LOG) {
+  try {
+    mkdirSync(dirname(file), { recursive: true })
+    appendFileSync(file, `${JSON.stringify(rec)}\n`, 'utf8')
+  } catch { /* history is best-effort; telemetry must not fail on a read-only disk */ }
+}
+
+/**
+ * @param {string} [file] - the history file.
+ * @returns {object[]} recorded probes, oldest first; bad lines are skipped.
+ */
+export function readProbes(file = PROBE_LOG) {
+  let text
+  try { text = readFileSync(file, 'utf8') } catch { return [] }
+  const out = []
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue
+    try { out.push(JSON.parse(line)) } catch { /* partial line */ }
+  }
+  return out
+}
+
+/**
+ * Compare a probe with the recent history of the same model.
+ * @param {object[]} history - earlier probes, oldest first.
+ * @param {object} rec - the new probe.
+ * @param {{window?: number, drop?: number}} [opts] - how many earlier probes, and the tok/s fraction lost that counts.
+ * @returns {string|undefined} a warning, or undefined when there is no regression (or too little history).
+ */
+export function probeRegression(history, rec, opts = {}) {
+  const prior = history.filter(h => h.ok === true && h.model === rec.model && typeof h.tokPerSec === 'number').slice(-(opts.window ?? 10))
+  if (rec.ok !== true || typeof rec.tokPerSec !== 'number' || prior.length < 3) return undefined
+  const sorted = prior.map(h => h.tokPerSec).sort((a, b) => a - b)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  if (rec.tokPerSec >= median * (1 - (opts.drop ?? 0.3))) return undefined
+  return `generation ${rec.tokPerSec} tok/s is below the recent median ${median} tok/s (last ${prior.length} probes)`
+}
+
+/**
+ * @param {number} ms - a delay.
+ * @param {AbortSignal} [signal] - resolves early when aborted.
+ * @returns {Promise<void>} resolves after the delay or the abort.
+ */
+const sleep = (ms, signal) => new Promise(res => {
+  if (signal?.aborted === true) return res()
+  const t = setTimeout(res, ms)
+  signal?.addEventListener('abort', () => { clearTimeout(t); res() }, { once: true })
+})
+
+/**
+ * Print model telemetry: loaded models with their memory, catalogue, latency, and ownership. Every
+ * probe is appended to the history file. With `watch`, repeat as one line per tick until aborted.
  * @param {object} cfg - the FiNess configuration.
+ * @param {{watch?: boolean, intervalMs?: number, signal?: AbortSignal, fetch?: typeof fetch, probeLog?: string, maxTicks?: number}} [opts] - `fetch` and `probeLog` are test seams.
  * @returns {Promise<boolean>} whether the engine answered at all.
  */
-export async function modelStats(cfg) {
+export async function modelStats(cfg, opts = {}) {
   const base = cfg.model.baseURL
   const ref = cfg.model.source ?? cfg.model.id
-  const ver = await engineVersion(base)
+  const f = opts.fetch ?? fetch
+  const log = opts.probeLog ?? PROBE_LOG
+  const ver = await engineVersion(base, f)
   if (ver === undefined) { fail(`no engine server on ${apiRoot(base)}`); info('start it with: ./turn_on.sh up'); return false }
 
   console.log(paint(C.cyan, 'engine'))
@@ -205,7 +300,7 @@ export async function modelStats(cfg) {
   else if (run.startedByUs === true) info(`run state: started by FiNess at ${run.at}, pid ${run.pid}`)
   else info(`run state: adopted at ${run.at} — the server was already running, so \`down\` will not stop it`)
 
-  const ps = await getJson(`${apiRoot(base)}/api/ps`)
+  const ps = await getJson(`${apiRoot(base)}/api/ps`, 3000, f)
   const loaded = ps?.models ?? []
   console.log(paint(C.cyan, 'loaded in memory'))
   if (loaded.length === 0) info('nothing loaded — the first request will pay the load cost')
@@ -217,32 +312,59 @@ export async function modelStats(cfg) {
     if (x.details !== undefined) info(`  ${x.details.parameter_size ?? '?'} params, ${x.details.quantization_level ?? '?'}, family ${x.details.family ?? '?'}`)
   }
 
-  const tags = await getJson(`${apiRoot(base)}/api/tags`)
+  const tags = await getJson(`${apiRoot(base)}/api/tags`, 3000, f)
   const all = tags?.models ?? []
   console.log(paint(C.cyan, `catalogue (${all.length})`))
   for (const x of all.slice(0, 12)) info(`${x.name}  ${human(x.size)}${x.name.startsWith('hf.co/') ? '  (hugging face)' : ''}`)
   if (all.length > 12) info(`... and ${all.length - 12} more`)
 
   console.log(paint(C.cyan, 'latency probe'))
-  const t0 = Date.now()
-  const probe = await (async () => {
-    try {
-      const r = await fetch(`${apiRoot(base)}/api/generate`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: ref, prompt: 'ping', stream: false, options: { num_predict: 8 } }),
-        signal: AbortSignal.timeout(120000),
-      })
-      return r.ok ? await r.json() : undefined
-    } catch { return undefined }
-  })()
-  if (probe === undefined) { warn(`${ref} did not answer a probe request`); return true }
-  const ms = Date.now() - t0
-  const tok = Number(probe.eval_count ?? 0)
-  const evalNs = Number(probe.eval_duration ?? 0)
-  info(`round trip ${ms} ms for ${tok} token(s)`)
-  if (evalNs > 0 && tok > 0) info(`generation ${(tok / (evalNs / 1e9)).toFixed(1)} tok/s, prompt eval ${((Number(probe.prompt_eval_duration ?? 0)) / 1e6).toFixed(0)} ms, load ${((Number(probe.load_duration ?? 0)) / 1e6).toFixed(0)} ms`)
+  /** @returns {Promise<object>} one probe, recorded, with a warning when it regressed against earlier runs. */
+  const probeOnce = async () => {
+    const history = readProbes(log)
+    const rec = await runProbe(base, ref, f, opts.signal)
+    if (opts.signal?.aborted !== true) appendProbe(rec, log)
+    const slow = probeRegression(history, rec)
+    if (slow !== undefined) warn(slow)
+    return rec
+  }
+  const first = await probeOnce()
+  if (!first.ok) {
+    if (opts.signal?.aborted !== true) warn(`${ref} did not answer a probe request`)
+  } else {
+    info(`round trip ${first.ms} ms for ${first.tokens} token(s)`)
+    if (first.tokPerSec !== undefined) info(`generation ${first.tokPerSec.toFixed(1)} tok/s, prompt eval ${first.promptEvalMs} ms, load ${first.loadMs} ms`)
+  }
+  if (opts.watch !== true) return true
+
+  const every = opts.intervalMs ?? 5000
+  info(`watching every ${every / 1000}s, history in ${log} — ctrl+c to stop`)
+  for (let tick = 1; opts.signal?.aborted !== true && tick < (opts.maxTicks ?? Infinity);) {
+    await sleep(every, opts.signal)
+    if (opts.signal?.aborted === true) break
+    tick++
+    const now = (await getJson(`${apiRoot(base)}/api/ps`, 3000, f))?.models ?? []
+    const rec = await probeOnce()
+    if (opts.signal?.aborted === true) break
+    const mem = now.length === 0 ? 'nothing loaded' : now.map(x => `${x.name} ${human(x.size)}`).join(', ')
+    const speed = rec.ok ? `${rec.ms} ms${rec.tokPerSec === undefined ? '' : `, ${rec.tokPerSec.toFixed(1)} tok/s`}` : 'no answer'
+    info(`${rec.at.slice(11, 19)}  ${speed}  |  ${mem}`)
+  }
+  info('stopped watching')
   return true
+}
+
+/**
+ * Parse `stats` flags and wire ctrl+c to a clean stop of `--watch`.
+ * @param {string[]} args - arguments after `stats`.
+ * @returns {{watch: boolean, intervalMs: number, signal: AbortSignal}} options for {@link modelStats}.
+ */
+export function statsOpts(args) {
+  const at = args.indexOf('--interval')
+  const secs = at >= 0 ? Number(args[at + 1]) : 5
+  const ctl = new AbortController()
+  process.once('SIGINT', () => ctl.abort())
+  return { watch: args.includes('--watch'), intervalMs: Math.max(1, Number.isFinite(secs) ? secs : 5) * 1000, signal: ctl.signal }
 }
 
 /**
@@ -318,10 +440,10 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
   const force = process.argv.includes('--force')
   const cfg = await standaloneConfig()
   if (cmd === 'up') process.exit((await modelUp(cfg)) ? 0 : 1)
-  else if (cmd === 'stats') process.exit((await modelStats(cfg)) ? 0 : 1)
+  else if (cmd === 'stats') process.exit((await modelStats(cfg, statsOpts(process.argv.slice(3)))) ? 0 : 1)
   else if (cmd === 'down') process.exit((await modelDown(cfg, { force })) ? 0 : 1)
   else {
-    console.log('usage: node scripts/model.mjs up | stats | down [--force]')
+    console.log('usage: node scripts/model.mjs up | stats [--watch] [--interval <s>] | down [--force]')
     process.exit(cmd === undefined ? 0 : 1)
   }
 }

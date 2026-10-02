@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
 import { readShadow } from './lib/labels.mjs'
 import { listSessions, readSessionEvents } from './lib/sessions.mjs'
+import { summarizeTools, toolRuns } from './lib/toolstats.mjs'
 import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
 
 /** How many sessions get a full event timeline; older ones keep their summary row only. */
@@ -110,6 +111,7 @@ function detail(summary) {
     answer: (answer ?? '').slice(0, 600),
     timeline: timeline.slice(0, 120),
     tools,
+    runs: toolRuns(events),
   }
 }
 
@@ -161,7 +163,21 @@ export function readBacklog() {
  * @returns {string} the HTML document.
  */
 function render(data) {
-  const { sessions, decisions, teamRuns, totals, generated, backlog = { tasks: [], html: '' } } = data
+  const { sessions, decisions, teamRuns, totals, generated, backlog = { tasks: [], html: '' }, toolSummary = summarizeTools([]) } = data
+  const maxBucket = Math.max(1, ...toolSummary.histogram.map(h => h.count))
+  const pct = r => `${(r * 100).toFixed(r > 0 && r < 0.1 ? 1 : 0)}%`
+  const toolRows = toolSummary.tools.map(t => `
+    <tr>
+      <td class="mono">${esc(t.name)}</td>
+      <td class="n">${esc(t.calls)}</td>
+      <td class="n">${esc(t.failures)}</td>
+      <td class="n ${t.failures > 0 ? 'bad' : ''}">${esc(pct(t.failRate))}</td>
+      <td class="n">${esc(t.p50 === undefined ? '-' : dur(t.p50))}</td>
+      <td class="n">${esc(t.p95 === undefined ? '-' : dur(t.p95))}</td>
+    </tr>`).join('')
+  const histRows = toolSummary.histogram.map(h => `
+    <tr><td class="mono">${esc(h.label)}</td><td class="n">${esc(h.count)}</td>
+      <td class="hist"><span style="width:${Math.round((h.count / maxBucket) * 100)}%"></span></td></tr>`).join('')
   const agreeRate = decisions.length === 0
     ? '-'
     : `${Math.round((decisions.reduce((a, d) => a + (d.agreement ?? 0), 0) / (decisions.length * 3)) * 100)}%`
@@ -250,6 +266,7 @@ tr:last-child td{border-bottom:none}
 .kind-tool .k{color:var(--accent)}.kind-error .k{color:var(--bad)}
 details summary{cursor:pointer;color:var(--dim);font-size:12px;margin-top:8px}
 pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;font-size:11px;max-height:280px}
+.hist{width:60%}.hist span{display:block;height:10px;background:var(--accent);border-radius:3px;min-width:0}
 footer{color:var(--dim);font-size:11px;margin-top:28px;border-top:1px solid var(--line);padding-top:10px}
 </style></head><body>
 <h1>FiNess — task dashboard</h1>
@@ -282,6 +299,13 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <table><thead><tr><th>id</th><th>when</th><th>title</th><th class="n">turns</th><th class="n">tools</th><th class="n">in</th><th class="n">out</th><th class="n">wall</th><th>route</th></tr></thead>
 <tbody>${sessionRows || '<tr><td colspan="9" class="dim">no sessions yet</td></tr>'}</tbody></table>
 <div id="detail" class="detail"></div>
+
+<h2 id="tools">Tools <span class="dim">(${esc(toolSummary.calls)} calls · ${esc(toolSummary.failures)} failed · from the session logs above)</span></h2>
+<table><thead><tr><th>tool</th><th class="n">calls</th><th class="n">failed</th><th class="n">failure</th><th class="n">p50</th><th class="n">p95</th></tr></thead>
+<tbody>${toolRows || '<tr><td colspan="6" class="dim">no tool calls in these sessions</td></tr>'}</tbody></table>
+<h2>Tool latency <span class="dim">(call to result, all tools)</span></h2>
+<table><thead><tr><th>latency</th><th class="n">calls</th><th></th></tr></thead>
+<tbody>${histRows}</tbody></table>
 
 <h2>Decisions <span class="dim">(shadow mode — logged, never applied)</span></h2>
 <table><thead><tr><th>when</th><th>task</th><th>level (model)</th><th>level (rules)</th><th>tier m/r</th><th>pipeline m/r</th><th class="n">agree</th><th class="n">latency</th></tr></thead>
@@ -335,7 +359,7 @@ const BACKLOG = ${JSON.stringify(backlog.tasks).replaceAll('<', '\\u003c')};
   });
   draw();
 })();
-const DATA = ${JSON.stringify(sessions).replaceAll('<', '\\u003c')};
+const DATA = ${JSON.stringify(sessions.map(({ runs, ...s }) => s)).replaceAll('<', '\\u003c')};
 const panel = document.getElementById('detail');
 let open = null;
 document.querySelectorAll('.row').forEach(row => row.addEventListener('click', () => {
@@ -385,7 +409,8 @@ export function buildDashboard(cfg, opts = {}) {
     wall: sessions.reduce((a, s) => a + s.wall, 0),
   }
   const backlog = readBacklog()
-  const html = render({ sessions, decisions, teamRuns, totals, backlog, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
+  const toolSummary = summarizeTools(sessions.flatMap(s => s.runs))
+  const html = render({ sessions, decisions, teamRuns, totals, backlog, toolSummary, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
   const out = join(REPO, '.finess', 'dashboard.html')
   mkdirSync(join(REPO, '.finess'), { recursive: true })
   writeFileSync(out, html, 'utf8')

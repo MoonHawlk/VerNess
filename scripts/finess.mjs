@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { classifyLine, commandList, loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { appendHistory, loadHistory } from './lib/history.mjs'
-import { modelDown, modelStats, modelUp } from './model.mjs'
+import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment } from './lib/routes.mjs'
@@ -1170,6 +1170,7 @@ commands
   setup         install/repair pnpm, dsh, the profile, its deps and the local model
   up            start the local model: engine, weights (Hugging Face GGUF), warm-up
   stats         model telemetry: what is loaded, memory held, tok/s, who owns the server
+                  (--watch [--interval <s>] repeats it; probes are logged to .finess/probes.jsonl)
   off           turn everything off: web UI, decision sidecar and local model
                   (add --force to also stop servers FiNess did not start)
   down          unload the model, free its memory and stop the engine we started
@@ -1235,7 +1236,7 @@ async function dispatch(first, rest, cfg) {
   }
 switch (first) {
   case 'up': process.exitCode = (await modelUp(cfg)) ? 0 : 1; break
-  case 'stats': process.exitCode = (await modelStats(cfg)) ? 0 : 1; break
+  case 'stats': process.exitCode = (await modelStats(cfg, statsOpts(rest))) ? 0 : 1; break
   case 'down': process.exitCode = (await modelDown(cfg, { force: rest.includes('--force') })) ? 0 : 1; break
   case 'setup': await cmdSetup(cfg); break
   case 'doctor': await cmdDoctor(cfg); break
