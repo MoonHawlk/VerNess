@@ -284,37 +284,43 @@ export function petAnimFrames(mood) {
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 /**
- * Play the boot animation, then show the full status panel. Off a TTY it shows the static panel only.
+ * Play the boot animation, then show the full status panel. When `animationAllowed` says no (off a
+ * TTY, `pet.animate: false`, `NO_COLOR`/`CI`, a narrow terminal) it shows the static panel only.
  * Not wired into the boot yet - `cmdRun` still prints `renderPet` directly.
  * @param {object} v - vitals from `gatherVitals`.
- * @param {{columns?: number}} [opts]
+ * @param {{columns?: number, cfg?: object, out?: {isTTY?: boolean, write(s: string): unknown},
+ *   env?: Record<string, string|undefined>}} [opts] - terminal width (no width means no animation),
+ *   configuration, and for tests the output stream and environment (default `process.stdout`/`env`).
  */
 export async function animatePet(v, opts = {}) {
+  const out = opts.out ?? process.stdout
+  const say = (l = '') => out.write(`${l}\n`)
   const { mood } = moodOf(v)
-  if (!process.stdout.isTTY) {
-    console.log()
-    for (const l of renderPet(v, opts)) console.log(l)
-    console.log()
+  const allowed = animationAllowed({ isTTY: out.isTTY, columns: opts.columns, env: opts.env ?? process.env, cfg: opts.cfg })
+  if (!allowed.ok) {
+    say()
+    for (const l of renderPet(v, opts)) say(l)
+    say()
     return
   }
   const frames = petAnimFrames(mood)
   const FH = frames[0].length
   const writeFrame = frame => {
-    for (const l of frame) process.stdout.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
+    for (const l of frame) out.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
   }
   writeFrame(frames[0])
   for (let i = 1; i < frames.length; i++) {
     await sleep(160)
-    process.stdout.write(`\x1b[${FH}A\r`)
+    out.write(`\x1b[${FH}A\r`)
     writeFrame(frames[i])
   }
   // Erase the animation area, then draw the full panel.
-  process.stdout.write(`\x1b[${FH}A\r`)
-  for (let i = 0; i < FH; i++) process.stdout.write('\x1b[2K\n')
-  process.stdout.write(`\x1b[${FH}A\r`)
-  console.log()
-  for (const l of renderPet(v, opts)) console.log(l)
-  console.log()
+  out.write(`\x1b[${FH}A\r`)
+  for (let i = 0; i < FH; i++) out.write('\x1b[2K\n')
+  out.write(`\x1b[${FH}A\r`)
+  say()
+  for (const l of renderPet(v, opts)) say(l)
+  say()
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -380,6 +386,14 @@ function panelRows(v) {
 }
 
 /**
+ * Is the terminal wide enough to draw the pet beside its panel? Only when the panel still gets a
+ * readable 50 columns next to the art (plus the indent and gutter).
+ * @param {number|undefined} columns - terminal width; undefined (a pipe) is never wide enough.
+ * @returns {boolean} whether `renderPet` lays art and panel side by side.
+ */
+export const sideBySide = columns => columns !== undefined && columns >= ART_W + 56
+
+/**
  * Draw the pet beside its panel, or above it when the terminal is too narrow for both.
  * @param {object} v - vitals from `gatherVitals`.
  * @param {{columns?: number}} [opts] - terminal width; undefined (a pipe) means stacked.
@@ -392,8 +406,7 @@ export function renderPet(v, opts = {}) {
   const rows = [['', title], ...panelRows(v)]
   const label = Math.max(...rows.map(([l]) => l.length))
   const cols = opts.columns
-  // Beside the panel only when the panel still gets a readable 50 columns next to the sheep.
-  const side = cols !== undefined && cols >= art[0].length + 56
+  const side = sideBySide(cols)
   // One column of slack: a line that fills the last column makes conhost wrap an empty line.
   const room = side ? cols - art[0].length - 6 : (cols ?? Infinity) - 3
 
@@ -438,4 +451,23 @@ export function renderPet(v, opts = {}) {
 export function petEnabled(cfg) {
   if (process.env.VERNESS_NO_PET !== undefined && process.env.VERNESS_NO_PET !== '' && process.env.VERNESS_NO_PET !== '0') return false
   return cfg.pet?.enabled !== false && process.stdout.isTTY === true
+}
+
+/**
+ * The animation off switch: may the pet move, or must she stay a still drawing? Config
+ * `pet.animate` (default true), forced off when stdout is not a terminal, when `NO_COLOR` or `CI`
+ * is set (set but empty counts, per no-color.org), or when the terminal is narrower than the
+ * side-by-side layout. Pure: the caller passes the environment, so it is tested without a terminal.
+ * @param {{isTTY?: boolean, columns?: number, env?: Record<string, string|undefined>, cfg?: object}} o -
+ *   `process.stdout.isTTY`, `process.stdout.columns`, `process.env` and the merged configuration.
+ * @returns {{ok: boolean, why?: string}} whether to animate, and why not.
+ */
+export function animationAllowed({ isTTY, columns, env = {}, cfg = {} } = {}) {
+  if (cfg.pet?.enabled === false) return { ok: false, why: 'pet.enabled is false' }
+  if (cfg.pet?.animate === false) return { ok: false, why: 'pet.animate is false' }
+  if (isTTY !== true) return { ok: false, why: 'stdout is not a terminal' }
+  if (env.NO_COLOR !== undefined) return { ok: false, why: 'NO_COLOR is set' }
+  if (env.CI !== undefined) return { ok: false, why: 'CI is set' }
+  if (!sideBySide(columns)) return { ok: false, why: 'terminal narrower than the side-by-side layout' }
+  return { ok: true }
 }
