@@ -5,6 +5,7 @@
  *   /api models <provider> [text]   the provider's catalog models, optionally filtered
  *   /api use <provider> <model>     switch the agent to that provider and model
  *   /api key <provider>             which variable holds the provider's key, and whether it is set
+ *   /api test [provider] [--yes]    one-token probe of key + model; COSTS tokens, so it asks first
  *   /api local                      back to the local model
  *
  * Providers come from the route adapter installed in the profile (pi-ai's catalog): endpoint,
@@ -13,13 +14,14 @@
  * which lands in history.
  *
  * Tools: an API model drives the same shell, file and web tools the local one has. `/access` decides
- * how far they reach. Zero tokens: this command never calls a model.
+ * how far they reach. Zero tokens, except `/api test`: it sends one real request, and only after
+ * you confirm with `--yes`.
  * @module scripts/commands/api
  */
 
 import { join } from 'node:path'
 
-import { accessMode, catalogProviders, effectiveRoute, keyEnvFor, knownRoutes } from '../lib/routes.mjs'
+import { accessMode, catalogProviders, effectiveRoute, keyEnvFor, knownRoutes, probeModel } from '../lib/routes.mjs'
 import { readState, writeState } from '../lib/personas.mjs'
 import { head, info, ok, paint, REPO, warn } from '../lib/util.mjs'
 
@@ -37,11 +39,43 @@ const keyHint = keyEnv => (keyEnv === undefined
   ? 'this provider signs in with ambient cloud credentials, not a key variable'
   : `add a line  ${keyEnv}=<your key>  to ${join(REPO, '.env')} (gitignored), then run the task again`)
 
+/**
+ * `/api test`: the key check is free; the probe is one billed request, sent only with `--yes`.
+ * @param {object} ctx - command context (`ctx.complete` replaces the adapter call in tests).
+ * @param {string|undefined} named - provider, or undefined for the active route.
+ * @param {boolean} yes - the operator confirmed the cost.
+ * @param {Map<string, object>} catalog - adapter catalog.
+ * @returns {Promise<number>} exit code.
+ */
+async function probe(ctx, named, yes, catalog) {
+  const cfg = ctx.cfg
+  const e = effectiveRoute(cfg)
+  const provider = named ?? e.name
+  const model = provider === e.name ? e.model : knownRoutes(cfg)[provider]?.model
+  if (!catalog.has(provider)) { warn(`${provider} is not a catalog provider; /api test probes catalog providers only`); return 1 }
+  if (model === undefined) { warn(`no model chosen for ${provider} - run /api use ${provider} <model>`); return 1 }
+  const keyEnv = await keyEnvFor(cfg, provider)
+  if (keyEnv !== undefined && !isSet(keyEnv)) {
+    warn(`${keyEnv} is not set - the probe would be refused (nothing was sent, nothing spent)`)
+    info(keyHint(keyEnv))
+    return 1
+  }
+  if (!yes) {
+    warn(`this sends one real request to ${provider} / ${model} and the provider bills it (about one token out)`)
+    info(`confirm with: /api test ${provider} --yes`)
+    return 0
+  }
+  const r = await probeModel(cfg, provider, model, { complete: ctx.complete })
+  if (!r.ok) { warn(`probe failed after ${r.ms}ms: ${r.error}`); return 1 }
+  ok(`${provider} / ${model} answered in ${r.ms}ms (${r.inputTokens} in, ${r.outputTokens} out tokens billed)`)
+  return 0
+}
+
 export default {
   name: 'api',
   group: 'model',
   summary: 'use a hosted API model instead of the local one: /api use <provider> <model>',
-  usage: '/api [models <provider> [filter] | use <provider> <model> | key <provider> | local]',
+  usage: '/api [models <provider> [filter] | use <provider> <model> | key <provider> | test [provider] [--yes] | local]',
   /**
    * @param {object} ctx - command context.
    * @param {string[]} args - subcommand and arguments.
@@ -49,7 +83,8 @@ export default {
    */
   async run(ctx, args) {
     const cfg = ctx.cfg
-    const [sub, provider, ...rest] = args
+    const yes = args.includes('--yes')
+    const [sub, provider, ...rest] = args.filter(a => a !== '--yes')
     const catalog = catalogProviders(cfg)
     const declared = Object.entries(knownRoutes(cfg)).filter(([, r]) => r.kind === 'declared').map(([n]) => n)
 
@@ -79,6 +114,8 @@ export default {
       ok(`back to the local route: ${e.model} via ${e.name}`)
       return 0
     }
+
+    if (sub === 'test') return probe(ctx, provider, yes, catalog)
 
     if (provider === undefined) { warn(`usage: ${this.usage}`); return 1 }
     const known = catalog.get(provider)

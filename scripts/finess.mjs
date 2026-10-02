@@ -29,7 +29,7 @@ import { applyAllowBuilds, bundleName, enableBundle, profileBundles, undecidedBu
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
-import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.finess', 'run')
@@ -459,7 +459,10 @@ async function shadowRoute(cfg, text) {
   }
   const rules = ruleRoute(text)
   const r = await askDecision(dc, text, ROUTING_QUESTIONS, { retries: 1 })
-  if (!r.ok) { info(paint(C.dim, `shadow: decision service unavailable (${r.error ?? r.status})`)); return }
+  if (!r.ok) {
+    info(paint(C.dim, `shadow: ${decisionFailure(r)}`))
+    return
+  }
   shadowTemperatures ??= loadTemperatures()
   const model = modelAnswers(r.body, shadowTemperatures)
   const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
