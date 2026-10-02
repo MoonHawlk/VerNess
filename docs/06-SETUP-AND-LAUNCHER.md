@@ -51,13 +51,12 @@ npm equivalents exist for habit: `npm start`, `npm run setup|doctor|sync|graph|m
 written `verness <subcommand>` from any directory (`verness`, `verness web`, `verness doctor`, …):
 
 ```sh
-pnpm setup        # once per machine: gives pnpm a global bin dir on PATH (then open a new shell)
-pnpm link -g      # from the repo root: puts `verness` on PATH, pointing at this checkout
-# or, without pnpm:  npm link
+npm link          # from the repo root (npm ships with Node): puts `verness` on PATH, pointing at this checkout
 verness doctor
 ```
 The link points at the checkout you ran it from, so link the clone you actually use (not a scratch
-worktree). Remove it with `pnpm remove -g verness` (or `npm unlink -g verness`). The `turn_on.*`
+worktree). Remove it with `npm unlink -g verness`. (pnpm 11 dropped `pnpm link -g` — its `link`
+now only takes a directory — so `npm link` is the documented way.) The `turn_on.*`
 wrappers keep working and stay the zero-install way in: they only check that `node` is on PATH.
 
 `scripts/cli.mjs` checks the Node version *before* loading the launcher, so an old Node gets a

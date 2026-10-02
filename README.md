@@ -82,7 +82,7 @@ nothing because the AI is not involved.
   `/threats` (security) · `/a11y` (frontend) · `/jd-check` (HR) · `/prd` (product) ·
   `/release-notes` (writer) · `/raid` (project manager) · `/triage` (support)
 - **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`, or `verness` once linked with
-  `pnpm link -g` — see [06](docs/06-SETUP-AND-LAUNCHER.md)) followed by nothing to start ·
+  `npm link` — see [06](docs/06-SETUP-AND-LAUNCHER.md)) followed by nothing to start ·
   `"a task"` for one task · `setup` · `doctor` · `up` · `down` · `off` · `web` · `sync` ·
   `decision up`
 
