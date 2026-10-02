@@ -62,6 +62,10 @@ wrappers keep working and stay the zero-install way in: they only check that `no
 
 `scripts/cli.mjs` checks the Node version *before* loading the launcher, so an old Node gets a
 plain `error: VerNess needs Node 22.19.0+ …` instead of a module-link error from the `.ts` contracts.
+It also warns on stderr (`!! scripts/lib/x.mjs is imported by the launcher but not tracked by git`)
+when a `scripts/lib` module the launcher reaches through its imports is not in git — it would run
+here but a clone would not start. One `git ls-files`, overlapped with loading the launcher; silent
+without git or outside a repository, and skipped for `--list-commands`.
 Node 22.19.0 itself runs the launcher without a type-stripping `ExperimentalWarning` (checked with
 `npx -y node@22.19`).
 

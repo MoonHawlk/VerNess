@@ -18,5 +18,15 @@ if (!nodeOk()) {
 }
 
 const argv = process.argv.slice(2)
+// The web UI's commands bridge parses `--list-commands` stdout as JSON: skip the extra work there.
+// The warning itself goes to stderr.
+// Start the git call first (tracked.mjs loads only builtins) so it runs while the launcher loads;
+// its warning prints before the command starts.
+let check = Promise.resolve()
+if (argv[0] !== '--list-commands') {
+  const { warnUntrackedImports } = await import('./lib/tracked.mjs')
+  check = warnUntrackedImports().catch(() => {})
+}
 const { main } = await import('./verness.mjs')
+await check
 await main(argv)
