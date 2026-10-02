@@ -25,7 +25,7 @@ import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, 
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
-import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, isWorktree, profileBundles, syncWarnings, undecidedBuilds } from './lib/profile-setup.mjs'
+import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
@@ -769,9 +769,16 @@ function ensureProfile(cfg, name, template) {
     }
     const abs = resolve(REPO, p.path)
     if (!existsSync(abs)) { warn(`plugin path missing: ${p.path}`); continue }
+    // pnpm reuses its copy of a same-version `file:` package, so remove it first when its files changed.
+    const hash = hashPluginDir(abs)
+    const stale = pluginNeedsReinstall({ stored: readPluginHashes(dir)[p.package], current: hash, installed: profileDeps(dir)[p.package] !== undefined })
+    if (stale) sh('pnpm', ['remove', p.package], { cwd: dir, capture: true, allowFail: true })
     sh('pnpm', ['add', `file:${abs}`], { cwd: dir, capture: true, allowFail: true })
     if (profileDeps(dir)[p.package] === undefined) warn(`could not add ${p.package} from ${p.path}`)
-    else ok(`plugin ${p.package} <- ${p.path}`)
+    else {
+      writePluginHash(dir, p.package, hash)
+      ok(`plugin ${p.package} <- ${p.path}${stale ? ' (changed, reinstalled)' : ''}`)
+    }
   }
 
   // Browser-UI bundles carry their own patch, so they are added as bundles (the way their authors
