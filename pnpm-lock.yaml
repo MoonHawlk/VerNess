@@ -32,6 +32,8 @@ importers:
         specifier: 0.1.7-rc.2
         version: 0.1.7-rc.2(ead59e2384682bf741eae1c9eaa56bcd)
 
+  packages/tool-hints: {}
+
 packages:
 
   '@deepseek-ai/cordis@4.0.4':

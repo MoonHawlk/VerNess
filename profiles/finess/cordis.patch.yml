@@ -5,6 +5,8 @@
 - insert:
     - id: finess-spike
       name: '@finess/spike'
+    - id: finess-tool-hints
+      name: '@finess/tool-hints'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared
     # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and
     # catalog providers given only the variable their key is read from.

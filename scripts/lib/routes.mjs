@@ -199,6 +199,34 @@ export function localModels(cfg, { state = readState() } = {}) {
 }
 
 /**
+ * Smallest model size (billions of parameters) we expect to call tools reliably. A heuristic, not a
+ * measurement: the one data point (T-438) is Qwen3 0.6B failing 20 of 33 tool calls.
+ */
+export const MIN_TOOL_MODEL_B = 4
+
+/**
+ * The parameter count a model id states (`qwen3:0.6b`, `hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0`, `llama3.1:8b`).
+ * @param {string|undefined} id - the model id.
+ * @returns {number|undefined} billions of parameters, or undefined when the id names none.
+ */
+export function modelSizeB(id) {
+  // A size token stands alone between separators; "e4b"-style MoE tags and "1b5" are not matched.
+  const m = /(?:^|[^a-z0-9.])(\d+(?:\.\d+)?)b(?![a-z0-9])/i.exec(String(id ?? ''))
+  return m === null ? undefined : Number(m[1])
+}
+
+/**
+ * A warning when the model is too small to use tools reliably, else undefined.
+ * @param {string|undefined} id - the model id.
+ * @returns {string|undefined} the note.
+ */
+export function smallModelNote(id) {
+  const b = modelSizeB(id)
+  if (b === undefined || b >= MIN_TOOL_MODEL_B) return undefined
+  return `${b}B is too small for reliable tool calls - expect wrong arguments; use ${MIN_TOOL_MODEL_B}B+ (or an API route) for real work`
+}
+
+/**
  * Resolve the route and model the next run uses. Every surface (patch, run, doctor, prompt status)
  * reads this, so they can never disagree.
  * @param {object} cfg - the FiNess configuration.

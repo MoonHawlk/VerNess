@@ -21,7 +21,7 @@ import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
-import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment } from './lib/routes.mjs'
+import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
@@ -661,6 +661,8 @@ function cmdModel(cfg, args) {
     info(`configured model  : ${r.id ?? '(none)'}`)
     info(`persona preference: ${loadPersonas(cfg).get(activePersonaId(cfg))?.model?.id ?? '(none)'}`)
     info(`/model override   : ${state.model ?? '(none)'}`)
+    const small = smallModelNote(model)
+    if (small !== undefined) warn(small)
     const list = sh('ollama', ['list'], { capture: true, allowFail: true })
     if (list.code === 0) {
       info('locally available:')
@@ -681,6 +683,8 @@ function cmdModel(cfg, args) {
   writeState({ model: args[0], modelRoute: route })
   syncPatch(cfg)
   ok(`model override set to ${args[0]} (route ${route})`)
+  const small = smallModelNote(args[0])
+  if (small !== undefined) warn(small)
   if (r.kind === 'local') info('the engine pulls it on the next run if it is missing - or fetch it now with /models add')
   return 0
 }
@@ -855,7 +859,7 @@ function routeRows(cfg) {
   const key = e.route?.apiKeyEnv
   return [
     ['route', e.name, e.error ?? `${e.route.kind}, chosen by ${e.source}`],
-    ['model', e.model ?? '-', e.route?.kind === 'local' ? `${localModels(cfg).length} registered locally` : 'served by the provider'],
+    ['model', e.model ?? '-', smallModelNote(e.model) ?? (e.route?.kind === 'local' ? `${localModels(cfg).length} registered locally` : 'served by the provider')],
     ['api key', key ?? '-', missingKey !== undefined ? 'missing - add it to .env' : (key === undefined || e.route.apiKeyValue !== undefined ? 'not needed' : 'set')],
     ['access', accessMode(), 'sandbox for shell and file tools (/access)'],
   ]
@@ -879,7 +883,7 @@ async function cmdDoctor(cfg) {
   ]
   const w = Math.max(...rows.map(r => r[0].length))
   for (const [k, v, s] of rows) {
-    const bad = /missing|run setup|needs|want|not serving|not declared|no model/.test(s)
+    const bad = /missing|run setup|needs|want|not serving|not declared|no model|too small/.test(s)
     console.log(`  ${k.padEnd(w)}  ${v}  ${paint(bad ? C.yellow : C.dim, `(${s})`)}`)
   }
 }
