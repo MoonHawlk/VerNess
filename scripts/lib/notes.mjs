@@ -113,13 +113,46 @@ export const markUnsent = (dir, key) => setSent(dir, key, false)
 /**
  * Prefix operator context onto a task, clearly delimited so the model reads it as context.
  * @param {string} task - the task text.
- * @param {{notes?: Note[]}} extra - what to prepend.
+ * @param {{notes?: Note[], brief?: string}} extra - what to prepend; the brief goes first.
  * @returns {string} the composed task (the task unchanged when there is nothing to add).
  */
 export function composeTask(task, extra = {}) {
   const blocks = []
+  const brief = String(extra.brief ?? '').trim()
+  if (brief !== '') blocks.push(`Project brief from the operator (standing context, not tasks):\n${brief}`)
   const notes = extra.notes ?? []
   if (notes.length > 0) blocks.push(['Side notes from the operator (context, not tasks):', ...notes.map(n => `- ${n.text}`)].join('\n'))
   if (blocks.length === 0) return task
   return [...blocks, '---', task].join('\n\n')
+}
+
+// --- The `#` project brief (T-147): durable, one file per checkout, survives sessions. ---
+
+/** @param {string} root - repo root. @returns {string} the brief file, `<root>/.verness/brief.md`. */
+export const briefFile = root => join(root, '.verness', 'brief.md')
+
+/** @param {string} root - repo root. @returns {string} the brief, trimmed ('' when none). */
+export function readBrief(root) {
+  try { return readFileSync(briefFile(root), 'utf8').replace(/^﻿/, '').trim() } catch { return '' }
+}
+
+/**
+ * Append one line (`- <text>`) to the brief: `#<text>` in the REPL.
+ * @param {string} root - repo root.
+ * @param {string} text - the line.
+ * @param {number} maxChars - cap for the whole brief.
+ * @returns {{line: string, total: number, warn: boolean, refused: boolean, reason?: 'empty'|'cap'}} the outcome;
+ *   `line` is what was appended, `warn` is true at 80% of the cap or more.
+ */
+export function appendBrief(root, text, maxChars) {
+  const cur = readBrief(root)
+  const t = String(text).trim()
+  const line = `- ${t}`
+  const next = cur === '' ? line : `${cur}\n${line}`
+  const outcome = (total, refused, reason) => ({ line, total, warn: total >= 0.8 * maxChars, refused, ...(reason === undefined ? {} : { reason }) })
+  if (t === '') return outcome(cur.length, true, 'empty')
+  if (next.length > maxChars) return outcome(cur.length, true, 'cap')
+  mkdirSync(join(root, '.verness'), { recursive: true })
+  writeFileSync(briefFile(root), `${next}\n`, 'utf8')
+  return outcome(next.length, false)
 }

@@ -26,7 +26,7 @@ import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
-import { NEW_KEY, composeTask, markSent, moveNotes, pendingNotes, readNotes } from './lib/notes.mjs'
+import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -50,7 +50,7 @@ const DEFAULTS = {
   tips: [],
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness' },
-  notes: { maxChars: 2000 },
+  notes: { maxChars: 2000, briefMaxChars: 4000 },
 }
 
 const C = {
@@ -996,6 +996,7 @@ async function cmdRun(cfg, task) {
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
   info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
+  info('/btw <note> adds a side note to your next task; #<note> adds a line to the project brief (## escapes)')
   info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
@@ -1005,6 +1006,8 @@ async function cmdRun(cfg, task) {
     ? undefined
     : createInterface({ input: process.stdin, output: process.stdout, completer: makeCompleter(cfg, commands) })
   const history = []
+  // Brief lines added (`#<note>`) since the last task, for a session that already has the rest.
+  const briefAdded = []
   for (;;) {
     // The prompt carries the live state, so persona, model and conversation are never a guess.
     const id = convo.id()
@@ -1020,6 +1023,26 @@ async function cmdRun(cfg, task) {
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
     // be swallowed by the registry; `//` escapes it, sending the rest (one slash kept) to the model.
     const parsed = classifyLine(line)
+    // `#<note>` appends to the durable project brief; `##` escapes it, as `//` does for a slash.
+    if (parsed.kind === 'brief') {
+      const max = Number(loadConfig().notes?.briefMaxChars ?? 4000)
+      if (parsed.text === '') {
+        const brief = readBrief(REPO)
+        console.log(paint(C.cyan, `project brief (${brief.length}/${max} characters, .verness/brief.md)`))
+        if (brief === '') info('empty - add a line with #<note>; ## sends a line starting with # as a task')
+        for (const l of brief.split('\n').filter(Boolean)) info(l)
+        continue
+      }
+      const r = appendBrief(REPO, parsed.text, max)
+      if (r.refused) warn(r.reason === 'cap' ? `the brief is capped at ${max} characters (${r.total} used) - edit .verness/brief.md` : 'empty note')
+      else {
+        briefAdded.push(r.line)
+        ok(`brief updated (${r.total}/${max} characters) - sent with your next task and the first task of every new session`)
+        if (r.warn) warn(`the brief is at ${Math.round((100 * r.total) / max)}% of its cap`)
+        info('meant as a task? ## sends a line that starts with #')
+      }
+      continue
+    }
     if (parsed.kind === 'command') {
       // Re-read the config: an earlier command may have switched persona or model.
       const cfgNow = loadConfig()
@@ -1061,10 +1084,12 @@ async function cmdRun(cfg, task) {
     // Notes filed before a session existed (or before a /resume) join the current one first.
     const noteKey = prior ?? NEW_KEY
     if (prior !== undefined) moveNotes(RUN_DIR_LOCAL, NEW_KEY, prior)
-    const outgoing = composeTask(taskText, { notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)) })
+    // The brief opens every new session in full; a continuing one gets only the lines added since.
+    const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
+    const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)) })
     const run = dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
     // A failed run may never have reached the model, so its notes stay pending for the next task.
-    if (run.code === 0) markSent(RUN_DIR_LOCAL, noteKey)
+    if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0 }
     if (before !== undefined) {
       convo.capture(before)
       if (convo.id() !== undefined) {
