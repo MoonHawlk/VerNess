@@ -22,9 +22,9 @@
     "check:clean-clone": "node scripts/check-clean-clone.mjs",
     "test": "node --test \"scripts/test/*.test.mjs\" \"packages/*/test/*.test.ts\"",
     "typecheck": "tsc -p packages/contracts",
-    "model:up": "node scripts/model.mjs up",
-    "model:stats": "node scripts/model.mjs stats",
-    "model:down": "node scripts/model.mjs down"
+    "model:up": "node scripts/cli.mjs up",
+    "model:stats": "node scripts/cli.mjs stats",
+    "model:down": "node scripts/cli.mjs down"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

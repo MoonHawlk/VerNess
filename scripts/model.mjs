@@ -425,25 +425,15 @@ export async function modelDown(cfg, opts = {}) {
   return true
 }
 
-/**
- * Load the FiNess configuration through the launcher, so both entry points read the same file.
- * @returns {Promise<object>} the merged configuration.
- */
-async function standaloneConfig() {
-  const { loadConfigForCli } = await import('./finess.mjs')
-  return loadConfigForCli()
-}
-
-// Standalone CLI: `node scripts/model.mjs up|stats|down [--force]`.
+// Standalone CLI: `node scripts/model.mjs up|stats|down [--force]`. It hands off to the launcher in a
+// child process: importing `finess.mjs` from here would be an import cycle (it imports this module),
+// and with this file as the entry that cycle deadlocks on its top-level await.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const cmd = process.argv[2]
-  const force = process.argv.includes('--force')
-  const cfg = await standaloneConfig()
-  if (cmd === 'up') process.exit((await modelUp(cfg)) ? 0 : 1)
-  else if (cmd === 'stats') process.exit((await modelStats(cfg, statsOpts(process.argv.slice(3)))) ? 0 : 1)
-  else if (cmd === 'down') process.exit((await modelDown(cfg, { force })) ? 0 : 1)
-  else {
+  if (!['up', 'stats', 'down'].includes(cmd ?? '')) {
     console.log('usage: node scripts/model.mjs up | stats [--watch] [--interval <s>] | down [--force]')
     process.exit(cmd === undefined ? 0 : 1)
   }
+  const r = spawnSync(process.execPath, [join(REPO, 'scripts', 'cli.mjs'), ...process.argv.slice(2)], { stdio: 'inherit', windowsHide: true })
+  process.exit(r.status ?? 1)
 }
