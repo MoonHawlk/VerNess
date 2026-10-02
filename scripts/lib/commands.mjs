@@ -149,15 +149,18 @@ export function resolveCommand(word, commands) {
 /**
  * Classify one REPL line. A leading `/` marks a command; a leading `//` escapes that, so the line is
  * a task with one slash removed (`//etc/hosts is odd` sends `/etc/hosts is odd`); anything else is a
- * task as typed.
+ * task as typed. A leading `#` appends the rest to the project brief (`kind: 'brief'`, text '' for a
+ * bare `#`, which shows it); `##` escapes that the same way `//` does (T-147).
  * @param {string} line - the raw input line.
- * @returns {{kind: 'empty'} | {kind: 'command' | 'task', text: string}} what the line is.
+ * @returns {{kind: 'empty'} | {kind: 'command' | 'task' | 'brief', text: string}} what the line is.
  */
 export function classifyLine(line) {
   const text = line.trim()
   if (text === '') return { kind: 'empty' }
   if (text.startsWith('//')) return { kind: 'task', text: text.slice(1) }
   if (text.startsWith('/')) return { kind: 'command', text }
+  if (text.startsWith('##')) return { kind: 'task', text: text.slice(1) }
+  if (text.startsWith('#')) return { kind: 'brief', text: text.slice(1).trim() }
   return { kind: 'task', text }
 }
 
