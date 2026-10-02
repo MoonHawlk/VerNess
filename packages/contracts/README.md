@@ -38,8 +38,9 @@ typechecking (`pnpm typecheck`).
 - **Decision** (`src/decision.ts`) — the vocabulary for the small-choice decision path:
   `REASON_CODES`/`ReasonCode` (13 codes covering rule matches, model confidence, fallbacks,
   escalation, tool and budget failures, and provider/answer problems), `ChoiceQuestion` (a fixed
-  option set, `<= 8`), `DecisionRequest`/`DecisionResult`, `DecisionCapabilities`, and the
-  `DecisionModel` interface a decision provider implements (`decide`).
+  option set, 2..`MAX_CHOICE_OPTIONS` = 8, checked by `validateChoiceQuestion`, which the
+  launcher's `askDecision` runs before every request), `DecisionRequest`/`DecisionResult`,
+  `DecisionCapabilities`, and the `DecisionModel` interface a decision provider implements (`decide`).
 - **Skill** (`src/skill.ts`, `src/validate-skill.ts`) — `SkillRef`, the file-authored
   `SkillMetadata` (`name`, `description`, optional `activation.triggers`,
   `requirements.tools`, `evaluators`, `version`), `SkillContext`/`SkillActivation` (what a skill
