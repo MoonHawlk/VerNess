@@ -346,6 +346,25 @@ export function latestRun(teamId, root = runsDir()) {
 }
 
 /**
+ * Recorded runs of every team (delegations included), newest first by stamp.
+ * @param {{root?: string, limit?: number}} [opts] - runs root and a cap on the rows.
+ * @returns {{id: string, team: string, stamp: string, dir: string, status: string, tasks: number, personas: string[]}[]} one row per run.
+ */
+export function listRuns({ root = runsDir(), limit = 20 } = {}) {
+  const rows = []
+  for (const team of subdirs(root)) {
+    for (const stamp of subdirs(join(root, team))) {
+      const run = readRun(join(root, team, stamp))
+      const status = run.state === 'incomplete' ? 'running'
+        : run.tasks.some(t => t.status === 'failed') ? 'failed'
+          : run.tasks.some(t => t.status !== 'ok') ? 'partial' : 'ok'
+      rows.push({ id: `${team}/${stamp}`, team, stamp, dir: run.dir, status, tasks: run.tasks.length, personas: [...new Set(run.tasks.map(t => t.persona).filter(Boolean))] })
+    }
+  }
+  return rows.sort((a, b) => (a.stamp < b.stamp ? 1 : a.stamp > b.stamp ? -1 : 0)).slice(0, limit)
+}
+
+/**
  * Read a run directory: `summary.json` when present, otherwise the `<task>.md` headers (runs made
  * before `summary.json` existed, or a run still in progress).
  * @param {string} dir - the run directory.
