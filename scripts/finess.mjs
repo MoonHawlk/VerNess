@@ -28,7 +28,7 @@ import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
-import { MAX_TASK_CHARS, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
+import { CAPS, MAX_TASK_CHARS, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
@@ -1098,9 +1098,14 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
       else if (res.timedOut) warn('stopped after 120 s')
       else if (res.code !== 0) info(`exit ${res.code}`)
       if (parsed.attach) {
-        const a = shellAttachment(parsed.text, res)
-        shellAttached.push(a)
-        ok(`output attached to your next task (${a.body.length} characters${a.truncated ? ', truncated' : ''})`)
+        // Pending `!!` output shares the attachment total with the next task's `@` references.
+        const left = CAPS.total - attachedChars(shellAttached)
+        if (left <= 0) warn(`not attached - pending !! output already uses the ${CAPS.total}-character total`)
+        else {
+          const a = shellAttachment(parsed.text, res, Math.min(CAPS.perItem, left))
+          shellAttached.push(a)
+          ok(`output attached to your next task (${a.body.length} characters${a.truncated ? ', truncated' : ''})`)
+        }
       }
       continue
     }
@@ -1153,7 +1158,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The brief opens every new session in full; a continuing one gets only the lines added since.
     const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
     // `@path` and `@https://...` attach a file, a directory listing or a page as text (T-181, T-447).
-    const refs = await expandRefs(taskText, { cwd: REPO, fs: nodeFs, fetch: globalThis.fetch })
+    const refs = await expandRefs(taskText, { cwd: REPO, fs: nodeFs, fetch: globalThis.fetch, caps: { total: CAPS.total - attachedChars(shellAttached) } })
     for (const n of refs.notes) info(n)
     for (const w of refs.warnings) warn(w)
     for (const m of refs.missing) info(`${m} is not a file here - left as text`)
@@ -1161,6 +1166,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)), attachments })
     if (outgoing.length > MAX_TASK_CHARS) {
       warn(`the task with its context is ${outgoing.length} characters, over the ${MAX_TASK_CHARS} a command line carries - not sent`)
+      // Never leave the next task stuck behind the same pending output.
+      if (shellAttached.length > 0) { shellAttached.length = 0; info('the pending !! output was dropped') }
       info('attach less (fewer @ files, a shorter !! output) or trim the brief')
       continue
     }

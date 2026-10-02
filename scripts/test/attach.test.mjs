@@ -10,7 +10,7 @@ import * as fs from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CAPS, expandRefs, findRefs, htmlToText, runShell, shellAttachment, shellSpec } from '../lib/attach.mjs'
+import { CAPS, attachedChars, expandRefs, findRefs, htmlToText, runShell, shellAttachment, shellSpec } from '../lib/attach.mjs'
 import { classifyLine } from '../lib/commands.mjs'
 import { composeTask } from '../lib/notes.mjs'
 import { REPO } from '../lib/util.mjs'
@@ -108,6 +108,18 @@ test('expandRefs: @url fetches without credentials, strips html, refuses binary 
   assert.ok(r.warnings.some(w => /not text \(image\/png\)/.test(w)))
   assert.ok(r.warnings.some(w => /HTTP 503/.test(w)))
   assert.ok(r.warnings.some(w => /timed out after 10 s/.test(w)))
+})
+
+test('pending !! output and @ references share one total', async () => {
+  const dir = sandbox()
+  try {
+    const pending = [shellAttachment('x', { code: 0, out: 'q'.repeat(CAPS.total) })]
+    const used = attachedChars(pending)
+    assert.equal(used, CAPS.perItem)
+    const r = await expandRefs('@big.txt @a.txt', { cwd: dir, fs, caps: { total: CAPS.total - used } })
+    assert.equal(attachedChars(r.attachments), CAPS.total - used)
+    assert.ok(r.warnings.some(w => /@a\.txt skipped/.test(w)))
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('composeTask appends attachments after the task, fenced; no attachments changes nothing', () => {

@@ -66,6 +66,9 @@ export function shellAttachment(line, res, cap = CAPS.perItem) {
   return { label: `$ ${line} (exit ${res.code})`, body: text, truncated }
 }
 
+/** @param {Attachment[]} list - attachments. @returns {number} the characters they carry, against `CAPS.total`. */
+export const attachedChars = list => list.reduce((n, a) => n + a.body.length, 0)
+
 /**
  * Find the `@` references in a task. `@` counts only at the start or after whitespace or an opening
  * bracket/quote, so `me@example.com` never expands. `@"a b.txt"` quotes a path with spaces. Trailing
