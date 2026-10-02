@@ -145,6 +145,9 @@
     // passes the checkout path to the plugin as `config.repo`.
     "plugins": [
       { "id": "finess-spike", "package": "@finess/spike", "path": "packages/spike", "enabled": true },
+      // One corrective line (a concrete fixed call) on a failed tool result - small local models
+      // misuse glob/pwsh/edit args and skip read-before-write (T-438). Zero prompt tokens.
+      { "id": "finess-tool-hints", "package": "@finess/tool-hints", "path": "packages/tool-hints", "enabled": true },
       // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
       // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
       { "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },

@@ -1,0 +1,9 @@
+{
+  "name": "@finess/tool-hints",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Appends one corrective hint (a concrete fixed call) to failed tool results; no prompt tokens.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": { ".": "./index.js" }
+}
