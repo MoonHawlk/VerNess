@@ -31,7 +31,7 @@ export default {
         p.family,
         p.id,
         p.name,
-        p.model.id ?? 'active route',
+        p.model.id === undefined && p.model.route === undefined ? 'session default' : `${p.model.route ?? ''}${p.model.route !== undefined && p.model.id !== undefined ? '/' : ''}${p.model.id ?? ''}`,
         `${p.tools.allow.length}/${p.tools.deny.length}`,
         String(p.skills.length),
         p.source,
