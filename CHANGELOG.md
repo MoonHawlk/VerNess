@@ -10,6 +10,20 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 tool-failure hints for small models, and an animated Ness.**
 
 ### Added
+- **`/workspace <dir>`** (and `--workspace`): point FiNess at any project; tasks, `!` commands and
+  `@` files run there (T-363).
+- **`!<cmd>`** runs a shell command locally at no token cost; **`!!<cmd>`** also attaches its output
+  to the next task; **`@path`** and **`@https://...`** attach a file, a folder listing or a web page
+  (T-181, T-447).
+- **`/recipe`**: one-line task templates in `recipes/*.md`, with six starters (code-review,
+  write-tests, explain, summarize-docs, commit-message, plan) (T-444).
+- **`/delegate <persona> <task>`** and **`/task list`** (T-169).
+- **Model per persona**: `"model": { "route", "id" }` in a persona file, e.g. a reviewer on a
+  stronger model than the worker (T-361).
+- **`/context`**: what the next task carries and how much of the context window it fills (T-151).
+- **Finish notifications**: bell and terminal title when a task, loop or team run took over
+  `notify.afterSeconds` (30); `notify.desktop: true` adds a desktop notice (T-445).
+- **CI**: GitHub Actions on Windows, macOS and Linux with Node 22 and 24 (T-446).
 - **Tool-failure hints** (`@finess/tool-hints`): when a tool call fails on bad arguments, a missing
   read or a wrong path, the result gains one line with a corrected call the model can copy. No prompt
   tokens on calls that succeed (T-438).
@@ -68,6 +82,9 @@ tool-failure hints for small models, and an animated Ness.**
   rendering and `.env` parsing are covered (T-365).
 
 ### Fixed
+- Long input wraps across rows with the cursor in the right place and the suggestions below it;
+  wide characters and emoji no longer shift the cursor (T-302).
+- `npm run model:up|stats|down` no longer hang (an import cycle deadlocked).
 - Piped input to the prompt no longer loses lines that arrive while a command runs, and EOF exits
   cleanly (T-439).
 - Dashboard tool errors show their name and code instead of "[object Object]".

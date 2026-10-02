@@ -687,3 +687,21 @@
   checkout's real `/btw` notes (now read-only commands). Two agent branches started from v0.4.0,
   before the rename; their old-name paths were renamed while resolving the merge.
 - `npm test` 481/481 and typecheck clean on `epic`; clean-clone check ok.
+
+## 2026-10-02 — third wave: FiNess beyond this repo
+- Nine single-task agents in four groups, merged into epic one by one with the suite run after
+  each: beyond the repo (`/workspace` T-363, `!`/`@` T-181/T-447, `/delegate` T-169), models
+  (persona presets T-361, `/context` T-151), holistic (`/recipe` T-444, finish notifications
+  T-445), structure (CI T-446, wrapped editor T-302).
+- Resolved by hand at merge: `scripts/finess.mjs` (the recipe overlay, the finish notification,
+  the attachments and the workspace cwd all meet in the REPL's task call; `@path` and `!cmd`
+  were pointed at the active workspace instead of the repo); the terminal-only command list.
+  CI checkout changed to full history so the clean-clone check never clones a shallow source.
+- Earlier the same day: the prompt-time pet animator was reverted (tab broke the session) and the
+  block sheep now plays a one-shot animation at boot and on `/pet`; `model.mjs` stopped hanging.
+- Two worktree agents ran a boot that rewrote the shared `~/.dsh` profile patch; the checkout
+  stamp from T-336 flagged it at the next `sync` from the main checkout, which restored it.
+- Live: `/workspace` with `!dir` on a temp project, `/context` on the real session (~5.3k tokens,
+  16% of 32k), `/recipe` lists. Not live: anything needing a model (T-449; the engine cannot
+  start because `OLLAMA_MODELS` points at a missing drive).
+- `npm test` 515/515, typecheck clean, clean-clone check ok.

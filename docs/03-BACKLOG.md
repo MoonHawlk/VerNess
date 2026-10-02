@@ -22,10 +22,8 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
 Tier L — local, zero tokens
-- [ ] T-181 `!<cmd>` shell prefix and `@path` file expansion in the REPL *(was the Tier L T-146)*
 
 TUI
-- [ ] T-302 Wrap long input lines in the editor; today the dropdown is suppressed when input exceeds the terminal width
 
 Launcher lifecycle
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (only Windows has been measured)
@@ -34,7 +32,7 @@ Launcher lifecycle
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
 - [ ] T-171 Measure before promising parallelism: time the same team at concurrency 1 and 2 on the local model and record the numbers in `04-PROGRESS.md`
-- [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`: a one-task ad-hoc team run
+- [ ] T-169 *(remaining part)* `/task cancel <id>`: needs a registry of running delegated/team runs (pid + handle); `/delegate` and `/task list` are done
 - [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
 
@@ -156,7 +154,7 @@ M9 Governance
 
 Tier S commands: surface existing substrate capabilities, never rebuild them
 - [ ] T-150 `/todos`: render the `ctx.todo` projection
-- [ ] T-151 `/compact`, `/context`
+- [ ] T-151 *(remaining part)* `/compact` (`/context` is done)
 - [ ] T-152 `/export`: reuse `dsh-session-log-export`
 - [ ] T-153 `/mcp`: MCP servers and their tool filters
 - [ ] T-156 `/hooks`: read-only list of mounted Cordis listeners per event
@@ -187,8 +185,6 @@ Goal: installing a new model, or moving the agent onto a hosted API model that c
 environment, is one command — no config edit, no guessing quants, no frozen route.
 - [ ] T-357 **First run with a real key**: one API turn that forces a tool call (e.g. list `docs/` and write a file under the workspace), recorded in `04-PROGRESS.md`. Nothing above proves a successful hosted turn yet
 - [ ] T-359 Setup wizard: `./turn_on.sh setup --api` asks for a provider, writes the key to `.env` with hidden input, and runs `/api use` — first-run to working hosted agent in one step
-- [ ] T-361 Model presets per persona: `persona.model = { route, id }` for hosted routes, surfaced in `/agents`, so a reviewer persona can run on a stronger model than the worker
-- [ ] T-363 `/workspace <dir>` — point the agent's working directory (and so the `workspace` sandbox root) at another project instead of this repo
 - [ ] T-364 Stop reading the adapter's `env-api-keys.js` by file path once the substrate exposes provider key names through a public seam (ADR-0010 consequence)
 - [ ] T-366 Windows: sandboxed PowerShell runs in ConstrainedLanguage (restricted token), so .NET type creation fails — including the substrate's own UTF-8 preamble. Measure what an API model can still do under `workspace`, and report upstream if the preamble should degrade gracefully
 
@@ -216,6 +212,12 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-440 Live check of `@finess/tool-hints` (T-438): run a session on the local 0.6B model and on a 4B+ model, then compare `/dashboard` tool failures before and after; the hints are unit-tested only
 - [ ] T-442 Watch the boot animation in a real terminal (Windows Terminal, conhost, Terminal.app): frames overwrite in place, the cursor comes back, typing during it leaves nothing behind
 - [ ] T-443 `/stats` in the REPL has no `--watch` (CLI only); decide whether a watching quick-tool fits the prompt
+
+## Follow-ups from the 2026-10-02 third round
+- [ ] T-448 Pass the task to dsh through a file or stdin instead of one argv string: Windows caps a command line at 32,767 characters, so `@` attachments are capped at 20k and a composed task over 30k is refused (T-181)
+- [ ] T-449 Live check with a running model: a `/workspace` turn and its continuation, `@path`/`@url`/`!!` reaching the model, `/recipe` runs, `/delegate`, a persona `model` preset, and the 30 s finish notification (all unit-tested; the engine was down: `OLLAMA_MODELS` points at a missing drive)
+- [ ] T-450 Real-terminal check of the wrapped editor (T-302): conhost wrap at the last column, drag-resize with the dropdown open, emoji sequences
+- [ ] T-451 First CI run (T-446) after the next push: confirm all six jobs, then require it on `main`
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
