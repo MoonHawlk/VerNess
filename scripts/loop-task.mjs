@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url'
 
 import { classifyRound, detectStall, observeSession, renderDigest, repeatReminder, roundPrompt } from './lib/loop.mjs'
 import { listSessions } from './lib/sessions.mjs'
+import { workspaceKey } from './lib/workspace.mjs'
 import { REPO, head, info, ok, paint, step, table, warn } from './lib/util.mjs'
 
 /** Rounds allowed before the driver stops regardless of progress. */
@@ -45,7 +46,8 @@ export async function runLoopTask(ctx, objective, opts = {}) {
   const roundTimeout = opts.roundTimeout ?? DEFAULT_ROUND_TIMEOUT
   const profile = ctx.cfg.profile.name
   const run = ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
-  const workspace = REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, '')
+  // The session lands under the directory the run started in (`ctx.dsh` uses the active workspace).
+  const workspace = ctx.workspaceKey ?? workspaceKey(REPO)
 
   // A loop gets its own session unless explicitly told to continue the current conversation: mixing
   // an autonomous run into an interactive one makes both histories harder to reason about.
