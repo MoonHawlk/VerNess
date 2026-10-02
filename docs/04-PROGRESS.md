@@ -675,8 +675,10 @@
   failure rate and latency histogram plus a route filter in the dashboard (T-271, T-272), a GGUF
   fit check on `/models add` (T-360), `/loop-task` round timeout and repeat guard (T-327, T-325),
   `/api test` and a `/cost` price table (T-358, T-362).
-- **Ness:** state-driven animation in ASCII (T-335a..h without d, T-434); simulated-terminal tests
-  only, not yet watched in a real terminal (T-442); at 80x24 she rarely moves at boot (T-441).
+- **Ness:** a prompt-time animator in ASCII (T-335a..h, T-434) was merged, then reverted at the
+  owner's request: they prefer the block sheep, and pressing tab while it repainted broke the
+  session. In its place the block sheep plays a one-shot animation at boot and on `/pet`, done
+  before the prompt opens, so nothing draws while the editor runs (T-442: watch it live).
 - **Launcher:** `--no-model` (T-381), checkout-stamped profile patch and worktree `sync` warning
   (T-336, half of T-433), piped stdin keeps every line (T-439), `setup` reinstalls a changed local
   plugin (T-432), team failure policy (T-167).

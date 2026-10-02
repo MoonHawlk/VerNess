@@ -223,19 +223,55 @@ const ART_W = Math.max(...SHEEP.map(l => l.length))
  * The sheep for a mood. Only the face changes - closed eyes keep just the lower lid - so her
  * outline stays put.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
+ * @param {{mark?: string, open?: boolean}} [pose] - one animation frame's overrides: the whole
+ *   mark line above her head, and whether her eyes are open.
  * @returns {string[]} eighteen lines (the mood mark, then the sheep), each exactly 41 columns wide.
  */
-export function petArt(mood) {
+export function petArt(mood, pose = {}) {
   const m = MOODS[mood] ?? MOODS.happy
+  const open = pose.open ?? m.open
   const rows = SHEEP.map(l => [...l])
-  if (!m.open) for (const c of EYES.cols) rows[EYES.rows[0]][c] = '░'
-  return [`    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
+  if (!open) for (const c of EYES.cols) rows[EYES.rows[0]][c] = '░'
+  return [pose.mark ?? `    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
 }
 
 /**
- * The round Ness, kept for the boot animation (plan WS-C decides how it and the sheep fit together).
- * Keyed by the sheep's moods so `moodOf` drives both: sleepy uses the round pet's curious frames,
- * worried its sad ones. Every frame is 8 lines x 9 columns, so the animator overwrites in place.
+ * The sheep's boot animation per mood: poses for {@link petArt}, each held `ms`. Only the mark line
+ * and her eyes change, so every frame is the same size and overwrites the last in place. The last
+ * pose is her resting look for the mood.
+ */
+const SHEEP_POSES = {
+  // a blink, then sparkles drift up and away
+  happy: [
+    { mark: '', open: true, ms: 300 }, { mark: '', open: false, ms: 140 }, { mark: '', open: true, ms: 260 },
+    { mark: '    *', open: true, ms: 180 }, { mark: '   * *', open: true, ms: 180 }, { mark: '  *   *', open: true, ms: 180 },
+    { mark: '', open: false, ms: 140 }, { mark: '', open: true, ms: 0 },
+  ],
+  // eyes stay shut while a z drifts up and to the right, twice
+  sleepy: [
+    { mark: '    z', ms: 260 }, { mark: '     z', ms: 260 }, { mark: '      Z', ms: 320 },
+    { mark: '    z', ms: 260 }, { mark: '     z', ms: 260 }, { mark: '      Z', ms: 320 }, { mark: '    z', ms: 0 },
+  ],
+  // the ! pulses, with a worried blink
+  worried: [
+    { mark: '    !', ms: 260 }, { mark: '', ms: 200 }, { mark: '    !', ms: 260 }, { mark: '    !!', open: false, ms: 160 },
+    { mark: '    !', ms: 260 }, { mark: '', ms: 200 }, { mark: '    !', ms: 0 },
+  ],
+}
+
+/**
+ * The sheep's boot animation frames for a mood.
+ * @param {'happy'|'sleepy'|'worried'} mood - the mood.
+ * @returns {{pose: {mark?: string, open?: boolean}, ms: number}[]} the frames, in playback order.
+ */
+export function sheepFrames(mood) {
+  return (SHEEP_POSES[mood] ?? SHEEP_POSES.happy).map(({ ms, ...pose }) => ({ pose, ms }))
+}
+
+/**
+ * The round Ness, an earlier design; the boot animation uses the sheep ({@link sheepFrames}), not
+ * these. Keyed by the sheep's moods: sleepy uses the round pet's curious frames, worried its sad
+ * ones. Every frame is 8 lines x 9 columns.
  */
 const W_FRAME = 9
 const FRAMES = {
@@ -284,43 +320,49 @@ export function petAnimFrames(mood) {
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 /**
- * Play the boot animation, then show the full status panel. When `animationAllowed` says no (off a
- * TTY, `pet.animate: false`, `NO_COLOR`/`CI`, a narrow terminal) it shows the static panel only.
- * Not wired into the boot yet - `cmdRun` still prints `renderPet` directly.
+ * Draw the pet panel, animating the sheep first when allowed: a short one-shot play of
+ * {@link sheepFrames} that ends on her resting look. It runs to completion before the caller goes
+ * on, so it never draws while the line editor or a command owns the screen. When
+ * `animationAllowed` says no (off a TTY, `pet.animate: false`, `NO_COLOR`/`CI`, a narrow terminal),
+ * or the panel is taller than the terminal (cursor-up cannot reach scrolled rows), it prints the
+ * still panel. Frames are written with the cursor hidden and the rows cleared, so typing during the
+ * play cannot leave stray art behind.
  * @param {object} v - vitals from `gatherVitals`.
- * @param {{columns?: number, cfg?: object, out?: {isTTY?: boolean, write(s: string): unknown},
- *   env?: Record<string, string|undefined>}} [opts] - terminal width (no width means no animation),
- *   configuration, and for tests the output stream and environment (default `process.stdout`/`env`).
+ * @param {{columns?: number, rows?: number, cfg?: object, out?: {isTTY?: boolean, write(s: string): unknown},
+ *   env?: Record<string, string|undefined>, wait?: (ms: number) => Promise<void>}} [opts] - terminal
+ *   size (no width means no animation), configuration, and for tests the output stream, environment
+ *   and clock (default `process.stdout`/`env`, real timers).
  */
 export async function animatePet(v, opts = {}) {
   const out = opts.out ?? process.stdout
   const say = (l = '') => out.write(`${l}\n`)
   const { mood } = moodOf(v)
   const allowed = animationAllowed({ isTTY: out.isTTY, columns: opts.columns, env: opts.env ?? process.env, cfg: opts.cfg })
-  if (!allowed.ok) {
-    say()
+  const frames = sheepFrames(mood)
+  const height = renderPet(v, { columns: opts.columns, pose: frames[0].pose }).length
+  if (!allowed.ok || (opts.rows !== undefined && height >= opts.rows)) {
     for (const l of renderPet(v, opts)) say(l)
-    say()
     return
   }
-  const frames = petAnimFrames(mood)
-  const FH = frames[0].length
-  const writeFrame = frame => {
-    for (const l of frame) out.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
+  const wait = opts.wait ?? sleep
+  const draw = (pose, first) => {
+    if (!first) out.write(`\x1b[${height}A\r`)
+    out.write(renderPet(v, { columns: opts.columns, pose }).map(l => `\x1b[2K${l}\n`).join(''))
   }
-  writeFrame(frames[0])
-  for (let i = 1; i < frames.length; i++) {
-    await sleep(160)
-    out.write(`\x1b[${FH}A\r`)
-    writeFrame(frames[i])
+  // ctrl+c mid-play must not leave the cursor hidden.
+  const show = () => out.write('\x1b[?25h')
+  process.once('exit', show)
+  out.write('\x1b[?25l')
+  try {
+    draw(frames[0].pose, true)
+    for (let i = 1; i < frames.length; i++) {
+      await wait(frames[i - 1].ms)
+      draw(frames[i].pose, false)
+    }
+  } finally {
+    process.removeListener('exit', show)
+    show()
   }
-  // Erase the animation area, then draw the full panel.
-  out.write(`\x1b[${FH}A\r`)
-  for (let i = 0; i < FH; i++) out.write('\x1b[2K\n')
-  out.write(`\x1b[${FH}A\r`)
-  say()
-  for (const l of renderPet(v, opts)) say(l)
-  say()
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -396,12 +438,14 @@ export const sideBySide = columns => columns !== undefined && columns >= ART_W +
 /**
  * Draw the pet beside its panel, or above it when the terminal is too narrow for both.
  * @param {object} v - vitals from `gatherVitals`.
- * @param {{columns?: number}} [opts] - terminal width; undefined (a pipe) means stacked.
+ * @param {{columns?: number, pose?: {mark?: string, open?: boolean}}} [opts] - terminal width
+ *   (undefined, a pipe, means stacked); `pose` draws one animation frame and always keeps the mark
+ *   line, so every frame has the same height.
  * @returns {string[]} the lines to print.
  */
 export function renderPet(v, opts = {}) {
   const { mood, says } = moodOf(v)
-  const art = petArt(mood)
+  const art = petArt(mood, opts.pose)
   const title = [[v.name, 'bold'], [` - FiNess ${v.versions.finess}${v.versions.commit !== undefined ? ` (${v.versions.commit})` : ''}  `], [`${v.model} via ${v.route}`, 'dim']]
   const rows = [['', title], ...panelRows(v)]
   const label = Math.max(...rows.map(([l]) => l.length))
@@ -423,7 +467,7 @@ export function renderPet(v, opts = {}) {
   const speech = `${paint('cyan', `${v.name}:`)} ${fit(says, room - v.name.length - 2)}`
 
   // The mood-mark line above the sheep is only worth a row when it carries a mark.
-  const shown = art[0].trim() === '' ? art.slice(1) : art
+  const shown = art[0].trim() === '' && opts.pose === undefined ? art.slice(1) : art
   if (!side) {
     // Too narrow even for the sheep alone: a wrapped sprite is noise, so the panel goes on without her.
     const fits = cols === undefined || cols > art[0].length + 2

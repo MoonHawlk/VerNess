@@ -23,7 +23,7 @@ import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
 import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
-import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
+import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
@@ -1006,7 +1006,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The pet is the boot banner: versions and workers at a glance. `/pet` redraws it later.
     const vitals = await gatherVitals(cfg, { dsh: dshVersion, commands: count, session: convo.id() })
     console.log()
-    for (const l of renderPet(vitals, { columns: process.stdout.columns })) console.log(l)
+    await animatePet(vitals, { columns: process.stdout.columns, rows: process.stdout.rows, cfg })
     console.log()
   } else {
     step(`FiNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, boot.model ?? '-')} via ${boot.name} (tools: ${accessMode()})`)

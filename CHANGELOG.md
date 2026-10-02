@@ -27,9 +27,9 @@ tool-failure hints for small models, and an animated Ness.**
 - **`/loop-task --round-timeout <s>`** (default 600) (T-327).
 - **`onFailure: stop | skip | retry-once`** for teams and tasks (T-167).
 - **`finess --no-model`** (`--no-start`): the prompt and quick-tools without booting a model (T-381).
-- **Ness animates by state**: blinks when all is well, a drifting `z` when no model is loaded, a
-  pulsing `!` when something needs attention, a one-shot cheer or `?` after a `/loop-task`; never
-  while a command or a model turn runs (T-335a..h, T-434).
+- **Ness moves**: at boot and on `/pet` the block-drawn sheep plays a short one-shot animation for
+  her mood (a blink and sparkles when all is well, a drifting `z` when no model is loaded, a pulsing
+  `!` when something needs attention), then rests; it finishes before the prompt opens.
 - **`/btw <note>`** (`/btw`, `/btw clear`, `/btw drop <n>`): side notes sent once with your next
   task as context, not tasks; capped at `notes.maxChars` (2000), warning at 80%; terminal only (T-130).
 - **`#<note>`** adds a line to a project brief (`.finess/brief.md`) that every new session receives;
@@ -57,7 +57,6 @@ tool-failure hints for small models, and an animated Ness.**
 - `/loop-task` repeat guard follows the substrate's repeat-tool-reminder: reminders at 3 and 5
   identical calls in a row, a stop at 8 (it used to stop on any call seen more than twice) (T-325).
 - `/team run`: a task whose dependency failed is `skipped`, never run; the run exits 1 (T-167).
-- The Ness drawing is ASCII and fits beside the panel from 77 columns (T-434).
 - `setup` reinstalls a local plugin whose files changed (T-432); `sync` stamps the profile patch with
   its checkout and warns when another checkout or a worktree takes it over (T-336, T-433).
 - `webBundles` entries may pin a version; `dsh-web-all` is pinned to 0.4.3 (0.4.4 needs dsh 0.2).

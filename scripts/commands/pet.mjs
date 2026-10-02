@@ -5,7 +5,7 @@
  * @module scripts/commands/pet
  */
 
-import { gatherVitals, renderPet } from '../lib/pet.mjs'
+import { animatePet, gatherVitals } from '../lib/pet.mjs'
 
 export default {
   name: 'pet',
@@ -30,7 +30,7 @@ export default {
       commands: new Set(ctx.commands.values()).size,
       session: ctx.conversation?.id(),
     })
-    for (const l of renderPet(vitals, { columns: process.stdout.columns })) console.log(l)
+    await animatePet(vitals, { columns: process.stdout.columns, rows: process.stdout.rows, cfg: ctx.cfg })
     return 0
   },
 }

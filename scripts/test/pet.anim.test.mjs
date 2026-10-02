@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { animatePet, animationAllowed, sideBySide } from '../lib/pet.mjs'
+import { PET_MOODS, animatePet, animationAllowed, moodOf, renderPet, sheepFrames, sideBySide } from '../lib/pet.mjs'
 
 const WIDE = 160
 const ok = { isTTY: true, columns: WIDE, env: {}, cfg: { pet: {} } }
@@ -57,22 +57,27 @@ test('no argument at all is a safe no', () => {
   assert.equal(animationAllowed().ok, false)
 })
 
+/** @returns {object} minimal vitals: a remote engine, nothing wrong. */
+const vitalsFor = () => ({
+  name: 'Ness', persona: 'generalist', model: 'm', route: 'r', session: undefined,
+  versions: { finess: '0', commit: undefined, node: '24', dsh: { installed: '1', pinned: '1' }, engine: undefined },
+  workers: { engine: { remote: true, baseURL: 'x' }, decision: { up: false, enabled: false } },
+  roster: { personas: 1, teams: 0 }, recent: {}, now: 0,
+})
+
 /**
- * Run `animatePet` against a fake terminal (isTTY true, empty environment), capturing every write.
+ * Run `animatePet` against a fake terminal (isTTY true, empty environment, instant clock),
+ * capturing every write.
  * @param {object} cfg - the configuration passed to it.
+ * @param {object} [extra] - more options for `animatePet` (e.g. `rows`).
  * @returns {Promise<string[]>} what it wrote.
  */
-async function captureOnTTY(cfg) {
-  const v = {
-    name: 'Ness', persona: 'generalist', model: 'm', route: 'r', session: undefined,
-    versions: { finess: '0', commit: undefined, node: '24', dsh: { installed: '1', pinned: '1' }, engine: undefined },
-    workers: { engine: { remote: true, baseURL: 'x' }, decision: { up: false, enabled: false } },
-    roster: { personas: 1, teams: 0 }, recent: {}, now: 0,
-  }
+async function captureOnTTY(cfg, extra = {}) {
+  const v = vitalsFor()
   // A fake terminal and a clean environment: the real stdout carries the test runner's protocol.
   const writes = []
   const out = { isTTY: true, write: s => { writes.push(String(s)); return true } }
-  await animatePet(v, { columns: WIDE, cfg, out, env: {} })
+  await animatePet(v, { columns: WIDE, cfg, out, env: {}, wait: async () => {}, ...extra })
   return writes
 }
 const CURSOR_UP = /\x1b\[\d+A/
@@ -86,4 +91,27 @@ test('animatePet obeys the switch on a terminal: pet.animate false draws a still
 test('animatePet animates on a terminal when allowed (control)', async () => {
   const writes = await captureOnTTY({ pet: { animate: true } })
   assert.ok(writes.some(w => CURSOR_UP.test(w)), 'frames overwrite in place')
+})
+
+test('every sheep frame has the same height and width as the first, for every mood', () => {
+  const v = vitalsFor()
+  for (const mood of PET_MOODS) {
+    const frames = sheepFrames(mood)
+    assert.ok(frames.length > 1, `${mood} has frames`)
+    const first = renderPet(v, { columns: WIDE, pose: frames[0].pose })
+    for (const { pose } of frames) assert.equal(renderPet(v, { columns: WIDE, pose }).length, first.length)
+  }
+})
+
+test('animatePet plays every frame in place, then shows the cursor again', async () => {
+  const writes = await captureOnTTY({ pet: { animate: true } })
+  const ups = writes.filter(w => CURSOR_UP.test(w)).length
+  assert.equal(ups, sheepFrames(moodOf(vitalsFor()).mood).length - 1)
+  assert.equal(writes.at(-1), '[?25h', 'cursor restored last')
+})
+
+test('animatePet draws a still panel when the terminal is shorter than the panel', async () => {
+  const writes = await captureOnTTY({ pet: { animate: true } }, { rows: 10 })
+  assert.ok(writes.some(w => w.includes('FiNess')))
+  assert.ok(!writes.some(w => CURSOR_UP.test(w)))
 })

@@ -44,7 +44,7 @@ Launcher lifecycle
 > (`scripts/lib/pet.mjs`). `scripts/test/pet.render.test.mjs` is a mood-agnostic `node:test` suite over
 > `PET_MOODS` (T-338); the off switch `animationAllowed` + `pet.animate` exists (T-335g), but nothing
 > animates after boot yet. The tasks below are written against frame lists, not a drawing.
-- [ ] T-335 Animations. Frames stay ASCII and minimal *(remaining: T-335d; the rest done 2026-10-02)*
+- [ ] T-335 Animations *(remaining: animating while the prompt is open; the 2026-10-02 attempt broke the line editor on tab and was reverted. The boot and `/pet` one-shot animation is done)*
   - [ ] T-335d Talking *(blocked)*: `dsh` streams straight to stdout during a turn, so nothing may draw then. Re-scoped: a one-line status spinner once the REPL reads the `--json` event stream, as `/loop-task` already does
 - [ ] T-334 Show running `/loop-task` and `/team` runs as live workers (pid + heartbeat file per run)
 
@@ -214,8 +214,7 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 
 ## Follow-ups from the 2026-10-02 round
 - [ ] T-440 Live check of `@finess/tool-hints` (T-438): run a session on the local 0.6B model and on a 4B+ model, then compare `/dashboard` tool failures before and after; the hints are unit-tested only
-- [ ] T-441 Shorten the boot text so Ness animates at boot in an 80x24 terminal (the wrapped command bar pushes her eye out of reach; she animates after `/pet` or in taller terminals)
-- [ ] T-442 Watch Ness in a real terminal (Windows Terminal, conhost, Terminal.app): ESC 7/8 cursor restore, resize stop, freeze on `/`, stop on Enter (simulated-terminal tests only so far)
+- [ ] T-442 Watch the boot animation in a real terminal (Windows Terminal, conhost, Terminal.app): frames overwrite in place, the cursor comes back, typing during it leaves nothing behind
 - [ ] T-443 `/stats` in the REPL has no `--watch` (CLI only); decide whether a watching quick-tool fits the prompt
 
 ## Parking lot (not scheduled)
