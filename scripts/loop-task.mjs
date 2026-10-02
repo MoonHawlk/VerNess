@@ -10,7 +10,8 @@
  * Four layered defences against the failure this was built for (a small model asking the same thing
  * forever), in increasing cost:
  *  1. a state digest injected every round, naming the tool calls already run;
- *  2. identical-call detection, which escalates from advisory to a hard stop;
+ *  2. consecutive identical-call detection (the substrate's repeat-tool-reminder tiers), escalating
+ *     from a gentle reminder to a detailed one to a hard stop;
  *  3. a no-progress counter over tool *diversity*, not just identical calls;
  *  4. an optional fresh-context verification round before `DONE` is believed.
  * @module scripts/loop-task
@@ -20,24 +21,28 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { classifyRound, detectStall, observeSession, renderDigest, roundPrompt } from './lib/loop.mjs'
+import { classifyRound, detectStall, observeSession, renderDigest, repeatReminder, roundPrompt } from './lib/loop.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { REPO, head, info, ok, paint, step, table, warn } from './lib/util.mjs'
 
 /** Rounds allowed before the driver stops regardless of progress. */
 const DEFAULT_MAX_ROUNDS = 8
 
+/** Wall-clock seconds one round may take before it is killed and the loop stops (`--round-timeout`). */
+export const DEFAULT_ROUND_TIMEOUT = 600
+
 /**
  * Run one objective to completion, or to a limit.
  *
  * @param {object} ctx - command context (`cfg`, `dsh`, `routeEnv`, `conversation`).
  * @param {string} objective - the objective, restated verbatim every round.
- * @param {{maxRounds?: number, constraints?: string[], verify?: boolean, fresh?: boolean}} [opts] - options.
+ * @param {{maxRounds?: number, constraints?: string[], verify?: boolean, fresh?: boolean, roundTimeout?: number}} [opts] - options; `roundTimeout` is seconds per round.
  * @returns {Promise<{outcome: string, rounds: number, detail: string}>} the result.
  */
 export async function runLoopTask(ctx, objective, opts = {}) {
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
   const constraints = opts.constraints ?? []
+  const roundTimeout = opts.roundTimeout ?? DEFAULT_ROUND_TIMEOUT
   const profile = ctx.cfg.profile.name
   const run = ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
   const workspace = REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, '')
@@ -54,6 +59,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
   const tokens = { input: 0, output: 0 }
   let previous
   let stalls = 0
+  let reminder = ''
   let outcome = 'exhausted'
   let detail = `no conclusion after ${maxRounds} rounds`
 
@@ -62,14 +68,21 @@ export async function runLoopTask(ctx, objective, opts = {}) {
       ? { turns: 0, calls: [], answers: [], errors: [] }
       : observeSession(sessionDirFor(identity, workspace))
     const digest = renderDigest(state)
-    const prompt = roundPrompt({ objective, digest, round, maxRounds, constraints })
+    const prompt = roundPrompt({ objective, digest, round, maxRounds, constraints: reminder === '' ? constraints : [...constraints, reminder] })
 
     step(`round ${round}/${maxRounds}`)
     const args = ['--profile', profile, '--json', ...(identity === undefined ? [] : ['--session-id', identity]), prompt]
     const t0 = Date.now()
-    const r = run(args, { capture: true, env: ctx.routeEnv })
+    const r = run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000 })
     const seconds = (Date.now() - t0) / 1000
     const parsed = parseRound(r.out)
+    if (r.timedOut === true) {
+      outcome = 'timeout'
+      detail = `round ${round} exceeded its ${roundTimeout}s budget and was killed`
+      log.push({ round, seconds, kind: 'timeout', newCalls: 0, detail })
+      warn(detail)
+      break
+    }
 
     // The stream reports the identity directly, so no directory diffing is needed.
     if (identity === undefined) {
@@ -91,7 +104,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
 
     if (verdict.kind === 'done') {
       if (opts.verify === false) { outcome = 'done'; detail = verdict.detail; break }
-      const check = await verifyRound(ctx, objective, verdict.detail, run, profile)
+      const check = await verifyRound(ctx, objective, verdict.detail, run, profile, roundTimeout)
       if (check.pass) { outcome = 'done'; detail = verdict.detail; ok(`verified: ${check.detail.slice(0, 120)}`); break }
       warn(`verification rejected the claim: ${check.detail.slice(0, 160)}`)
       if (check.detail !== '') constraints.push(`A previous round claimed completion and an independent check rejected it: ${check.detail.slice(0, 200)}`)
@@ -100,6 +113,8 @@ export async function runLoopTask(ctx, objective, opts = {}) {
 
     // Defences 2 and 3: identical calls, and churning the same tool with varied arguments.
     if (stall.repeated.length > 0) { outcome = 'repeating'; detail = `identical tool call repeated: ${stall.repeated.join(', ')}`; warn(detail); break }
+    reminder = repeatReminder(stall.chain)
+    if (reminder !== '') warn(`${stall.chain.name} repeated ${stall.chain.count}x - reminder added to the next round`)
     if (stall.churning.length > 0) warn(`churning: ${stall.churning.join(', ')} - the digest now says so explicitly`)
     // In a task loop, prose is not progress: a round that ran no tool and reached no verdict has
     // moved nothing, however much text it produced. That is the loop this command exists to break.
@@ -136,9 +151,10 @@ export async function runLoopTask(ctx, objective, opts = {}) {
  * @param {string} claim - what the working run claimed.
  * @param {(args: string[], opts: object) => {code: number, out: string}} run - the substrate runner.
  * @param {string} profile - the profile name.
+ * @param {number} [timeout] - seconds the check may take.
  * @returns {Promise<{pass: boolean, detail: string}>} the verdict.
  */
-async function verifyRound(ctx, objective, claim, run, profile) {
+async function verifyRound(ctx, objective, claim, run, profile, timeout) {
   const prompt = [
     'You are verifying someone else\'s work. You have not seen how it was done.',
     '',
@@ -148,7 +164,7 @@ async function verifyRound(ctx, objective, claim, run, profile) {
     'Check the claim yourself with your tools. Do not assume it is true.',
     'Reply with exactly one line: "PASS: <why>" or "NEEDS_WORK: <what is missing>".',
   ].join('\n')
-  const r = run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv })
+  const r = run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000 })
   const text = parseRound(r.out).answer
   const pass = /^\s*PASS\b/im.test(text)
   const m = /^\s*(?:PASS|NEEDS_WORK):\s*(.+)$/im.exec(text)
@@ -221,11 +237,13 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
   const { loadConfigForCli, makeCliContext } = await import('./finess.mjs')
   const argv = process.argv.slice(2)
   const at = argv.indexOf('--max-rounds')
-  const objective = argv.filter(a => !a.startsWith('--') && a !== argv[at + 1]).join(' ')
+  const tt = argv.indexOf('--round-timeout')
+  const objective = argv.filter((a, i) => !a.startsWith('--') && i !== at + 1 && i !== tt + 1).join(' ')
   const ctx = await makeCliContext(loadConfigForCli())
   const res = await runLoopTask(ctx, objective, {
     maxRounds: at >= 0 ? Number(argv[at + 1]) : undefined,
     verify: !argv.includes('--no-verify'),
+    roundTimeout: tt >= 0 ? Number(argv[tt + 1]) : undefined,
   })
   process.exit(res.outcome === 'done' ? 0 : 1)
 }

@@ -212,8 +212,8 @@ let dshEntry
  * characters, and `%` is expanded. Resolving the shim to its JS file and spawning `process.execPath`
  * with it sidesteps all three, on every platform.
  * @param {string[]} args - arguments for dsh.
- * @param {{env?: Record<string,string>, capture?: boolean}} [opts] - options.
- * @returns {{code: number, out: string}} exit status and captured output.
+ * @param {{env?: Record<string,string>, capture?: boolean, timeoutMs?: number}} [opts] - options; `timeoutMs` kills the run and sets `timedOut`.
+ * @returns {{code: number, out: string, timedOut?: boolean}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
   resolveDshEntry()
@@ -225,8 +225,9 @@ function dsh(args, opts = {}) {
     stdio: opts.capture === true ? 'pipe' : 'inherit',
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    ...(opts.timeoutMs > 0 ? { timeout: opts.timeoutMs, killSignal: 'SIGKILL' } : {}),
   })
-  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
+  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), timedOut: r.error?.code === 'ETIMEDOUT' }
 }
 
 /**
