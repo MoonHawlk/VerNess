@@ -499,6 +499,8 @@ pnpm test         # node --test: scripts/test/*.test.mjs + packages/*/test/*.tes
 pnpm typecheck    # tsc -p packages/contracts
 ```
 
+CI (`.github/workflows/ci.yml`) runs typecheck, tests and the clean-clone check on every push and pull request to `main` and `epic`, on Ubuntu, Windows and macOS with Node 22 and 24.
+
 Adding a slash command means adding one file in `scripts/commands/` (see `docs/07-COMMAND-LAYER.md`).
 
 ---

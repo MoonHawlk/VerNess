@@ -1,0 +1,49 @@
+# FiNess CI: the owner runs FiNess on macOS and Windows, so every push proves parity on all three.
+name: CI
+
+on:
+  push:
+    branches: [main, epic]
+  pull_request:
+    branches: [main, epic]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_COLOR: '1'
+  FINESS_NO_PET: '1'
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # engines: ^22.19.0 || >=24.0.0 -- '22' resolves to the newest 22.x (>= 22.19).
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json (pnpm@11.7.0)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      # The committed tree must start from a clean clone; the check is Node-only, so one OS is enough
+      # per Node version (the Windows leg is the one that has caught launcher-path bugs).
+      - name: Clean-clone check
+        if: matrix.os == 'windows-latest'
+        run: node scripts/check-clean-clone.mjs
