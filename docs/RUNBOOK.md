@@ -60,6 +60,8 @@ dsh --profile verness "call verness_ping and report the result"
 ```
 
 ## Troubleshooting
+- **`verness` is not found** — link the launcher once from the repo root: `npm link`; `.\turn_on.cmd` works without linking. See 06-SETUP-AND-LAUNCHER.md, *One `verness` command*.
+- **`error: VerNess needs Node 22.19.0+`** — the Node on PATH is too old (or is 23.x); install 22.19+ or 24+.
 - **A persona is listed as broken** — run `node scripts/verness.mjs persona check` (or `/persona check`
   in the REPL); it prints `personas/x.json:line:column path: message` for every issue.
 - **`N entry did not activate`** — read the error after it. Authoring mistakes in tool schemas are

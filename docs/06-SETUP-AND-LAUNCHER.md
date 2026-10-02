@@ -5,7 +5,7 @@ Two files are all you need day to day:
 | File | Role |
 |---|---|
 | `verness.config.json` | **the setup file** — personas, tips, model, plugins, general settings |
-| `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd` | **the launcher** — thin wrappers over `scripts/verness.mjs` |
+| `verness` (or `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd`) | **the launcher** — the `verness` bin and the thin wrappers all run `scripts/cli.mjs`, which checks Node and then loads `scripts/verness.mjs` |
 
 The launcher is plain Node (`^22.19.0 || >=24`; 23.x is rejected; the substrate already requires 22.19), so the same logic runs on
 Windows, macOS and Linux. The only platform-specific code is path resolution and the Windows `.cmd`
@@ -44,6 +44,29 @@ for your user only with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (n
 but it is a user-wide policy change — the first two options change nothing).
 
 npm equivalents exist for habit: `npm start`, `npm run setup|doctor|sync|graph|model:up|model:stats|model:down`.
+
+### One `verness` command
+
+`package.json` exposes the launcher as a bin, so after linking it once every example above can be
+written `verness <subcommand>` from any directory (`verness`, `verness web`, `verness doctor`, …):
+
+```sh
+npm link          # from the repo root (npm ships with Node): puts `verness` on PATH, pointing at this checkout
+verness doctor
+```
+The link points at the checkout you ran it from, so link the clone you actually use (not a scratch
+worktree). Remove it with `npm unlink -g verness`. (pnpm 11 dropped `pnpm link -g` — its `link`
+now only takes a directory — so `npm link` is the documented way.) The `turn_on.*`
+wrappers keep working and stay the zero-install way in: they only check that `node` is on PATH.
+
+`scripts/cli.mjs` checks the Node version *before* loading the launcher, so an old Node gets a
+plain `error: VerNess needs Node 22.19.0+ …` instead of a module-link error from the `.ts` contracts.
+It also warns on stderr (`!! scripts/lib/x.mjs is imported by the launcher but not tracked by git`)
+when a `scripts/lib` module the launcher reaches through its imports is not in git — it would run
+here but a clone would not start. One `git ls-files`, overlapped with loading the launcher; silent
+without git or outside a repository, and skipped for `--list-commands`.
+Node 22.19.0 itself runs the launcher without a type-stripping `ExperimentalWarning` (checked with
+`npx -y node@22.19`).
 
 `setup` does, in order: check Node → install pnpm if missing → install the pinned `dsh` → fetch the
 read-only submodule → create the profile from its template → install the route adapter → **link**

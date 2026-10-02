@@ -9,7 +9,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -28,12 +28,12 @@ import { loadTeams } from './lib/teams.mjs'
 import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
+import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.verness', 'run')
 const WIN = process.platform === 'win32'
-const NODE_MIN = [22, 19, 0]
 
 /** Defaults for every configurable field; the config file overrides these shallowly per section. */
 const DEFAULTS = {
@@ -287,16 +287,6 @@ function profileDeps(dir) {
 function npmRootGlobal() {
   const r = sh('npm', ['root', '-g'], { capture: true, allowFail: true })
   return r.code === 0 ? r.out.split('\n').pop().trim() : undefined
-}
-
-/**
- * @returns {boolean} whether the running Node satisfies the substrate engine range
- *   (`^22.19.0 || >=24.0.0` in `package.json`) — note major 23 is not in range.
- */
-function nodeOk() {
-  const [maj, min, pat] = process.versions.node.split('.').map(Number)
-  if (maj >= 24) return true
-  return maj === NODE_MIN[0] && (min > NODE_MIN[1] || (min === NODE_MIN[1] && pat >= NODE_MIN[2]))
 }
 
 // -------------------------------------------------------------- patch generation
@@ -1173,12 +1163,27 @@ commands
 
 everything is configured in verness.config.json (personas, tips, model, plugins)`
 
-// Only act as a CLI when invoked directly: `scripts/model.mjs` imports this module for its config.
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const [, , first, ...rest] = process.argv
-  const cfg = loadConfig()
-  await dispatch(first, rest, cfg)
+/**
+ * Run one command line as the CLI. `scripts/cli.mjs` (the `verness` bin) calls this after its
+ * Node-version check.
+ * @param {string[]} argv - the words after the script name.
+ */
+export async function main(argv) {
+  const [first, ...rest] = argv
+  await dispatch(first, rest, loadConfig())
 }
+
+/** @returns {boolean} whether this file is the process entry, even when reached through a symlink. */
+function invokedDirectly() {
+  if (process.argv[1] === undefined) return false
+  const entry = resolve(process.argv[1])
+  const self = fileURLToPath(import.meta.url)
+  if (entry === self) return true
+  try { return realpathSync(entry) === realpathSync(self) } catch { return false }
+}
+
+// Only act as a CLI when invoked directly: `scripts/model.mjs` imports this module for its config.
+if (invokedDirectly()) await main(process.argv.slice(2))
 
 /**
  * Route one command line.

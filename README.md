@@ -81,7 +81,8 @@ nothing because the AI is not involved.
   `/dotnet-check` (C#; prints the steps, does not run them) · `/release-check` (DevOps) ·
   `/threats` (security) · `/a11y` (frontend) · `/jd-check` (HR) · `/prd` (product) ·
   `/release-notes` (writer) · `/raid` (project manager) · `/triage` (support)
-- **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`) followed by nothing to start ·
+- **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`, or `verness` once linked with
+  `npm link` — see [06](docs/06-SETUP-AND-LAUNCHER.md)) followed by nothing to start ·
   `"a task"` for one task · `setup` · `doctor` · `up` · `down` · `off` · `web` · `sync` ·
   `decision up`
 

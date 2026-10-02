@@ -6,5 +6,5 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Write-Error 'node is not on PATH. Install Node 22.19+ or 24+ from https://nodejs.org'
   exit 1
 }
-& node (Join-Path $PSScriptRoot 'scripts/verness.mjs') @args
+& node (Join-Path $PSScriptRoot 'scripts/cli.mjs') @args
 exit $LASTEXITCODE
