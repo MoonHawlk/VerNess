@@ -49,13 +49,14 @@ test('groupCommits: one bullet per done line, strongest type wins, the rest go t
     { hash: 'a6', subject: 'fix(contracts): validator edges (T-387)' },
     { hash: 'a7', subject: 'chore(config): drop inline persona (T-388)' },
     { hash: 'a8', subject: 'fix(commands): /mo resolves to /model' },
+    { hash: 'a9', subject: 'feat(pet): off switch (T-433)' },
   ]
   const { sections, unplaced, open } = groupCommits(commits, doneIndex(DONE))
   assert.deepEqual(sections.Added, ['Web commands bridge (ADR-0011) (T-374..T-378)', '`/exit` (alias `/quit`) (T-148)'])
   assert.deepEqual(sections.Fixed, ['Validator edges (T-387)'])
   assert.deepEqual(sections.Changed, ['The inline persona removed from the config (T-388)'])
-  assert.deepEqual(unplaced, ['T-135 (only docs a1, test a2)', 'Fixed? /mo resolves to /model (no task ID: a8)'])
-  assert.deepEqual(open, ['T-431', 'T-432'])
+  assert.deepEqual(unplaced, ['T-135 (only docs a1, test a2)', 'Added? off switch (T-433) (task not in 03-BACKLOG-DONE.md: a9)', 'Fixed? /mo resolves to /model (no task ID: a8)'])
+  assert.deepEqual(open, ['T-431', 'T-432', 'T-433'])
 })
 
 test('setupTriggers ignores the root package.json; nextVersion follows the pre-1.0 rule', () => {

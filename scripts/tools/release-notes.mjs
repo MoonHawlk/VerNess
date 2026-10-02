@@ -15,7 +15,7 @@ const args = parseArgs(process.argv.slice(2))
 helpIf(args, `
 release-notes [--since <tag>] [--to <ref>] [--version vX.Y.Z]
   draft the next CHANGELOG.md entry (Added / Changed / Fixed / Upgrade) to stdout; writes nothing
-  --since X    start after this ref (default: the last tag reachable from --to)
+  --since X    start after this ref (default: the highest v* tag)
   --to X       end at this ref (default: epic, or HEAD when there is no epic branch)
   --version X  the heading's version (default: next minor if anything is Added, else next patch)
   Tasks are placed from feat/fix/chore commits whose IDs are in 03-BACKLOG-DONE.md (one bullet per
@@ -25,7 +25,8 @@ release-notes [--since <tag>] [--to <ref>] [--version vX.Y.Z]
 const verify = ref => git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]).code === 0
 const to = typeof args.to === 'string' ? args.to : (verify('epic') ? 'epic' : 'HEAD')
 if (!verify(to)) { console.log(`unknown ref: ${to}`); process.exit(1) }
-const since = typeof args.since === 'string' ? args.since : git(['describe', '--tags', '--abbrev=0', to]).out
+// The highest v* tag, not `describe`: release tags sit on main's merge commit, which epic may not contain.
+const since = typeof args.since === 'string' ? args.since : (git(['tag', '--list', 'v*', '--sort=-v:refname']).out.split('\n')[0] ?? '')
 if (since === '' || !verify(since)) { console.log(since === '' ? `no tag reachable from ${to}; pass --since <ref>` : `unknown ref: ${since}`); process.exit(1) }
 
 const range = `${since}..${to}`

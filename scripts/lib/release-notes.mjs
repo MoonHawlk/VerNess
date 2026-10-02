@@ -113,7 +113,7 @@ export function groupCommits(commits, index) {
       }
       continue
     }
-    if (known.length === 0) { loose[section].push(`${p.text} (no task ID: ${c.hash})`); continue }
+    if (known.length === 0) { loose[section].push(`${p.text} (${p.ids.length > 0 ? 'task not in 03-BACKLOG-DONE.md' : 'no task ID'}: ${c.hash})`); continue }
     for (const id of known) {
       const entry = index.get(id)
       const prev = tasks.get(entry.key)
