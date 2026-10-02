@@ -516,6 +516,8 @@ function makeArgsSupplier(cfg) {
       persona: ['list', 'show', ...personas],
       team: ['list', 'show', 'run', ...teams],
       teams: ['list', 'show', 'run', ...teams],
+      delegate: personas,
+      task: ['list', '--limit'],
       resume: sessions,
       model: ['reset', ...models],
       models: ['list', 'search', 'add', 'rm', '--use', '--purge', ...models],
@@ -559,6 +561,7 @@ function makeCompleter(cfg, commands) {
       return [hits.length > 0 ? hits : options, word]
     }
     if (cmd === 'persona' || cmd === 'p') return complete(['list', 'show', ...loadPersonas(cfg).keys()])
+    if (cmd === 'delegate' && parts.length === 2) return complete([...loadPersonas(cfg).keys()])
     if (cmd === 'team' || cmd === 'teams') return complete(['list', 'show', 'run', ...loadTeams().keys()])
     if (cmd === 'resume' || cmd === 'continue') {
       return complete(listSessions({ limit: 10 }).map(x => x.id.slice(0, 8)))
