@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
 import { readShadow } from './lib/labels.mjs'
 import { listSessions, readSessionEvents } from './lib/sessions.mjs'
-import { summarizeTools, toolRuns } from './lib/toolstats.mjs'
+import { summarizeTools, toolRuns, toolstatsClientSource } from './lib/toolstats.mjs'
 import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
 
 /** How many sessions get a full event timeline; older ones keep their summary row only. */
@@ -42,6 +42,16 @@ export function errorText(err) {
   const head = [err.name, err.code].filter(v => typeof v === 'string' && v !== '').join(' ')
   const msg = typeof err.message === 'string' && err.message !== '' ? err.message : ''
   return head === '' ? (msg === '' ? JSON.stringify(err) : msg) : msg === '' ? head : `${head}: ${msg}`
+}
+
+/**
+ * Does a session belong under a route filter? Embedded verbatim in the page, so keep it self-contained.
+ * @param {{routes?: string[]}} s - a session record.
+ * @param {string} route - `provider/model`, or '' for all.
+ * @returns {boolean} true when the filter is empty or the session used that route.
+ */
+export function matchRoute(s, route) {
+  return route === '' || (s.routes ?? []).includes(route)
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact human duration. */
@@ -118,6 +128,7 @@ function detail(summary) {
     toolCalls: summary.toolCalls,
     bytes: summary.bytes,
     route: routes.map(r => `${r.provider}/${r.model}`).join(', '),
+    routes: routes.map(r => `${r.provider}/${r.model}`),
     inputTokens: routes.reduce((a, r) => a + r.inputTokens, 0),
     outputTokens: routes.reduce((a, r) => a + r.outputTokens, 0),
     prompt: (prompt ?? '').slice(0, 300),
@@ -309,16 +320,20 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <details><summary>full backlog file (rendered)</summary><div class="md">${backlog.html}</div></details>
 
 <h2>Sessions</h2>
+<div class="bar">
+  <select id="f-route"><option value="">all routes</option>${[...new Set(sessions.flatMap(s => s.routes))].sort().map(r => `<option>${esc(r)}</option>`).join('')}</select>
+  <span class="dim">persona is not recorded in session logs, so this filters by route (model) only; it also narrows the tool tables below</span>
+</div>
 <table><thead><tr><th>id</th><th>when</th><th>title</th><th class="n">turns</th><th class="n">tools</th><th class="n">in</th><th class="n">out</th><th class="n">wall</th><th>route</th></tr></thead>
 <tbody>${sessionRows || '<tr><td colspan="9" class="dim">no sessions yet</td></tr>'}</tbody></table>
 <div id="detail" class="detail"></div>
 
-<h2 id="tools">Tools <span class="dim">(${esc(toolSummary.calls)} calls · ${esc(toolSummary.failures)} failed · from the session logs above)</span></h2>
+<h2 id="tools">Tools <span class="dim" id="tools-sum">(${esc(toolSummary.calls)} calls · ${esc(toolSummary.failures)} failed · from the session logs above)</span></h2>
 <table><thead><tr><th>tool</th><th class="n">calls</th><th class="n">failed</th><th class="n">failure</th><th class="n">p50</th><th class="n">p95</th></tr></thead>
-<tbody>${toolRows || '<tr><td colspan="6" class="dim">no tool calls in these sessions</td></tr>'}</tbody></table>
+<tbody id="tool-body">${toolRows || '<tr><td colspan="6" class="dim">no tool calls in these sessions</td></tr>'}</tbody></table>
 <h2>Tool latency <span class="dim">(call to result, all tools)</span></h2>
 <table><thead><tr><th>latency</th><th class="n">calls</th><th></th></tr></thead>
-<tbody>${histRows}</tbody></table>
+<tbody id="hist-body">${histRows}</tbody></table>
 
 <h2>Decisions <span class="dim">(shadow mode — logged, never applied)</span></h2>
 <table><thead><tr><th>when</th><th>task</th><th>level (model)</th><th>level (rules)</th><th>tier m/r</th><th>pipeline m/r</th><th class="n">agree</th><th class="n">latency</th></tr></thead>
@@ -373,6 +388,28 @@ const BACKLOG = ${JSON.stringify(backlog.tasks).replaceAll('<', '\\u003c')};
   draw();
 })();
 const DATA = ${JSON.stringify(sessions.map(({ runs, ...s }) => s)).replaceAll('<', '\\u003c')};
+const RUNS = ${JSON.stringify(sessions.map(s => s.runs)).replaceAll('<', '\\u003c')};
+${toolstatsClientSource()}
+${matchRoute.toString()}
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const dur = n => !(n > 0) ? '-' : n < 1000 ? n + ' ms' : n < 60000 ? (n / 1000).toFixed(1) + ' s' : Math.floor(n / 60000) + 'm ' + Math.round((n % 60000) / 1000) + 's';
+  const pct = r => (r * 100).toFixed(r > 0 && r < 0.1 ? 1 : 0) + '%';
+  $('f-route').addEventListener('input', () => {
+    const route = $('f-route').value;
+    const keep = DATA.map(s => matchRoute(s, route));
+    document.querySelectorAll('.row').forEach(r => { r.style.display = keep[Number(r.dataset.i)] ? '' : 'none'; });
+    const sum = summarizeTools(RUNS.filter((_, i) => keep[i]).flat());
+    const max = Math.max(1, ...sum.histogram.map(h => h.count));
+    $('tool-body').innerHTML = sum.tools.map(t => '<tr><td class="mono">' + esc(t.name) + '</td><td class="n">' + t.calls + '</td><td class="n">' + t.failures
+      + '</td><td class="n ' + (t.failures > 0 ? 'bad' : '') + '">' + pct(t.failRate) + '</td><td class="n">' + (t.p50 === undefined ? '-' : dur(t.p50))
+      + '</td><td class="n">' + (t.p95 === undefined ? '-' : dur(t.p95)) + '</td></tr>').join('') || '<tr><td colspan="6" class="dim">no tool calls in these sessions</td></tr>';
+    $('hist-body').innerHTML = sum.histogram.map(h => '<tr><td class="mono">' + esc(h.label) + '</td><td class="n">' + h.count
+      + '</td><td class="hist"><span style="width:' + Math.round((h.count / max) * 100) + '%"></span></td></tr>').join('');
+    $('tools-sum').textContent = '(' + sum.calls + ' calls \\u00b7 ' + sum.failures + ' failed \\u00b7 from the sessions shown above)';
+  });
+})();
 const panel = document.getElementById('detail');
 let open = null;
 document.querySelectorAll('.row').forEach(row => row.addEventListener('click', () => {

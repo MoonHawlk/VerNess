@@ -69,3 +69,17 @@ export function summarizeTools(runs) {
   }
   return { tools, histogram, calls: runs.length, failures: runs.filter(r => r.failed === true).length }
 }
+
+/**
+ * JavaScript source of {@link summarizeTools} and its helpers, so the static dashboard page can
+ * recompute the summary over a filtered set of runs (one implementation, no drift).
+ * @returns {string} statements defining `summarizeTools` in a browser script.
+ */
+export function toolstatsClientSource() {
+  return [
+    `const LATENCY_BUCKETS = [${LATENCY_BUCKETS.join(', ')}];`,
+    `const bucketLabel = ${bucketLabel};`,
+    `const quantile = ${quantile};`,
+    summarizeTools.toString(),
+  ].join('\n')
+}
