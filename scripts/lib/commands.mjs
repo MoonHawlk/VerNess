@@ -150,9 +150,11 @@ export function resolveCommand(word, commands) {
  * Classify one REPL line. A leading `/` marks a command; a leading `//` escapes that, so the line is
  * a task with one slash removed (`//etc/hosts is odd` sends `/etc/hosts is odd`); anything else is a
  * task as typed. A leading `#` appends the rest to the project brief (`kind: 'brief'`, text '' for a
- * bare `#`, which shows it); `##` escapes that the same way `//` does (T-147).
+ * bare `#`, which shows it); `##` escapes that the same way `//` does (T-147). A leading `!` runs the
+ * rest as a local shell command (`kind: 'shell'`) and `!!` also attaches its output to the next task
+ * (`attach: true`) (T-181); `!` has no escape, since `!!` is taken.
  * @param {string} line - the raw input line.
- * @returns {{kind: 'empty'} | {kind: 'command' | 'task' | 'brief', text: string}} what the line is.
+ * @returns {{kind: 'empty'} | {kind: 'command' | 'task' | 'brief', text: string} | {kind: 'shell', text: string, attach: boolean}} what the line is.
  */
 export function classifyLine(line) {
   const text = line.trim()
@@ -161,6 +163,8 @@ export function classifyLine(line) {
   if (text.startsWith('/')) return { kind: 'command', text }
   if (text.startsWith('##')) return { kind: 'task', text: text.slice(1) }
   if (text.startsWith('#')) return { kind: 'brief', text: text.slice(1).trim() }
+  if (text.startsWith('!!')) return { kind: 'shell', text: text.slice(2).trim(), attach: true }
+  if (text.startsWith('!')) return { kind: 'shell', text: text.slice(1).trim(), attach: false }
   return { kind: 'task', text }
 }
 

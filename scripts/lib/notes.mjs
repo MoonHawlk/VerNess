@@ -111,9 +111,11 @@ export const markSent = (dir, key) => setSent(dir, key, true)
 export const markUnsent = (dir, key) => setSent(dir, key, false)
 
 /**
- * Prefix operator context onto a task, clearly delimited so the model reads it as context.
+ * Prefix operator context onto a task, clearly delimited so the model reads it as context. Attached
+ * files, pages and command output (`@path`, `@url`, `!!cmd`; T-181) follow the task, each fenced.
  * @param {string} task - the task text.
- * @param {{notes?: Note[], brief?: string}} extra - what to prepend; the brief goes first.
+ * @param {{notes?: Note[], brief?: string, attachments?: {label: string, body: string, truncated?: boolean}[]}} extra -
+ *   what to add; the brief goes first, attachments last.
  * @returns {string} the composed task (the task unchanged when there is nothing to add).
  */
 export function composeTask(task, extra = {}) {
@@ -122,8 +124,11 @@ export function composeTask(task, extra = {}) {
   if (brief !== '') blocks.push(`Project brief from the operator (standing context, not tasks):\n${brief}`)
   const notes = extra.notes ?? []
   if (notes.length > 0) blocks.push(['Side notes from the operator (context, not tasks):', ...notes.map(n => `- ${n.text}`)].join('\n'))
-  if (blocks.length === 0) return task
-  return [...blocks, '---', task].join('\n\n')
+  const atts = (extra.attachments ?? []).map(a =>
+    [`----- attached: ${a.label}${a.truncated === true ? ' (truncated)' : ''} -----`, a.body, `----- end of ${a.label} -----`].join('\n'))
+  const tail = atts.length === 0 ? [] : ['Attached by the operator (context for the task above):', ...atts]
+  if (blocks.length === 0 && tail.length === 0) return task
+  return [...blocks, ...(blocks.length === 0 ? [] : ['---']), task, ...tail].join('\n\n')
 }
 
 // --- The `#` project brief (T-147): durable, one file per checkout, survives sessions. ---

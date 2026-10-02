@@ -187,8 +187,20 @@ Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 | `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
 | `/btw <note>` | a side note for the next task (see `/btw` above) (T-130) |
 | `#<note>`, `#`, `##…` | append to / show the project brief; `##` escapes a leading `#` (T-147) |
+| `!<cmd>` | runs `<cmd>` locally in the agent's working directory (the repo root) and prints stdout+stderr; nothing goes to the model, zero tokens. The shell is `cmd.exe /d /s /c` on Windows and `/bin/sh -c` elsewhere (so `!ls` is Unix-only; `!git status` works on both), stdin closed, 120 s timeout. Refused under `/access read-only`. Bare `!` prints usage; `!` has no escape (T-181) |
+| `!!<cmd>` | the same, and the output (capped at 12,000 characters) rides on the next task as an attachment `$ <cmd> (exit N)`; kept until a run succeeds, like `/btw` notes; pending `!!` output counts against the same 20,000 total as `@` references and is dropped if the composed task is refused as too long (T-181) |
+| `@path` in a task | attaches the file (text only; a NUL byte means binary and is refused) or a directory's sorted listing (`name/` for folders, max 200 entries), resolved from the repo root. `@"a b.txt"` quotes spaces; trailing `.,;:!?)` is dropped. `@` counts only at the start or after whitespace or `( [ { ' " \``, so `me@example.com` never expands; a path that does not exist stays plain text with a note (T-181) |
+| `@https://…` in a task | fetches the page (Node `fetch`, 10 s timeout, redirects followed, no cookies, auth or referrer; a URL with `user:pass@` is refused), HTML stripped to text, non-text types refused; the REPL says what it fetched (T-447) |
 | plain text, 3+ characters | the dropdown suggests up to 6 earlier tasks that start with it (case-insensitive), newest first, labelled `recent`, from the persisted input history `.finess/history.jsonl` (cap 500; credential-looking lines are never written); lines starting with `/` or `#` are never suggested; Up/Down reaches earlier runs (T-303) |
 | `/usage --by day` | tokens per local day and route across counted sessions (with `--all` / `--limit N`): day, route, model, sessions, calls, input and output tokens, newest day first. Each call is dated by its `assistant/message` event time (fallback: session `createdAt`, then log mtime) and bucketed by the local calendar date, never UTC; the header prints the offset. Any other `--by` value exits 1 (T-137) |
+
+Attachments follow the task after `Attached by the operator (context for the task above):`, each fenced
+`----- attached: <label> -----` … `----- end of <label> -----`, with `(truncated)` on the opening line when
+clipped. Caps: 12,000 characters per item and 20,000 in total, each overflow warned. They are smaller than
+one might expect because the task reaches the substrate as a single argv element and Windows refuses a
+command line over 32,767 characters; a composed task (brief, notes, task and attachments) over 30,000
+characters is not sent, with a warning, on every platform. Parsing and expansion live in
+`scripts/lib/attach.mjs` (fs, fetch and spawn injected; `scripts/test/attach.test.mjs`).
 
 ## On the web: the commands bridge (ADR-0011)
 
