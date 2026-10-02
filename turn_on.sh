@@ -7,4 +7,4 @@ if ! command -v node >/dev/null 2>&1; then
   echo "error: node is not on PATH. Install Node 22.19+ or 24+ from https://nodejs.org" >&2
   exit 1
 fi
-exec node "$DIR/scripts/verness.mjs" "$@"
+exec node "$DIR/scripts/cli.mjs" "$@"

@@ -33,3 +33,12 @@ test('cli.mjs runs the launcher: --list-commands prints valid JSON on stdout', (
   assert.equal(r.status, 0, r.stderr)
   assert.doesNotThrow(() => JSON.parse(r.stdout), r.stdout.slice(0, 200))
 })
+
+test('package.json exposes the entry as the `verness` bin, and every wrapper runs it (T-380)', () => {
+  const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'))
+  assert.equal(pkg.bin?.verness, 'scripts/cli.mjs')
+  assert.match(readFileSync(join(REPO, pkg.bin.verness), 'utf8'), /^#!\/usr\/bin\/env node\r?\n/)
+  for (const w of ['turn_on.sh', 'turn_on.ps1', 'turn_on.cmd']) {
+    assert.match(readFileSync(join(REPO, w), 'utf8'), /scripts[\\/]cli\.mjs/, w)
+  }
+})
