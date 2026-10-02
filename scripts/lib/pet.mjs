@@ -204,12 +204,18 @@ const SHEEP = [
 ]
 /** Her eyes are two pixels tall, split over rows 3 (lower half) and 4 (upper half), columns 8 and 11. */
 const EYES = { rows: [3, 4], cols: [8, 11] }
-/** Per mood: the mark floating above her head, and whether her eyes are open. */
+/** Per mood: the mark floating above her head, and whether her eyes are open. Broken-first order. */
 const MOODS = {
-  happy: { mark: '', open: true },
-  sleepy: { mark: 'z', open: false },
   worried: { mark: '!', open: true },
+  sleepy: { mark: 'z', open: false },
+  happy: { mark: '', open: true },
 }
+/**
+ * Every mood `moodOf` can return, in priority order: broken, then idle, then ok. Tests iterate this
+ * instead of naming moods, so a redesign only has to keep the order.
+ * @type {readonly ('worried'|'sleepy'|'happy')[]}
+ */
+export const PET_MOODS = Object.freeze(Object.keys(MOODS))
 /** Every line of the art is padded to this width, so the panel beside it stays aligned. */
 const ART_W = Math.max(...SHEEP.map(l => l.length))
 
