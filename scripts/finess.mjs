@@ -28,6 +28,7 @@ import { loadTeams } from './lib/teams.mjs'
 import { notifyDone } from './lib/notify.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
+import { loadRecipes } from './lib/recipes.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
@@ -516,6 +517,7 @@ function makeArgsSupplier(cfg) {
     const names = [...new Set([...loadPersonas(cfg).keys()])]
     cache = {
       persona: ['list', 'show', ...personas],
+      recipe: [...loadRecipes(join(REPO, 'recipes')).recipes.keys()],
       team: ['list', 'show', 'run', ...teams],
       teams: ['list', 'show', 'run', ...teams],
       delegate: personas,
@@ -564,6 +566,7 @@ function makeCompleter(cfg, commands) {
     }
     if (cmd === 'persona' || cmd === 'p') return complete(['list', 'show', ...loadPersonas(cfg).keys()])
     if (cmd === 'delegate' && parts.length === 2) return complete([...loadPersonas(cfg).keys()])
+    if (cmd === 'recipe' && parts.length === 2) return complete([...loadRecipes(join(REPO, 'recipes')).recipes.keys()])
     if (cmd === 'team' || cmd === 'teams') return complete(['list', 'show', 'run', ...loadTeams().keys()])
     if (cmd === 'resume' || cmd === 'continue') {
       return complete(listSessions({ limit: 10 }).map(x => x.id.slice(0, 8)))
@@ -1062,6 +1065,10 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
     // be swallowed by the registry; `//` escapes it, sending the rest (one slash kept) to the model.
     const parsed = classifyLine(line)
+    /** @type {string} */
+    let taskText
+    /** @type {string[]} */
+    let overlayArgs = []
     // `#<note>` appends to the durable project brief; `##` escapes it, as `//` does for a slash.
     if (parsed.kind === 'brief') {
       const max = Number(loadConfig().notes?.briefMaxChars ?? 4000)
@@ -1087,7 +1094,9 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
       const cfgNow = loadConfig()
       // `/exit` asks through `ctx.quit`; the loop then ends the same way an empty line does.
       let quit = false
-      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true } })
+      // `/recipe` hands its filled task back through `queueTask`; it then runs as this turn's task.
+      let queued
+      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true }, queueTask: t => { queued = t } })
       if (quit) break
       // `name` is the resolved one, so `/p` and a prefix like `/pers` reload too.
       if (handled && name === 'persona') {
@@ -1106,9 +1115,10 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
         warn(`no such command: /${typed}${near.length > 0 ? ` - did you mean ${near.map(n => `/${n}`).join(', ')}?` : ''}`)
         if (near.length === 0) info('press tab on an empty slash to list every command, or run /help')
       }
-      continue
-    }
-    const taskText = parsed.text
+      if (queued === undefined) continue
+      taskText = queued.text
+      overlayArgs = queued.overlay === undefined ? [] : ['--patch', queued.overlay]
+    } else taskText = parsed.text
     if (noModel) {
       warn('no model in this session (--no-model) - the task was not sent')
       info('restart without --no-model to run tasks; quick-tools (/help) still work here')
@@ -1132,7 +1142,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)) })
     const t0 = Date.now()
-    const run = dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
+    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0 }
