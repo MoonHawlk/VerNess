@@ -3,6 +3,7 @@
  * synthetic keypress events. Proves the rendering path, not just that the module parses.
  */
 import { readLineWithSuggestions } from '../lib/prompt.mjs'
+import { longLineCases } from './prompt.long-lines.mjs'
 
 const chunks = []
 const realWrite = process.stdout.write.bind(process.stdout)
@@ -84,6 +85,10 @@ await done2
 const replay = screen(chunks.join(''), 40)
 process.stdout.write = realWrite
 
+// Long lines (T-302): every keystroke replayed on a VT that wraps, reflows on resize and knows
+// wide characters; see long-lines below.
+const long = await longLineCases(realWrite)
+
 const plain = out.replaceAll(/\u001b\[[0-9;]*[A-Za-z]/g, '')
 const checks = {
   'rendered the prompt': plain.includes('finess> '),
@@ -98,6 +103,7 @@ const checks = {
   'accepted the highlighted item (trailing space is intentional)': line.trim() === '/decision',
   'kept the output printed before the prompt': replay[0] === 'earlier line one' && replay[1] === 'earlier line two',
   'left only the submitted line below it': replay.slice(2).join('').replaceAll(' ', '') === 'finess>/d along argument that wraps the input row'.replaceAll(' ', ''),
+  ...long,
 }
 let bad = 0
 for (const [k, v] of Object.entries(checks)) {
