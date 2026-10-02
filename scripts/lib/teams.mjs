@@ -12,14 +12,17 @@
  * @module scripts/lib/teams
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
 
 import { loadPersonas, writePersonaOverlay } from './personas.mjs'
 import { parseJsonc, REPO, human, info, ok, paint, step, table, warn } from './util.mjs'
 
 /** @returns {string} the teams directory. */
 export const teamsDir = () => join(REPO, 'teams')
+
+/** @returns {string} where team runs are recorded: `.verness/runs/<team>/<stamp>/`. */
+export const runsDir = () => join(REPO, '.verness', 'runs')
 
 /**
  * Load every team definition.
@@ -96,7 +99,8 @@ function personaFor(team, task, personas, fallbackId) {
  * Run a team's task list.
  * @param {object} team - the team to run.
  * @param {object} ctx - the command context (`cfg`, `sh`, `activePersona`, `runTask`).
- * @param {{concurrency?: number, only?: string[], dryRun?: boolean}} [opts] - run options.
+ * @param {{concurrency?: number, only?: string[], dryRun?: boolean, runsRoot?: string}} [opts] - run
+ *   options; `runsRoot` overrides `.verness/runs` (tests).
  * @returns {Promise<{dir: string, results: object[]}>} the output directory and per-task results.
  */
 export async function runTeam(team, ctx, opts = {}) {
@@ -113,7 +117,7 @@ export async function runTeam(team, ctx, opts = {}) {
   if (selected.length === 0) { warn('no matching tasks'); return { dir: '', results: [] } }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const dir = join(REPO, '.verness', 'runs', team.id, stamp)
+  const dir = join(opts.runsRoot ?? runsDir(), team.id, stamp)
   const concurrency = Math.max(1, Number(opts.concurrency ?? team.concurrency ?? 1))
 
   step(`team ${team.name}: ${selected.length} task(s), concurrency ${concurrency}`)
@@ -192,8 +196,133 @@ export async function runTeam(team, ctx, opts = {}) {
     ...table(['task', 'persona', 'exit', 'seconds'], results.map(r => [r.id, r.persona, String(r.code), r.seconds.toFixed(1)])),
     '',
   ].join('\n'), 'utf8')
+  writeFileSync(join(dir, 'summary.json'), `${JSON.stringify(buildSummary(team, stamp, concurrency, selected, results), null, 2)}\n`, 'utf8')
   step('team run complete')
   for (const l of table(['task', 'persona', 'exit', 'seconds'], results.map(r => [r.id, r.persona, String(r.code), r.seconds.toFixed(1)]))) console.log(`  ${l}`)
   info(`transcripts: ${dir}`)
   return { dir, results }
+}
+
+/**
+ * A task's status word from its exit code.
+ * @param {number|null|undefined} code - the exit code; `undefined` means the task never ran.
+ * @returns {'ok'|'failed'|'not-run'} the status.
+ */
+const statusOf = code => (code === undefined ? 'not-run' : code === 0 ? 'ok' : 'failed')
+
+/**
+ * The machine-readable record of a run, written as `summary.json` beside `summary.md` (T-170).
+ * Tasks keep the selected (definition) order, not completion order, and tasks a deadlock left
+ * unstarted appear as `not-run`. `file` is a basename so the JSON stays portable across machines.
+ * @param {object} team - the team.
+ * @param {string} stamp - the run's directory name.
+ * @param {number} concurrency - the effective concurrency.
+ * @param {object[]} selected - the tasks selected for this run.
+ * @param {object[]} results - per-task result records from the runner.
+ * @returns {object} the summary.
+ */
+export function buildSummary(team, stamp, concurrency, selected, results) {
+  const byId = new Map(results.map(r => [r.id, r]))
+  const tasks = selected.map(t => {
+    const r = byId.get(t.id)
+    return {
+      id: t.id,
+      member: t.member ?? null,
+      persona: r?.persona ?? null,
+      dependsOn: t.dependsOn,
+      status: statusOf(r === undefined ? undefined : r.code),
+      exit: r === undefined ? null : r.code,
+      seconds: r === undefined ? null : Number(r.seconds.toFixed(1)),
+      file: r === undefined ? null : basename(r.file),
+    }
+  })
+  return {
+    v: 1,
+    team: team.id,
+    name: team.name,
+    stamp,
+    finishedAt: new Date().toISOString(),
+    concurrency,
+    ok: tasks.every(t => t.status === 'ok'),
+    tasks,
+  }
+}
+
+/**
+ * Directory names inside `dir`, sorted ascending; empty when `dir` is missing.
+ * @param {string} dir - the directory.
+ * @returns {string[]} sub-directory names.
+ */
+const subdirs = dir => {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir).filter(n => {
+    try { return statSync(join(dir, n)).isDirectory() } catch { return false }
+  }).sort()
+}
+
+/**
+ * Find the newest recorded run. Stamps are ISO timestamps with `:` and `.` replaced, so a lexical
+ * sort is chronological on every platform (mtime is not: copies and checkouts reset it).
+ * @param {string} [teamId] - a team id; omitted means the newest run of any team.
+ * @param {string} [root] - the runs root (defaults to `.verness/runs`).
+ * @returns {{team: string, stamp: string, dir: string}|undefined} the run, or undefined when none.
+ */
+export function latestRun(teamId, root = runsDir()) {
+  const teams = teamId === undefined ? subdirs(root) : subdirs(root).filter(t => t === teamId)
+  let best
+  for (const team of teams) {
+    const stamp = subdirs(join(root, team)).at(-1)
+    if (stamp !== undefined && (best === undefined || stamp > best.stamp)) best = { team, stamp, dir: join(root, team, stamp) }
+  }
+  return best
+}
+
+/**
+ * Read a run directory: `summary.json` when present, otherwise the `<task>.md` headers (runs made
+ * before `summary.json` existed, or a run still in progress).
+ * @param {string} dir - the run directory.
+ * @returns {{team: string, stamp: string, dir: string, state: 'complete'|'incomplete', source: string, tasks: object[]}} the run.
+ */
+export function readRun(dir) {
+  const stamp = basename(dir)
+  const team = basename(join(dir, '..'))
+  const jsonPath = join(dir, 'summary.json')
+  if (existsSync(jsonPath)) {
+    try {
+      const s = JSON.parse(readFileSync(jsonPath, 'utf8').replace(/^﻿/, ''))
+      return { team: s.team ?? team, stamp: s.stamp ?? stamp, dir, state: 'complete', source: 'summary.json', tasks: s.tasks ?? [] }
+    } catch { /* unreadable: fall back to the transcripts */ }
+  }
+  const files = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.md') && f !== 'summary.md').sort() : []
+  const tasks = files.map(f => {
+    const body = readFileSync(join(dir, f), 'utf8')
+    const exitRaw = /^- exit: (-?\d+|null)\s*$/m.exec(body)?.[1]
+    const secondsRaw = /^- seconds: ([\d.]+)\s*$/m.exec(body)?.[1]
+    const exit = exitRaw === undefined || exitRaw === 'null' ? null : Number(exitRaw)
+    return {
+      id: f.replace(/\.md$/, ''),
+      persona: /^- persona: (\S+)/m.exec(body)?.[1] ?? null,
+      status: exitRaw === undefined ? 'not-run' : statusOf(exit),
+      exit,
+      seconds: secondsRaw === undefined ? null : Number(secondsRaw),
+      file: f,
+    }
+  })
+  const state = existsSync(join(dir, 'summary.md')) ? 'complete' : 'incomplete'
+  return { team, stamp, dir, state, source: 'transcripts', tasks }
+}
+
+/**
+ * Table rows for `/team status`.
+ * @param {{tasks: object[]}} run - a run from `readRun`.
+ * @returns {string[][]} rows of task, persona, status, exit, seconds.
+ */
+export function statusRows(run) {
+  return run.tasks.map(t => [
+    t.id,
+    t.persona ?? '-',
+    t.status ?? '?',
+    t.exit === null || t.exit === undefined ? '-' : String(t.exit),
+    typeof t.seconds === 'number' ? t.seconds.toFixed(1) : '-',
+  ])
 }
