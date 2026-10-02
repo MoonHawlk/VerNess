@@ -9,7 +9,7 @@
  * @module scripts/lib/profile-setup
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** @param {string} key - a package name. @returns {string} it as a YAML mapping key. */
@@ -104,6 +104,45 @@ export function enableBundle(dir, name) {
 export function bundleName(spec) {
   const at = spec.indexOf('@', 1)
   return at === -1 ? spec : spec.slice(0, at)
+}
+
+/** The comment line a synced profile patch carries to name the checkout that wrote it. */
+export const CHECKOUT_STAMP = '# checkout: '
+
+/**
+ * The checkout path stamped in a synced patch, if any.
+ * @param {string} text - the patch text.
+ * @returns {string|undefined} the path, or undefined for an unstamped (older or committed) patch.
+ */
+export function patchCheckout(text) {
+  const line = text.split(/\r?\n/).find(l => l.startsWith(CHECKOUT_STAMP))
+  return line === undefined ? undefined : line.slice(CHECKOUT_STAMP.length).trim()
+}
+
+/**
+ * Warnings before a sync overwrites the shared `~/.dsh` profile patch (T-336, T-433): another
+ * checkout wrote it last, or this checkout is a git worktree (the web UI's bridge then runs the
+ * worktree's launcher until the main checkout syncs again).
+ * @param {{existing?: string, repo: string, worktree: boolean}} opts - the patch text now in the
+ *   profile (undefined when none), this checkout's path, and whether it is a linked worktree.
+ * @returns {string[]} warning lines, empty when nothing is off.
+ */
+export function syncWarnings({ existing, repo, worktree }) {
+  const out = []
+  const prev = existing === undefined ? undefined : patchCheckout(existing)
+  const same = (a, b) => a.replaceAll('\\', '/').toLowerCase() === b.replaceAll('\\', '/').toLowerCase()
+  if (prev !== undefined && !same(prev, repo)) out.push(`the profile patch was last written by another checkout (${prev}); this sync replaces it`)
+  if (worktree) out.push('syncing from a git worktree: the web UI will run this worktree\'s launcher until the main checkout runs sync again')
+  return out
+}
+
+/**
+ * Whether a checkout is a linked git worktree (its `.git` is a file, not a directory).
+ * @param {string} repo - the checkout path.
+ * @returns {boolean} true for a linked worktree.
+ */
+export function isWorktree(repo) {
+  try { return statSync(join(repo, '.git')).isFile() } catch { return false }
 }
 
 /**

@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { applyAllowBuilds, bundleName, enableBundle, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
+import { applyAllowBuilds, bundleName, enableBundle, isWorktree, patchCheckout, syncWarnings, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
 
 const PNPM_WROTE = `packages:
   - .
@@ -76,3 +76,27 @@ test('bundleName strips a pinned version and keeps the scope', () => {
   assert.equal(bundleName('plain@1.2.3'), 'plain')
   assert.equal(bundleName('plain'), 'plain')
 })
+
+test('patchCheckout reads the stamp; an unstamped patch has none', () => {
+  assert.equal(patchCheckout('# GENERATED\r\n# checkout: C:\\a\\repo\r\n- insert:\r\n'), 'C:\\a\\repo')
+  assert.equal(patchCheckout('# GENERATED\n- insert:\n'), undefined)
+})
+
+test('syncWarnings: another checkout and a worktree warn; the same checkout (any slash or case) does not', () => {
+  assert.deepEqual(syncWarnings({ existing: undefined, repo: '/r', worktree: false }), [])
+  assert.deepEqual(syncWarnings({ existing: '# checkout: C:\\Repo\n', repo: 'c:/repo', worktree: false }), [])
+  const other = syncWarnings({ existing: '# checkout: /other\n', repo: '/r', worktree: false })
+  assert.equal(other.length, 1)
+  assert.match(other[0], /another checkout \(\/other\)/)
+  assert.match(syncWarnings({ existing: undefined, repo: '/r', worktree: true })[0], /worktree/)
+})
+
+test('isWorktree: a .git file is a linked worktree, a .git directory or none is not', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'finess-wt-'))
+  try {
+    assert.equal(isWorktree(dir), false)
+    writeFileSync(join(dir, '.git'), 'gitdir: /x/.git/worktrees/y\n')
+    assert.equal(isWorktree(dir), true)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
