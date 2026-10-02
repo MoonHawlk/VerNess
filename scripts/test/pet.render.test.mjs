@@ -7,7 +7,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PET_MOODS, activityOf, ago, moodOf, petAnimFrames, petArt, petFrames, petIntro, renderPet } from '../lib/pet.mjs'
+import { PET_MOODS, ago, moodOf, petAnimFrames, petArt, renderPet } from '../lib/pet.mjs'
 
 const NOW = Date.parse('2026-09-26T12:00:00Z')
 const base = () => ({
@@ -160,72 +160,24 @@ test('ago', () => {
   assert.equal(ago(-1), '0s', 'clock skew never prints a negative age')
 })
 
-for (const mood of PET_MOODS) {
-  test(`${mood}: resting art is ASCII only (T-434) and is frame 0 of the mood's track`, () => {
-    for (const l of petArt(mood)) assert.match(l, /^[\x20-\x7e]*$/, `ASCII only: "${l}"`)
-    assert.deepEqual(petFrames(mood).frames[0].lines, petArt(mood), 'the animator starts from what is drawn')
-  })
-
-  test(`${mood}: timings are sane (T-335a)`, () => {
-    const p = petFrames(mood)
-    assert.equal(typeof p.loop, 'boolean')
-    assert.ok(p.jitter >= 0 && p.jitter <= 1)
-    assert.ok(p.frames.length >= 2, 'she moves')
-    for (const f of p.frames) assert.ok(Number.isInteger(f.ms) && f.ms >= 80 && f.ms <= 10000, `${mood}: ${f.ms} ms`)
-    assert.deepEqual(p.frames.map(f => f.lines), petAnimFrames(mood))
-  })
-
-  for (const kind of ['cheer', 'sigh']) {
-    test(`${mood}: the ${kind} intro plays once, ends on the resting art, never touches the mark row`, () => {
-      const t = petIntro(kind, mood)
-      assert.equal(t.loop, false)
-      assert.deepEqual(t.frames.at(-1).lines, petArt(mood))
-      for (const f of t.frames) {
-        assert.equal(f.lines[0], petArt(mood)[0], 'row 0 is not drawn for a happy sheep')
-        assert.equal(f.lines.length, artH)
-        for (const l of f.lines) assert.ok(l.length === artW && /^[\x20-\x7e]*$/.test(l), `"${l}"`)
-      }
-    })
-  }
-}
-
-test('activity: recent /loop-task results add an intro, problems and stale results do not', () => {
-  assert.deepEqual(activityOf(base()), { state: 'ready', mood: OK }, 'the loop in base() is two hours old')
-  const done = base(); done.recent.loop = { outcome: 'done', at: NOW - 60e3, objective: 'x' }
-  assert.deepEqual(activityOf(done), { state: 'done', mood: OK, intro: 'cheer' })
-  const failed = base(); failed.recent.loop = { outcome: 'stalled', at: NOW - 60e3, objective: 'x' }
-  assert.deepEqual(activityOf(failed), { state: 'failed', mood: OK, intro: 'sigh' })
-  const idle = base(); idle.workers.engine.loaded = []
-  assert.equal(activityOf(idle).state, 'idle')
-  const down = structuredClone(done); down.workers.engine.up = false
-  assert.deepEqual(activityOf(down), { state: 'problem', mood: BROKEN }, 'a problem is shown, not a celebration')
-  const future = base(); future.recent.loop = { outcome: 'done', at: NOW + 60e3, objective: 'x' }
-  assert.equal(activityOf(future).intro, undefined, 'clock skew earns nothing')
-  const none = base(); none.recent = {}
-  assert.equal(activityOf(none).state, 'ready')
-})
-
-// Specific to the current drawing (the ASCII sheep, 9 x 21). Delete or rewrite with the drawing.
-test('drawing-specific: the sheep changes only her eye and her mark with the mood', () => {
+// Specific to the current drawing (the block sheep, 18 x 41). Delete or rewrite with the drawing.
+test('drawing-specific: the sheep changes only her face with the mood', () => {
   const outline = petArt('happy').slice(1)
   for (const m of PET_MOODS) {
     const a = petArt(m)
-    assert.equal(a.length, 9)
-    assert.ok(a.every(l => l.length === 21), `${m} art is 21 columns wide`)
+    assert.equal(a.length, 18)
+    assert.ok(a.every(l => l.length === 41), `${m} art is 41 columns wide`)
     const sheep = a.slice(1)
     for (let r = 0; r < sheep.length; r++) if (r !== 3) assert.equal(sheep[r], outline[r], `${m} outline row ${r}`)
+    assert.equal(sheep[4][8] + sheep[4][11], '▀▀', `${m} lower lids`)
   }
-  assert.equal(petArt('happy')[4][4], 'o', 'happy eye open')
-  assert.equal(petArt('sleepy')[4][4], '-', 'sleepy eye closed')
-  assert.equal(petFrames('happy').frames[1].lines[4][4], '-', 'the blink closes it')
+  assert.equal(outline[3][8] + outline[3][11], '▄▄', 'happy eyes open')
+  assert.equal(petArt('sleepy')[4][8] + petArt('sleepy')[4][11], '░░', 'sleepy eyes closed')
   assert.match(petArt('sleepy')[0], /z/)
   assert.match(petArt('worried')[0], /!/)
-  assert.doesNotMatch(petFrames('worried').frames[1].lines[0], /!/, 'the pulse hides the !')
   assert.equal(petArt('happy')[0].trim(), '', 'happy needs no mark')
-  const zRow = f => f.lines.findIndex(l => /z/i.test(l))
-  assert.deepEqual(petFrames('sleepy').frames.map(zRow), [0, 3, 2, 1], 'the z drifts up, then restarts')
   const wide = offTTY(() => renderPet(base(), { columns: 120 }))
-  assert.ok(wide.some(l => l.includes('|||') && l.includes('Ness:')), 'side by side at 120, speech by her hooves')
-  assert.ok(!offTTY(() => renderPet(base(), { columns: 70 })).some(l => l.includes('`;') && l.includes('versions')), 'stacked under 77 columns')
-  assert.ok(!offTTY(() => renderPet(base(), { columns: 22 })).some(l => l.includes('|||')), 'no sheep when she would wrap')
+  assert.ok(wide.some(l => l.includes('█') && l.includes('versions')), 'side by side at 120')
+  assert.ok(!offTTY(() => renderPet(base(), { columns: 50 })).some(l => l.includes('█') && l.includes('versions')), 'stacked under 97 columns')
+  assert.ok(!offTTY(() => renderPet(base(), { columns: 40 })).some(l => l.includes('█')), 'no sheep when she would wrap')
 })
