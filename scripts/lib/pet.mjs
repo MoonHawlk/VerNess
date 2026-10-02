@@ -179,32 +179,24 @@ export function moodOf(v) {
 }
 
 /**
- * Ness is a baby sheep, drawn in blocks: every pixel of the original sprite is one half-cell, so a
- * terminal cell (about twice as tall as wide) holds two pixels stacked and the proportions survive.
- * The shades are her wool (`░`), cheeks and mouth (`▒`) and nose (`▓`).
+ * Ness is a sheep, drawn in plain ASCII so legacy Windows consoles (conhost with a raster font)
+ * show her as she is (T-434). Her head is on the left; the free cells above it carry the marks.
  */
 const SHEEP = [
-  '      ▄▀▀▀▀▀▀▀▀▀▄',
-  '    ▄▀           ▀▄   ▄▄▄▄   ▄▄▄▓▄',
-  '   ▄▀ ▄▀▀▀▀▀▀▀▄    ▀▀▀    ▀▀▀     ▀▀▄',
-  ' ▄▀▀▄▀░░▄░░▄░░░█ ▄▀▄▒                ▀▄',
-  '  ▀▀█░░░▀░░▀░░░█ ▀▄▄▓▀                 ▀▄',
-  '   █░░░░░░░░░░░█                        █',
-  '  █░▓▓▓▓░░░░░▄▀                         █',
-  '  ▀▄░▓▓░▒░▒▄▀░ ░░ ░ ░░   ░    ░ ░       █',
-  '   ▀▄▄▄▄▄▓▓▀░░ ░  ░ ░  ░░░ ░    ░░      █',
-  '         █▓░                            █',
-  '           █░              ░          ░▄▀',
-  '          ░▀▄░░░░░░░░░  ░░░░░░    ░░▄▄▄▀',
-  '             ▀▄▀▄▄▄▀▓▄▄▄▀▀▀▀▀▄▄▄▓█▀█░█',
-  '              █░█ █░▒█        █▒▒█ █░█',
-  '              █░█ █░░█        █░▒█ █░█',
-  '              █▀█ █▀▀█        █▀▓█ █▀█',
-  '          ░░ ░  ░░▒░░░  ░ ░░░░░░',
+  '         __  _',
+  '     .-:\'  `; `-._',
+  '    (_,           )',
+  '  ,\'o"(            )>',
+  '  (__,-\'            )',
+  '    (             )',
+  '     `-\'._.--._.-\'',
+  '        |||  |||',
 ]
-/** Her eyes are two pixels tall, split over rows 3 (lower half) and 4 (upper half), columns 8 and 11. */
-const EYES = { rows: [3, 4], cols: [8, 11] }
-/** Per mood: the mark floating above her head, and whether her eyes are open. Broken-first order. */
+/** Her eye, in `petArt` coordinates (row 0 is the mark row above the sheep). */
+const EYE = { row: 4, col: 4 }
+/** Where the mood mark floats, in `petArt` coordinates: straight above her eye. */
+const MARK = { row: 0, col: 4 }
+/** Per mood: the mark floating above her head, and whether her eye is open. Broken-first order. */
 const MOODS = {
   worried: { mark: '!', open: true },
   sleepy: { mark: 'z', open: false },
@@ -220,107 +212,115 @@ export const PET_MOODS = Object.freeze(Object.keys(MOODS))
 const ART_W = Math.max(...SHEEP.map(l => l.length))
 
 /**
- * The sheep for a mood. Only the face changes - closed eyes keep just the lower lid - so her
- * outline stays put.
+ * The sheep for a mood. Only the eye and the mark change, so her outline stays put.
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
- * @returns {string[]} eighteen lines (the mood mark, then the sheep), each exactly 41 columns wide.
+ * @returns {string[]} nine lines (the mood mark, then the sheep), each exactly `ART_W` columns wide.
  */
 export function petArt(mood) {
   const m = MOODS[mood] ?? MOODS.happy
-  const rows = SHEEP.map(l => [...l])
-  if (!m.open) for (const c of EYES.cols) rows[EYES.rows[0]][c] = '░'
-  return [`    ${m.mark}`, ...rows.map(r => r.join(''))].map(l => l.padEnd(ART_W))
+  return draw([[MARK.row, MARK.col, m.mark === '' ? ' ' : m.mark], [EYE.row, EYE.col, m.open ? 'o' : '-']])
 }
 
 /**
- * The round Ness, kept for the boot animation (plan WS-C decides how it and the sheep fit together).
- * Keyed by the sheep's moods so `moodOf` drives both: sleepy uses the round pet's curious frames,
- * worried its sad ones. Every frame is 8 lines x 9 columns, so the animator overwrites in place.
+ * @param {[number, number, string][]} marks - `[row, col, char]` cells to set, in `petArt` coordinates.
+ * @returns {string[]} the bare sheep with those cells set, every line padded to `ART_W`.
  */
-const W_FRAME = 9
-const FRAMES = {
-  happy: [
-    // quiet start
-    ['         ', '  o      ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
-    // excited, first bounce
-    ['   o     ', ' o       ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(  \\u/  )', ' (     ) ', '  (   )  '],
-    // peak jump - floats up, big smile, bubbles everywhere
-    ['  o  o   ', '    o    ', '  (   )  ', ' ( ^_^ ) ', '(  \\u/  )', '(       )', ' (     ) ', '         '],
-    // settled, bubbles drifting (resting)
-    ['  o   o  ', '   o     ', '  (   )  ', ' (     ) ', '( ^   ^ )', '(   u   )', ' (     ) ', '  (   )  '],
-  ],
-  worried: [
-    // normal but sad
-    ['         ', '         ', '  (   )  ', ' (     ) ', '( -   - )', '(   ~   )', ' (     ) ', '  (   )  '],
-    // starts drooping
-    ['         ', '         ', '  (   )  ', ' ( _   _)', '(   ~   )', '(       )', ' ( , , ) ', '  (   )  '],
-    // fully wilting - shape deforms
-    ['         ', '         ', '   ( )   ', '  (- -  )', ' ( ~~~  )', '(       )', ' /     \\ ', '         '],
-    // resting sad state
-    ['         ', '         ', '  (   )  ', ' ( -   -)', '(   ~   )', '(       )', ' (     ) ', '  (   )  '],
-  ],
-  sleepy: [
-    // round, curious look
-    ['         ', '         ', '  (   )  ', ' ( o . ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
-    // squashed into a wide oval
-    ['         ', '         ', ' /-----\\ ', '/ o   o \\', '(   ??  )', '\\-------/', '         ', '         '],
-    // stretched into a tall oval
-    ['         ', '  (   )  ', ' (     ) ', '( o . o )', '(   ?   )', ' (     ) ', '  (   )  ', '         '],
-    // back to round, still curious (resting)
-    ['         ', '         ', '  (   )  ', ' ( o ? ) ', '(   ?   )', '(       )', ' (     ) ', '  (   )  '],
-  ],
+function draw(marks) {
+  const rows = ['', ...SHEEP].map(l => [...l.padEnd(ART_W)])
+  for (const [r, c, ch] of marks) rows[r][c] = ch
+  return rows.map(r => r.join(''))
 }
 
 /**
- * All animation frames of the round Ness for a mood, each line padded to W_FRAME.
+ * @typedef {{lines: string[], ms: number}} PetFrame - one picture, and how long it stays.
+ * @typedef {{frames: PetFrame[], loop: boolean, jitter: number}} PetTrack - frames in playback order;
+ *   `loop: false` plays once and stays on the last frame; `jitter` (0..1) randomises each `ms` by up
+ *   to that fraction either way, so idle motion never looks mechanical.
+ */
+
+/**
+ * How each mood moves while Ness waits at the prompt. Frame 0 is always `petArt(mood)`, the drawing
+ * already on screen, so the animator starts from what the reader sees.
+ * - happy: a long rest, then the eye closed for ~150 ms, at a randomised interval (T-335b).
+ * - sleepy: a `z` drifts up from her head to the mark row, then restarts (T-335c).
+ * - worried: the `!` pulses (T-335e); it stops when the problem is fixed and `/pet` redraws her.
+ * Each entry is a list of `[ms, cells]`, the cells drawn over the bare sheep.
+ * @type {Record<string, {loop: boolean, jitter: number, frames: [number, [number, number, string][]][]}>}
+ */
+const MOTION = {
+  worried: { loop: true, jitter: 0, frames: [[700, [[MARK.row, MARK.col, '!']]], [450, []]] },
+  sleepy: {
+    loop: true,
+    jitter: 0.1,
+    frames: [[1800, [[MARK.row, MARK.col, 'z']]], [700, [[3, 3, 'z']]], [700, [[2, 2, 'z']]], [700, [[1, 3, 'Z']]]],
+  },
+  happy: { loop: true, jitter: 0.4, frames: [[3500, []], [150, [[EYE.row, EYE.col, '-']]]] },
+}
+
+/**
+ * One-shot intros, played before the mood's loop when something just happened (see `activityOf`).
+ * They only touch rows 1 to 3, which are drawn in every mood (happy hides the blank mark row).
+ * - cheer: sparkles around her head - the last `/loop-task` finished `done`.
+ * - sigh: a `?` rises beside her head - the last `/loop-task` ended without finishing.
+ */
+const INTROS = {
+  cheer: [[250, [[2, 1, '*'], [1, 16, '*']]], [250, [[3, 0, '+'], [2, 19, '+']]], [250, [[1, 1, '*'], [1, 18, '*']]]],
+  sigh: [[500, [[3, 2, '?']]], [500, [[2, 2, '?']]], [500, [[1, 2, '?']]]],
+}
+
+/**
+ * The mood's frames with their timings (T-335a).
+ * @param {'happy'|'sleepy'|'worried'} mood - the mood.
+ * @returns {PetTrack} the track; frame 0 equals `petArt(mood)`.
+ */
+export function petFrames(mood) {
+  const m = MOODS[mood] === undefined ? 'happy' : mood
+  const t = MOTION[m]
+  const eye = [EYE.row, EYE.col, MOODS[m].open ? 'o' : '-']
+  return { loop: t.loop, jitter: t.jitter, frames: t.frames.map(([ms, cells]) => ({ ms, lines: draw([eye, ...cells]) })) }
+}
+
+/**
+ * A one-shot intro drawn over the mood's resting face (eye and mark), ending back on `petArt(mood)`.
+ * @param {'cheer'|'sigh'} kind - which intro.
+ * @param {'happy'|'sleepy'|'worried'} mood - the mood whose resting face it plays over.
+ * @returns {PetTrack|undefined} a `loop: false` track, or undefined for an unknown kind.
+ */
+export function petIntro(kind, mood) {
+  const steps = INTROS[kind]
+  if (steps === undefined) return undefined
+  const m = MOODS[mood] ?? MOODS.happy
+  const face = [[MARK.row, MARK.col, m.mark === '' ? ' ' : m.mark], [EYE.row, EYE.col, m.open ? 'o' : '-']]
+  const frames = steps.map(([ms, cells]) => ({ ms, lines: draw([...face, ...cells]) }))
+  return { loop: false, jitter: 0, frames: [...frames, { ms: 0, lines: petArt(mood) }] }
+}
+
+/**
+ * All frames of a mood, without timings (the shape the render test checks).
  * @param {'happy'|'sleepy'|'worried'} mood - the mood.
  * @returns {string[][]} the frames, in playback order.
  */
 export function petAnimFrames(mood) {
-  return (FRAMES[mood] ?? FRAMES.happy).map(frame => frame.map(l => l.padEnd(W_FRAME)))
+  return petFrames(mood).frames.map(f => f.lines)
 }
 
-/** @param {number} ms @returns {Promise<void>} */
-const sleep = ms => new Promise(r => setTimeout(r, ms))
+/** How recent a `/loop-task` result must be to earn an intro at the prompt. */
+const RECENT_MS = 15 * 60e3
 
 /**
- * Play the boot animation, then show the full status panel. When `animationAllowed` says no (off a
- * TTY, `pet.animate: false`, `NO_COLOR`/`CI`, a narrow terminal) it shows the static panel only.
- * Not wired into the boot yet - `cmdRun` still prints `renderPet` directly.
+ * What Ness is doing, and how she shows it. The mood is `moodOf`'s; the intro only reflects a
+ * `/loop-task` that ended in the last few minutes. Working on a turn has no state here: nothing may
+ * draw while `dsh` streams (T-335d), so the animator is stopped before every turn.
  * @param {object} v - vitals from `gatherVitals`.
- * @param {{columns?: number, cfg?: object, out?: {isTTY?: boolean, write(s: string): unknown},
- *   env?: Record<string, string|undefined>}} [opts] - terminal width (no width means no animation),
- *   configuration, and for tests the output stream and environment (default `process.stdout`/`env`).
+ * @returns {{state: 'problem'|'idle'|'ready'|'done'|'failed', mood: 'happy'|'sleepy'|'worried',
+ *   intro?: 'cheer'|'sigh'}} the activity state, its mood and the one-shot intro, if any.
  */
-export async function animatePet(v, opts = {}) {
-  const out = opts.out ?? process.stdout
-  const say = (l = '') => out.write(`${l}\n`)
+export function activityOf(v) {
   const { mood } = moodOf(v)
-  const allowed = animationAllowed({ isTTY: out.isTTY, columns: opts.columns, env: opts.env ?? process.env, cfg: opts.cfg })
-  if (!allowed.ok) {
-    say()
-    for (const l of renderPet(v, opts)) say(l)
-    say()
-    return
-  }
-  const frames = petAnimFrames(mood)
-  const FH = frames[0].length
-  const writeFrame = frame => {
-    for (const l of frame) out.write(`  \x1b[36m${l}\x1b[0m\x1b[K\n`)
-  }
-  writeFrame(frames[0])
-  for (let i = 1; i < frames.length; i++) {
-    await sleep(160)
-    out.write(`\x1b[${FH}A\r`)
-    writeFrame(frames[i])
-  }
-  // Erase the animation area, then draw the full panel.
-  out.write(`\x1b[${FH}A\r`)
-  for (let i = 0; i < FH; i++) out.write('\x1b[2K\n')
-  out.write(`\x1b[${FH}A\r`)
-  say()
-  for (const l of renderPet(v, opts)) say(l)
-  say()
+  const base = mood === 'worried' ? 'problem' : mood === 'sleepy' ? 'idle' : 'ready'
+  const loop = v.recent?.loop
+  if (mood === 'worried' || loop === undefined || !(v.now - loop.at < RECENT_MS) || loop.at > v.now) return { state: base, mood }
+  return loop.outcome === 'done' ? { state: 'done', mood, intro: 'cheer' } : { state: 'failed', mood, intro: 'sigh' }
 }
 
 /** @param {number} ms - a duration. @returns {string} a compact age: `42s`, `5m`, `3h`, `2d`. */
@@ -449,13 +449,20 @@ export function renderPet(v, opts = {}) {
  * @returns {boolean} whether to draw it.
  */
 export function petEnabled(cfg) {
-  if (process.env.FINESS_NO_PET !== undefined && process.env.FINESS_NO_PET !== '' && process.env.FINESS_NO_PET !== '0') return false
+  if (noPet(process.env)) return false
   return cfg.pet?.enabled !== false && process.stdout.isTTY === true
 }
 
 /**
+ * @param {Record<string, string|undefined>} env - the environment.
+ * @returns {boolean} whether `FINESS_NO_PET` asks for no pet (set, and neither empty nor `0`).
+ */
+const noPet = env => env.FINESS_NO_PET !== undefined && env.FINESS_NO_PET !== '' && env.FINESS_NO_PET !== '0'
+
+/**
  * The animation off switch: may the pet move, or must she stay a still drawing? Config
- * `pet.animate` (default true), forced off when stdout is not a terminal, when `NO_COLOR` or `CI`
+ * `pet.animate` (default true), forced off by the pet's own opt-outs (`pet.enabled: false`,
+ * `FINESS_NO_PET`), when stdout is not a terminal, when `NO_COLOR` or `CI`
  * is set (set but empty counts, per no-color.org), or when the terminal is narrower than the
  * side-by-side layout. Pure: the caller passes the environment, so it is tested without a terminal.
  * @param {{isTTY?: boolean, columns?: number, env?: Record<string, string|undefined>, cfg?: object}} o -
@@ -464,6 +471,7 @@ export function petEnabled(cfg) {
  */
 export function animationAllowed({ isTTY, columns, env = {}, cfg = {} } = {}) {
   if (cfg.pet?.enabled === false) return { ok: false, why: 'pet.enabled is false' }
+  if (noPet(env)) return { ok: false, why: 'FINESS_NO_PET is set' }
   if (cfg.pet?.animate === false) return { ok: false, why: 'pet.animate is false' }
   if (isTTY !== true) return { ok: false, why: 'stdout is not a terminal' }
   if (env.NO_COLOR !== undefined) return { ok: false, why: 'NO_COLOR is set' }
