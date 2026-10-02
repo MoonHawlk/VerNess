@@ -47,20 +47,33 @@ const adapterDist = cfg => join(dshHome(), 'profiles', cfg.profile.name, 'node_m
 /**
  * Load `KEY=value` lines from the repo's `.env` into `process.env`, never overriding a variable the
  * shell already set. `.env` is gitignored, so this is where provider keys live.
+ * @param {string} [file] - the file to read; the repo's `.env` unless a test names another.
+ * @param {Record<string, string|undefined>} [env] - the environment to fill; `process.env` by default.
  * @returns {string[]} the names that were loaded (never the values).
  */
-export function loadDotEnv() {
-  const file = join(REPO, '.env')
+export function loadDotEnv(file = join(REPO, '.env'), env = process.env) {
   if (!existsSync(file)) return []
+  return applyDotEnv(readFileSync(file, 'utf8'), env)
+}
+
+/**
+ * Apply `.env` text to an environment: `export` prefixes, quoted values and trailing comments are
+ * understood; a variable that is already set, or an empty value, is left alone.
+ * @param {string} text - the file's contents.
+ * @param {Record<string, string|undefined>} env - the environment to fill.
+ * @returns {string[]} the names that were set (never the values).
+ */
+export function applyDotEnv(text, env) {
   const loaded = []
-  for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+  for (const raw of text.split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(raw)
     if (m === null) continue
-    let value = m[2]
-    if (/^(['"]).*\1$/.test(value)) value = value.slice(1, -1)
-    else value = value.replace(/\s+#.*$/, '')
-    if (process.env[m[1]] !== undefined || value === '') continue
-    process.env[m[1]] = value
+    // `(.*)` is greedy, so trailing blanks land in the capture: a key pasted as `KEY=sk-...  ` must
+    // not carry them, and a quoted value may be followed by blanks or a comment.
+    const quoted = /^(['"])(.*?)\1(?:\s+#.*)?$/.exec(m[2].trim())
+    const value = quoted !== null ? quoted[2] : m[2].replace(/\s+#.*$/, '').trim()
+    if (env[m[1]] !== undefined || value === '') continue
+    env[m[1]] = value
     loaded.push(m[1])
   }
   return loaded
@@ -123,10 +136,10 @@ export async function keyEnvFor(cfg, provider) {
 /**
  * Every route the configuration and state know about, by name.
  * @param {object} cfg - the VerNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
  * @returns {Record<string, object>} route specs, each with a `kind`.
  */
-export function knownRoutes(cfg) {
-  const state = readState()
+export function knownRoutes(cfg, { state = readState() } = {}) {
   const routes = {}
   routes[cfg.model.route] = { ...cfg.model, kind: 'local', api: 'openai-completions' }
   for (const [name, r] of Object.entries(cfg.extraRoutes ?? {})) {
@@ -143,10 +156,10 @@ export function knownRoutes(cfg) {
 /**
  * Model ids the local engine is registered to serve: the configured one plus every `/models add`.
  * @param {object} cfg - the VerNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
  * @returns {string[]} model ids, configured one first.
  */
-export function localModels(cfg) {
-  const state = readState()
+export function localModels(cfg, { state = readState() } = {}) {
   const ids = [cfg.model.source ?? cfg.model.id, cfg.model.id, ...(state.localModels ?? [])]
   // A `/model <id>` override on the local route is served too, or the adapter refuses it.
   if (state.model !== undefined && (state.modelRoute ?? cfg.model.route) === cfg.model.route) ids.push(state.model)
@@ -157,12 +170,12 @@ export function localModels(cfg) {
  * Resolve the route and model the next run uses. Every surface (patch, run, doctor, prompt status)
  * reads this, so they can never disagree.
  * @param {object} cfg - the VerNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
  * @returns {{name: string, route: object, model: string|undefined, source: string, error?: string}}
  */
-export function effectiveRoute(cfg) {
-  const state = readState()
-  const routes = knownRoutes(cfg)
-  const persona = loadPersonas(cfg).get(activePersonaId(cfg))
+export function effectiveRoute(cfg, { state = readState() } = {}) {
+  const routes = knownRoutes(cfg, { state })
+  const persona = loadPersonas(cfg).get(activePersonaId(cfg, state))
   const configured = cfg.activeRoute === '' || cfg.activeRoute === undefined ? cfg.model.route : cfg.activeRoute
   const name = state.route ?? persona?.model?.route ?? configured
   const route = routes[name]
