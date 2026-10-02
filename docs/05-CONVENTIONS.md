@@ -60,6 +60,18 @@ Before claiming a feature ships:
 git clone . "$(mktemp -d)/fresh" && cd "$_" && node scripts/verness.mjs help
 ```
 
+The same check, cross-platform and self-cleaning: `node scripts/check-clean-clone.mjs [rev...]`
+(or `npm run check:clean-clone`) clones into a temp dir, checks out the commit (default `HEAD`),
+runs `verness help` and removes the clone. To run it on every push, opt in once per checkout:
+
+```sh
+git config core.hooksPath scripts/hooks   # undo: git config --unset core.hooksPath
+```
+
+`scripts/hooks/pre-push` is a one-line `sh` shim over the Node script (works in Git for Windows
+and on macOS); it checks each pushed commit and blocks the push if one cannot start. Skip once with
+`VERNESS_SKIP_CLEAN_CLONE=1 git push` or `git push --no-verify`.
+
 If a new directory of source ever appears, check `git ls-files` covers it rather than trusting a
 clean `git status` — an ignored file is invisible to both.
 

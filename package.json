@@ -16,6 +16,7 @@
     "doctor": "node scripts/verness.mjs doctor",
     "sync": "node scripts/verness.mjs sync",
     "graph": "node scripts/verness.mjs graph",
+    "check:clean-clone": "node scripts/check-clean-clone.mjs",
     "test": "node --test \"scripts/test/*.test.mjs\" \"packages/*/test/*.test.ts\"",
     "typecheck": "tsc -p packages/contracts",
     "model:up": "node scripts/model.mjs up",
