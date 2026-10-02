@@ -945,18 +945,26 @@ async function prepareRoute(cfg, ready) {
  * Boot the harness. With a task it runs one-shot; without, it prompts (headless) or opens the app.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @param {string[]} task - the task words, if any.
+ * @param {{noModel?: boolean}} [opts] - `noModel` opens the REPL without booting a model or the
+ *   substrate (T-381): quick-tools work, free-text tasks print a hint instead.
  */
-async function cmdRun(cfg, task) {
+async function cmdRun(cfg, task, { noModel = false } = {}) {
   const dshVersion = version('dsh', '--version')
-  if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
-  if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
-  syncPatch(cfg)
   const ready = new Set()
-  const first = await prepareRoute(cfg, ready)
-  // A one-shot run has nothing to fall back to; the REPL still opens, so /api local or /api use can
-  // repair the route (every turn re-checks it).
-  if (first === undefined && (task.length > 0 || cfg.profile.template !== 'headless')) {
-    die('the selected route cannot run yet (see above)', 'back to the local model: /api local')
+  let first
+  if (noModel) {
+    if (task.length > 0) die('--no-model opens the prompt only; a task needs the model', 'run the task without --no-model')
+    if (cfg.profile.template !== 'headless') die('--no-model needs a headless profile (the app surface boots the substrate)')
+  } else {
+    if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
+    if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
+    syncPatch(cfg)
+    first = await prepareRoute(cfg, ready)
+    // A one-shot run has nothing to fall back to; the REPL still opens, so /api local or /api use can
+    // repair the route (every turn re-checks it).
+    if (first === undefined && (task.length > 0 || cfg.profile.template !== 'headless')) {
+      die('the selected route cannot run yet (see above)', 'back to the local model: /api local')
+    }
   }
   let env = first?.env ?? {}
 
@@ -994,6 +1002,7 @@ async function cmdRun(cfg, task) {
     ? 'a new conversation starts with your first task; it is kept for every later turn'
     : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
   info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
+  if (noModel) warn('model-less start (--no-model): quick-tools only; restart without the flag to run tasks')
   info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
   info('/btw <note> adds a side note to your next task; #<note> adds a line to the project brief (## escapes)')
   info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
@@ -1073,6 +1082,11 @@ async function cmdRun(cfg, task) {
       continue
     }
     const taskText = parsed.text
+    if (noModel) {
+      warn('no model in this session (--no-model) - the task was not sent')
+      info('restart without --no-model to run tasks; quick-tools (/help) still work here')
+      continue
+    }
     await shadowRoute(cfg, taskText)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.
@@ -1146,6 +1160,8 @@ const HELP = `FiNess launcher
 
 commands
   (none)        boot the harness; headless profiles prompt for tasks in a loop
+  --no-model    open the prompt without booting a model (alias --no-start): settings,
+                  /persona, /config, /help and other quick-tools; tasks print a hint
   "<task>"      run one task and exit
   web           open the browser UI: a chat window with a message bar instead of the
                   terminal prompt (same model, persona and plugins; alias: ui)
@@ -1227,6 +1243,7 @@ switch (first) {
   case 'graph': cmdGraph(); break
   case 'help': case '--help': case '-h': console.log(HELP); break
   case 'run': await cmdRun(cfg, rest); break
+  case '--no-model': case '--no-start': await cmdRun(cfg, rest, { noModel: true }); break
   case undefined: await cmdRun(cfg, []); break
   default: await cmdRun(cfg, [first, ...rest])
 }
