@@ -36,7 +36,7 @@ export const DEFAULT_ROUND_TIMEOUT = 600
  *
  * @param {object} ctx - command context (`cfg`, `dsh`, `routeEnv`, `conversation`).
  * @param {string} objective - the objective, restated verbatim every round.
- * @param {{maxRounds?: number, constraints?: string[], verify?: boolean, fresh?: boolean, roundTimeout?: number}} [opts] - options; `roundTimeout` is seconds per round.
+ * @param {{maxRounds?: number, constraints?: string[], verify?: boolean, fresh?: boolean, roundTimeout?: number, loopsDir?: string}} [opts] - options; `roundTimeout` is seconds per round, `loopsDir` overrides where the run record goes (tests).
  * @returns {Promise<{outcome: string, rounds: number, detail: string}>} the result.
  */
 export async function runLoopTask(ctx, objective, opts = {}) {
@@ -137,7 +137,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
   console.log(`  ${paint(colour, outcome)}: ${detail}`)
   info(`${tokens.input} input / ${tokens.output} output tokens across ${log.length} round(s)`)
 
-  recordRun({ objective, outcome, detail, rounds: log.length, identity, tokens, log })
+  recordRun({ objective, outcome, detail, rounds: log.length, identity, tokens, log }, opts.loopsDir)
   return { outcome, rounds: log.length, detail, tokens }
 }
 
@@ -224,9 +224,11 @@ function parseRound(out) {
   return { answer, sessionId, usage, reason }
 }
 
-/** @param {object} record - the run record appended to the loop log. */
-function recordRun(record) {
-  const dir = join(REPO, '.finess', 'loops')
+/**
+ * @param {object} record - the run record appended to the loop log.
+ * @param {string} [dir] - the loop log directory; tests pass a temporary one.
+ */
+function recordRun(record, dir = join(REPO, '.finess', 'loops')) {
   mkdirSync(dir, { recursive: true })
   const day = new Date().toISOString().slice(0, 10)
   appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`, 'utf8')

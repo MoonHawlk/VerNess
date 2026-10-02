@@ -1,11 +1,18 @@
 /**
  * `/loop-task` guards: consecutive-repeat tiers (T-325) and the per-round wall-clock budget (T-327).
  */
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { callFingerprint, detectStall, repeatChain, repeatReminder } from '../lib/loop.mjs'
 import { runLoopTask } from '../loop-task.mjs'
+
+// Run records go to a temporary directory, never the checkout's .finess/loops.
+const LOOPS = mkdtempSync(join(tmpdir(), 'finess-loops-'))
+after(() => rmSync(LOOPS, { recursive: true, force: true }))
 
 const call = (name, args) => ({ name, args, fp: callFingerprint(name, args) })
 const same = n => Array.from({ length: n }, () => call('read', { path: 'a', mode: 'x' }))
@@ -58,7 +65,7 @@ test('runLoopTask: a round past its budget is classified timeout and stops the l
     cfg: { profile: { name: 'p' } },
     dsh: (args, opts) => { seen.push(opts.timeoutMs); return { code: 1, out: '', timedOut: true } },
   }
-  const res = await runLoopTask(ctx, 'x', { maxRounds: 5, roundTimeout: 7 })
+  const res = await runLoopTask(ctx, 'x', { maxRounds: 5, roundTimeout: 7, loopsDir: LOOPS })
   assert.equal(res.outcome, 'timeout')
   assert.equal(res.rounds, 1)
   assert.deepEqual(seen, [7000])
@@ -67,6 +74,6 @@ test('runLoopTask: a round past its budget is classified timeout and stops the l
 test('runLoopTask: the round budget defaults to 600 seconds', async () => {
   const seen = []
   const ctx = { cfg: { profile: { name: 'p' } }, dsh: (a, o) => { seen.push(o.timeoutMs); return { code: 1, out: '', timedOut: true } } }
-  await runLoopTask(ctx, 'x')
+  await runLoopTask(ctx, 'x', { loopsDir: LOOPS })
   assert.deepEqual(seen, [600000])
 })
