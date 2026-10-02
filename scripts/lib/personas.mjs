@@ -28,7 +28,7 @@ export const personasDir = () => join(REPO, 'personas')
  * Load every persona: files in `personas/` (validated against the v2 schema), plus any inline
  * definitions from the config (files win). Inline config definitions are not validated — they are
  * operator-owned and keep their pre-existing, looser shape (Ruling R4).
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {object} [opts] - options.
  * @param {string} [opts.dir] - the persona directory to scan, for tests. Defaults to `personasDir()`.
  * @returns {Map<string, object>} personas by id.
@@ -36,7 +36,7 @@ export const personasDir = () => join(REPO, 'personas')
 export function loadPersonas(cfg, { dir = personasDir() } = {}) {
   const out = new Map()
   for (const [id, p] of Object.entries(cfg.personas?.definitions ?? {})) {
-    out.set(id, normalize(id, { ...p, source: 'verness.config.json' }))
+    out.set(id, normalize(id, { ...p, source: 'finess.config.json' }))
   }
   if (existsSync(dir)) {
     for (const f of readdirSync(dir)) {
@@ -154,8 +154,8 @@ export function groupByFamily(personas) {
 
 /**
  * The persona that is currently active: the local state override, else the config's choice.
- * @param {object} cfg - the VerNess configuration.
- * @param {object} [state] - the launcher state; `.verness/state.json` unless a test passes one.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {object} [state] - the launcher state; `.finess/state.json` unless a test passes one.
  * @returns {string} the active persona id.
  */
 export function activePersonaId(cfg, state = readState()) {
@@ -215,7 +215,7 @@ export function describePersona(p) {
  * Write a `--patch` overlay that applies one persona to a single run, without changing the profile.
  * Used by the team runner so concurrent tasks can wear different personas.
  * @param {object} persona - a normalized persona.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {string} [file] - where to write it. Concurrent runs must each pass their own: rewriting the
  *   shared per-persona file while another run's dsh is still reading it could hand that run a
  *   truncated overlay.

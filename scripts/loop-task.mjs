@@ -210,7 +210,7 @@ function parseRound(out) {
 
 /** @param {object} record - the run record appended to the loop log. */
 function recordRun(record) {
-  const dir = join(REPO, '.verness', 'loops')
+  const dir = join(REPO, '.finess', 'loops')
   mkdirSync(dir, { recursive: true })
   const day = new Date().toISOString().slice(0, 10)
   appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ at: new Date().toISOString(), ...record })}\n`, 'utf8')
@@ -218,7 +218,7 @@ function recordRun(record) {
 
 // Standalone CLI: `node scripts/loop-task.mjs "<objective>" [--max-rounds N] [--no-verify]`.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const { loadConfigForCli, makeCliContext } = await import('./verness.mjs')
+  const { loadConfigForCli, makeCliContext } = await import('./finess.mjs')
   const argv = process.argv.slice(2)
   const at = argv.indexOf('--max-rounds')
   const objective = argv.filter(a => !a.startsWith('--') && a !== argv[at + 1]).join(' ')

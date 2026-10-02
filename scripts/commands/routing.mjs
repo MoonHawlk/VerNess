@@ -98,7 +98,7 @@ export default {
   summary: 'recent shadow routing decisions: rules vs the decision model, and how often they agree',
   usage: '/routing [--limit N]',
   details: [
-    'reads .verness/decisions/ only: zero tokens, no call to the decision model',
+    'reads .finess/decisions/ only: zero tokens, no call to the decision model',
     'each cell is rules / model (confidence); nothing the model says is applied yet',
     'agreement is model == rules over the whole log; accuracy needs labels (/decisions-data report)',
   ],

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const WIN = process.platform === 'win32'
 /** Launcher-local state and per-run artifacts; gitignored, safe to delete. */
-export const RUN_DIR = join(REPO, '.verness', 'run')
+export const RUN_DIR = join(REPO, '.finess', 'run')
 
 const C = {
   dim: '[2m', red: '[31m', green: '[32m',

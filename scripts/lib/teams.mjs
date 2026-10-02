@@ -4,7 +4,7 @@
  * A team lives in `teams/<id>.json`: `members` bind a role to a persona, `tasks` are the units of
  * work, each naming the member that owns it and optionally the tasks it depends on. The runner
  * executes them respecting dependencies, with a configurable amount of concurrency, and writes every
- * transcript to `.verness/runs/<team>/<stamp>/`.
+ * transcript to `.finess/runs/<team>/<stamp>/`.
  *
  * Each task is a separate substrate run wearing its own persona, applied as a `--patch` overlay so
  * the shared profile is never mutated. That is what makes concurrent, differently-skilled tasks
@@ -21,8 +21,8 @@ import { parseJsonc, REPO, human, info, ok, paint, step, table, warn } from './u
 /** @returns {string} the teams directory. */
 export const teamsDir = () => join(REPO, 'teams')
 
-/** @returns {string} where team runs are recorded: `.verness/runs/<team>/<stamp>/`. */
-export const runsDir = () => join(REPO, '.verness', 'runs')
+/** @returns {string} where team runs are recorded: `.finess/runs/<team>/<stamp>/`. */
+export const runsDir = () => join(REPO, '.finess', 'runs')
 
 /**
  * Load every team definition.
@@ -100,7 +100,7 @@ function personaFor(team, task, personas, fallbackId) {
  * @param {object} team - the team to run.
  * @param {object} ctx - the command context (`cfg`, `sh`, `activePersona`, `runTask`).
  * @param {{concurrency?: number, only?: string[], dryRun?: boolean, runsRoot?: string}} [opts] - run
- *   options; `runsRoot` overrides `.verness/runs` (tests).
+ *   options; `runsRoot` overrides `.finess/runs` (tests).
  * @returns {Promise<{dir: string, results: object[]}>} the output directory and per-task results.
  */
 export async function runTeam(team, ctx, opts = {}) {
@@ -264,7 +264,7 @@ const subdirs = dir => {
  * Find the newest recorded run. Stamps are ISO timestamps with `:` and `.` replaced, so a lexical
  * sort is chronological on every platform (mtime is not: copies and checkouts reset it).
  * @param {string} [teamId] - a team id; omitted means the newest run of any team.
- * @param {string} [root] - the runs root (defaults to `.verness/runs`).
+ * @param {string} [root] - the runs root (defaults to `.finess/runs`).
  * @returns {{team: string, stamp: string, dir: string}|undefined} the run, or undefined when none.
  */
 export function latestRun(teamId, root = runsDir()) {

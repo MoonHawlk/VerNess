@@ -13,7 +13,7 @@ Testing runs against **Ollama** (`http://localhost:11434/v1`) with a very small 
 (`qwen3:0.6b`, 522 MB) declared as a hand-written `pi-ai` route named `ollama-local`.
 No adapter of ours is needed: `@deepseek-ai/dsh-llm-pi-ai` already supports OpenAI-compatible
 self-hosted gateways, so the whole integration is configuration in
-`profiles/verness/cordis.patch.yml`.
+`profiles/finess/cordis.patch.yml`.
 
 Frontier providers stay available by switching `agent-default-model` back to `deepseek-official`
 (or any other configured route) — one patch row.

@@ -21,7 +21,7 @@ export const commandsDir = () => join(REPO, 'scripts', 'commands')
 /**
  * A persona `id` or command `name` used to build a path must be a plain, single path segment —
  * file-based personas (`personas/<id>.json`) are schema-validated, but inline config personas
- * (`verness.config.json`) are not (Ruling R4), so a value like `../evil` must be rejected here
+ * (`finess.config.json`) are not (Ruling R4), so a value like `../evil` must be rejected here
  * before it is ever joined into a path.
  */
 const SAFE_NAME = /^[a-z][a-z0-9-]*$/
@@ -104,7 +104,7 @@ export async function loadCommands({ persona, root = REPO } = {}) {
 }
 
 /**
- * The machine-readable command list behind `verness.mjs --list-commands`: one entry per command,
+ * The machine-readable command list behind `finess.mjs --list-commands`: one entry per command,
  * its aliases folded in, sorted by name. `web` is false for a command whose definition sets
  * `web: false` (it only makes sense in the terminal), so the web commands bridge skips it.
  * @param {Map<string, object>} commands - the registry, as `loadCommands` returns it.

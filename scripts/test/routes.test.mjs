@@ -1,7 +1,7 @@
 /**
  * Model routes (T-365): `parseRef` for `/models add`, the precedence `effectiveRoute` applies, how a
  * catalog route is rendered into the profile patch, and `.env` parsing. Every test passes its own
- * launcher state and environment, so neither `.verness/state.json` nor the real `.env` is read.
+ * launcher state and environment, so neither `.finess/state.json` nor the real `.env` is read.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -11,7 +11,7 @@ import { join } from 'node:path'
 
 import { parseRef } from '../commands/models.mjs'
 import { applyDotEnv, effectiveRoute, knownRoutes, loadDotEnv, localModels } from '../lib/routes.mjs'
-import { renderPatch } from '../verness.mjs'
+import { renderPatch } from '../finess.mjs'
 
 // ------------------------------------------------------------------------------ parseRef
 
@@ -227,7 +227,7 @@ test('applyDotEnv: trailing whitespace is not part of a value, quoted or not', (
 })
 
 test('loadDotEnv: reads the named file into the given environment; a missing file loads nothing', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-env-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-env-'))
   try {
     const file = join(dir, '.env')
     writeFileSync(file, 'ROUTES_TEST_KEY=abc\n', 'utf8')

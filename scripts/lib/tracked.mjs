@@ -83,7 +83,7 @@ export function trackedLibFiles(repo = REPO) {
 export async function warnUntrackedImports(repo = REPO) {
   const tracked = await trackedLibFiles(repo)
   if (tracked === undefined) return []
-  const missing = untrackedImports(libImports(join(repo, 'scripts', 'verness.mjs'), repo), tracked)
+  const missing = untrackedImports(libImports(join(repo, 'scripts', 'finess.mjs'), repo), tracked)
   for (const p of missing) {
     process.stderr.write(`  !! ${p} is imported by the launcher but not tracked by git — a clone will not start (git add it, check .gitignore)\n`)
   }

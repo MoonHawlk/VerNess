@@ -60,13 +60,13 @@ this.
 | `scripts/lib/input.mjs` | create | `classifyInput()`, `expandFileRefs()` (pure) |
 | `scripts/lib/notes.mjs` | create | `/btw` notes and the `#` brief: storage, caps, `composeTask()` |
 | `scripts/lib/config-view.mjs` | create | `explainConfig()`: flatten config layers with their owning source |
-| `scripts/lib/history.mjs` | create | persisted REPL history (`.verness/history.jsonl`) |
+| `scripts/lib/history.mjs` | create | persisted REPL history (`.finess/history.jsonl`) |
 | `scripts/commands/exit.mjs` | create | `/exit`, `/quit` |
 | `scripts/commands/btw.mjs` | create | `/btw` |
 | `scripts/commands/config.mjs` | create | `/config` |
 | `scripts/commands/usage.mjs` | modify | `--by day` |
 | `scripts/lib/sessions.mjs` | modify | `usageByDay()` |
-| `scripts/verness.mjs` | modify | REPL loop uses `classifyInput` + `composeTask`; `makeCtx` gains `configLayers`, `requestExit`; `DEFAULTS.notes` |
+| `scripts/finess.mjs` | modify | REPL loop uses `classifyInput` + `composeTask`; `makeCtx` gains `configLayers`, `requestExit`; `DEFAULTS.notes` |
 | `scripts/lib/prompt.mjs` | modify | wrap long lines (T-302) |
 | `scripts/check-clean-clone.mjs` | create | clone to temp dir and boot `help` (T-311) |
 | `scripts/hooks/pre-push` | create | calls the check (T-311) |
@@ -230,7 +230,7 @@ git commit -m "test: registry conformance, shape and name collisions (T-135)"
 **Files:**
 - Create: `scripts/lib/input.mjs`
 - Modify: `scripts/lib/commands.mjs` (add `resolveCommand`, use it in `runCommand`)
-- Modify: `scripts/verness.mjs` (REPL loop in `cmdRun`, and `dispatch`)
+- Modify: `scripts/finess.mjs` (REPL loop in `cmdRun`, and `dispatch`)
 - Test: `scripts/test/input.test.mjs`, `scripts/test/commands.resolve.test.mjs`
 
 **Interfaces:**
@@ -393,7 +393,7 @@ Update the JSDoc `@returns` of `runCommand` to `{handled: boolean, code?: number
 Run: `node --test scripts/test/input.test.mjs scripts/test/commands.resolve.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 6: Wire the REPL loop in `scripts/verness.mjs`**
+- [ ] **Step 6: Wire the REPL loop in `scripts/finess.mjs`**
 
 Add `import { classifyInput } from './lib/input.mjs'` beside the other `./lib` imports.
 
@@ -448,7 +448,7 @@ Place that line as the first statement of `dispatch` after `const commands = awa
 - [ ] **Step 8: Manual check**
 
 ```bash
-printf '/mo\n/dec\n//usr is a path\n' | node scripts/verness.mjs 2>&1 | cat
+printf '/mo\n/dec\n//usr is a path\n' | node scripts/finess.mjs 2>&1 | cat
 ```
 
 Expected (piped, so no colours): `/mo` prints the model status; `/dec` prints
@@ -459,7 +459,7 @@ Expected (piped, so no colours): `/mo` prints the model status; `/dec` prints
 
 ```bash
 npm test
-git add scripts/lib/input.mjs scripts/lib/commands.mjs scripts/verness.mjs scripts/test/input.test.mjs scripts/test/commands.resolve.test.mjs
+git add scripts/lib/input.mjs scripts/lib/commands.mjs scripts/finess.mjs scripts/test/input.test.mjs scripts/test/commands.resolve.test.mjs
 git commit -m "feat(repl): unique-prefix commands and the // literal escape (T-182)"
 ```
 
@@ -469,7 +469,7 @@ git commit -m "feat(repl): unique-prefix commands and the // literal escape (T-1
 
 **Files:**
 - Create: `scripts/commands/exit.mjs`
-- Modify: `scripts/verness.mjs` (`makeCtx` adds `requestExit`; the loop checks it)
+- Modify: `scripts/finess.mjs` (`makeCtx` adds `requestExit`; the loop checks it)
 - Test: `scripts/test/commands.exit.test.mjs`
 
 **Interfaces:**
@@ -542,7 +542,7 @@ In the REPL loop's command branch (Task 3, Step 6), after `runCommand` returns, 
 
 ```bash
 npm test
-git add scripts/commands/exit.mjs scripts/verness.mjs scripts/test/commands.exit.test.mjs
+git add scripts/commands/exit.mjs scripts/finess.mjs scripts/test/commands.exit.test.mjs
 git commit -m "feat(commands): /exit and /quit (T-148)"
 ```
 
@@ -552,7 +552,7 @@ git commit -m "feat(commands): /exit and /quit (T-148)"
 
 **Files:**
 - Create: `scripts/lib/notes.mjs`, `scripts/commands/btw.mjs`
-- Modify: `scripts/verness.mjs` (`DEFAULTS.notes`; the REPL composes the task; `/new` clears pending notes)
+- Modify: `scripts/finess.mjs` (`DEFAULTS.notes`; the REPL composes the task; `/new` clears pending notes)
 - Modify: `docs/07-COMMAND-LAYER.md` (the `/btw` section: send-once rule)
 - Test: `scripts/test/notes.test.mjs`
 
@@ -583,7 +583,7 @@ import {
   addNote, clearNotes, composeTask, dropNote, markSent, moveNotes, pendingNotes, readNotes,
 } from '../lib/notes.mjs'
 
-const tmp = () => mkdtempSync(join(tmpdir(), 'verness-notes-'))
+const tmp = () => mkdtempSync(join(tmpdir(), 'finess-notes-'))
 
 test('add, read, drop, clear', () => {
   const d = tmp()
@@ -832,7 +832,7 @@ export default {
 
 - [ ] **Step 6: Wire it into the REPL**
 
-In `scripts/verness.mjs`:
+In `scripts/finess.mjs`:
 1. Add `notes: { maxChars: 2000, briefMaxChars: 4000 }` to `DEFAULTS`.
 2. Import: `import { composeTask, markSent, markUnsent, moveNotes, pendingNotes, readNotes } from './lib/notes.mjs'`.
 3. In the REPL loop, after `const line = input.text` and after `await shadowRoute(cfg, line)`
@@ -882,7 +882,7 @@ is implemented." to "partly built: see `docs/03-BACKLOG.md` WS-A for what is ope
 - [ ] **Step 8: Manual check**
 
 ```bash
-printf '/btw use metric units\n/btw\n' | node scripts/verness.mjs | cat
+printf '/btw use metric units\n/btw\n' | node scripts/finess.mjs | cat
 ```
 
 Expected: `note 1 saved - 19/2000 characters`, then the list with `1. use metric units`.
@@ -891,7 +891,7 @@ Expected: `note 1 saved - 19/2000 characters`, then the list with `1. use metric
 
 ```bash
 npm test
-git add scripts/lib/notes.mjs scripts/commands/btw.mjs scripts/commands/conversation.mjs scripts/verness.mjs scripts/test/notes.test.mjs docs/07-COMMAND-LAYER.md
+git add scripts/lib/notes.mjs scripts/commands/btw.mjs scripts/commands/conversation.mjs scripts/finess.mjs scripts/test/notes.test.mjs docs/07-COMMAND-LAYER.md
 git commit -m "feat(commands): /btw side notes, sent once per session (T-130)"
 ```
 
@@ -901,11 +901,11 @@ git commit -m "feat(commands): /btw side notes, sent once per session (T-130)"
 
 **Files:**
 - Modify: `scripts/lib/notes.mjs` (brief functions)
-- Modify: `scripts/verness.mjs` (the `brief` input kind; send the brief on a session's first turn)
+- Modify: `scripts/finess.mjs` (the `brief` input kind; send the brief on a session's first turn)
 - Test: extend `scripts/test/notes.test.mjs`
 
 **Interfaces:**
-- Produces: `briefFile(root: string): string` → `<root>/.verness/brief.md`; `readBrief(root): string`;
+- Produces: `briefFile(root: string): string` → `<root>/.finess/brief.md`; `readBrief(root): string`;
   `appendBrief(root, text, maxChars): {total: number, refused: boolean}`.
 - Consumes: `composeTask` (Task 5).
 
@@ -934,7 +934,7 @@ test('composeTask puts the brief before the notes', () => {
 
 ```js
 /** @param {string} root - repo root. @returns {string} the brief file. */
-export const briefFile = root => join(root, '.verness', 'brief.md')
+export const briefFile = root => join(root, '.finess', 'brief.md')
 
 /** @param {string} root - repo root. @returns {string} the brief, trimmed ('' when none). */
 export function readBrief(root) {
@@ -952,13 +952,13 @@ export function appendBrief(root, text, maxChars) {
   const cur = readBrief(root)
   const next = [cur, `- ${String(text).trim()}`].filter(s => s !== '').join('\n')
   if (String(text).trim() === '' || next.length > maxChars) return { total: cur.length, refused: true }
-  mkdirSync(join(root, '.verness'), { recursive: true })
+  mkdirSync(join(root, '.finess'), { recursive: true })
   writeFileSync(briefFile(root), `${next}\n`, 'utf8')
   return { total: next.length, refused: false }
 }
 ```
 
-- [ ] **Step 4: REPL wiring in `scripts/verness.mjs`**
+- [ ] **Step 4: REPL wiring in `scripts/finess.mjs`**
 
 Replace the Task 3 stub for `brief`:
 
@@ -966,7 +966,7 @@ Replace the Task 3 stub for `brief`:
     if (input.kind === 'brief') {
       const max = Number(cfg.notes?.briefMaxChars ?? 4000)
       const r = appendBrief(REPO, input.text, max)
-      if (r.refused) warn(`the brief is capped at ${max} characters - edit .verness/brief.md`)
+      if (r.refused) warn(`the brief is capped at ${max} characters - edit .finess/brief.md`)
       else ok(`brief updated (${r.total}/${max}) - sent on the first task of every new session`)
       continue
     }
@@ -980,11 +980,11 @@ and in the task path, include the brief only on a session's first turn:
 
 (import `appendBrief`, `readBrief`).
 
-- [ ] **Step 5: Tests, manual check (`printf '# amounts in EUR\n' | node scripts/verness.mjs | cat`), commit**
+- [ ] **Step 5: Tests, manual check (`printf '# amounts in EUR\n' | node scripts/finess.mjs | cat`), commit**
 
 ```bash
 npm test
-git add scripts/lib/notes.mjs scripts/verness.mjs scripts/test/notes.test.mjs
+git add scripts/lib/notes.mjs scripts/finess.mjs scripts/test/notes.test.mjs
 git commit -m "feat(repl): # appends to a durable project brief (T-147)"
 ```
 
@@ -994,7 +994,7 @@ git commit -m "feat(repl): # appends to a durable project brief (T-147)"
 
 **Files:**
 - Modify: `scripts/lib/input.mjs` (`expandFileRefs`)
-- Modify: `scripts/verness.mjs` (the `shell` input kind; expand `@` in tasks)
+- Modify: `scripts/finess.mjs` (the `shell` input kind; expand `@` in tasks)
 - Test: `scripts/test/input.test.mjs`
 
 **Interfaces:**
@@ -1009,7 +1009,7 @@ import { join } from 'node:path'
 import { expandFileRefs } from '../lib/input.mjs'
 
 const root = () => {
-  const d = mkdtempSync(join(tmpdir(), 'verness-at-'))
+  const d = mkdtempSync(join(tmpdir(), 'finess-at-'))
   mkdirSync(join(d, 'docs'))
   writeFileSync(join(d, 'docs', 'a.md'), 'hello\n')
   return d
@@ -1117,7 +1117,7 @@ not `10%^`. If it prints the caret, run the shell line through `spawnSync(proces
 
 ```bash
 npm test
-git add scripts/lib/input.mjs scripts/verness.mjs scripts/test/input.test.mjs
+git add scripts/lib/input.mjs scripts/finess.mjs scripts/test/input.test.mjs
 git commit -m "feat(repl): ! runs a local shell command, @path attaches a file (T-181)"
 ```
 
@@ -1127,11 +1127,11 @@ git commit -m "feat(repl): ! runs a local shell command, @path attaches a file (
 
 **Files:**
 - Create: `scripts/lib/config-view.mjs`, `scripts/commands/config.mjs`
-- Modify: `scripts/verness.mjs` (`makeCtx` exposes `configLayers`; add `readRawConfig`)
+- Modify: `scripts/finess.mjs` (`makeCtx` exposes `configLayers`; add `readRawConfig`)
 - Test: `scripts/test/config-view.test.mjs`
 
 **Interfaces:**
-- Produces: `explainConfig(layers: {defaults: object, file: object, state: object}): {path: string, value: string, source: 'default'|'verness.config.json'|'.verness/state.json'}[]`
+- Produces: `explainConfig(layers: {defaults: object, file: object, state: object}): {path: string, value: string, source: 'default'|'finess.config.json'|'.finess/state.json'}[]`
 - `ctx.configLayers: {defaults, file, state}`; the persona source is printed separately from `loadPersonas(cfg).get(active).source`.
 
 - [ ] **Step 1: Failing test**
@@ -1151,10 +1151,10 @@ test('each leaf names the layer that set it', () => {
   })
   const by = Object.fromEntries(rows.map(r => [r.path, r]))
   assert.equal(by['model.id'].value, 'hf.co/x')
-  assert.equal(by['model.id'].source, 'verness.config.json')
+  assert.equal(by['model.id'].source, 'finess.config.json')
   assert.equal(by['model.maxTokens'].source, 'default')
   assert.equal(by['pet.enabled'].value, 'true')
-  assert.equal(by['state.model'].source, '.verness/state.json')
+  assert.equal(by['state.model'].source, '.finess/state.json')
   assert.equal(by['state.persona'].value, 'data-scientist')
 })
 
@@ -1175,8 +1175,8 @@ test('arrays print as one value', () => {
 // scripts/lib/config-view.mjs
 /**
  * Where each configuration value comes from. The config merges shallowly per top-level section
- * (built-in defaults, then `verness.config.json`), and a few values are overridden at run time from
- * `.verness/state.json`. Printing the owner of every value answers "why is it using that?".
+ * (built-in defaults, then `finess.config.json`), and a few values are overridden at run time from
+ * `.finess/state.json`. Printing the owner of every value answers "why is it using that?".
  * @module scripts/lib/config-view
  */
 
@@ -1209,9 +1209,9 @@ export function explainConfig(layers) {
   const fileLeaves = new Map(leaves(layers.file))
   const rows = new Map()
   for (const [p, v] of leaves(layers.defaults)) rows.set(p, { path: p, value: show(p, v), source: 'default' })
-  for (const [p, v] of fileLeaves) rows.set(p, { path: p, value: show(p, v), source: 'verness.config.json' })
+  for (const [p, v] of fileLeaves) rows.set(p, { path: p, value: show(p, v), source: 'finess.config.json' })
   for (const [k, v] of Object.entries(layers.state ?? {})) {
-    if (v !== undefined) rows.set(`state.${k}`, { path: `state.${k}`, value: show(k, v), source: '.verness/state.json' })
+    if (v !== undefined) rows.set(`state.${k}`, { path: `state.${k}`, value: show(k, v), source: '.finess/state.json' })
   }
   return [...rows.values()].sort((a, b) => a.path.localeCompare(b.path))
 }
@@ -1256,22 +1256,22 @@ export default {
 }
 ```
 
-In `scripts/verness.mjs` add:
+In `scripts/finess.mjs` add:
 
 ```js
 /** @returns {object} the config file as written (no defaults), or {} when absent or invalid. */
 function readRawConfig() {
-  try { return parseJsonc(readFileSync(join(REPO, 'verness.config.json'), 'utf8')) } catch { return {} }
+  try { return parseJsonc(readFileSync(join(REPO, 'finess.config.json'), 'utf8')) } catch { return {} }
 }
 ```
 
 and in `makeCtx`'s returned object: `configLayers: { defaults: structuredClone(DEFAULTS), file: readRawConfig() },`
 
-- [ ] **Step 4: Tests, `node scripts/verness.mjs config model | cat`, commit**
+- [ ] **Step 4: Tests, `node scripts/finess.mjs config model | cat`, commit**
 
 ```bash
 npm test
-git add scripts/lib/config-view.mjs scripts/commands/config.mjs scripts/verness.mjs scripts/test/config-view.test.mjs
+git add scripts/lib/config-view.mjs scripts/commands/config.mjs scripts/finess.mjs scripts/test/config-view.test.mjs
 git commit -m "feat(commands): /config shows each value and its owner (T-180)"
 ```
 
@@ -1356,13 +1356,13 @@ export function usageByDay(sessions) {
 
 Use the variable name the file already uses for the session list (read the file first; it is
 62 lines). Import `usageByDay`. Also add `'--by'` and `'day'` to the `usage` entry of
-`makeArgsSupplier` in `scripts/verness.mjs`.
+`makeArgsSupplier` in `scripts/finess.mjs`.
 
-- [ ] **Step 5: Tests, `node scripts/verness.mjs usage --by day | cat`, commit**
+- [ ] **Step 5: Tests, `node scripts/finess.mjs usage --by day | cat`, commit**
 
 ```bash
 npm test
-git add scripts/lib/sessions.mjs scripts/commands/usage.mjs scripts/verness.mjs scripts/test/sessions.usage.test.mjs
+git add scripts/lib/sessions.mjs scripts/commands/usage.mjs scripts/finess.mjs scripts/test/sessions.usage.test.mjs
 git commit -m "feat(usage): --by day breakdown (T-137)"
 ```
 
@@ -1460,7 +1460,7 @@ git commit -m "fix(repl): long input wraps instead of hiding the dropdown (T-302
 
 **Files:**
 - Create: `scripts/lib/history.mjs`
-- Modify: `scripts/lib/prompt.mjs` (`makeSuggester` gains an optional `recent` supplier), `scripts/verness.mjs`
+- Modify: `scripts/lib/prompt.mjs` (`makeSuggester` gains an optional `recent` supplier), `scripts/finess.mjs`
 - Test: `scripts/test/history.test.mjs`
 
 **Interfaces:**
@@ -1472,7 +1472,7 @@ git commit -m "fix(repl): long input wraps instead of hiding the dropdown (T-302
 
 Source decision: the backlog says "from the session log". Reading every log on each keystroke is too
 slow, and the log also holds composed tasks (notes, briefs, attached files). The REPL's own input
-history is the right source: what the operator typed, stored at `.verness/history.jsonl`.
+history is the right source: what the operator typed, stored at `.finess/history.jsonl`.
 
 - [ ] **Step 1: Failing tests**
 
@@ -1487,7 +1487,7 @@ import { join } from 'node:path'
 import { appendHistory, loadHistory } from '../lib/history.mjs'
 import { makeSuggester } from '../lib/prompt.mjs'
 
-const file = () => join(mkdtempSync(join(tmpdir(), 'verness-hist-')), 'history.jsonl')
+const file = () => join(mkdtempSync(join(tmpdir(), 'finess-hist-')), 'history.jsonl')
 
 test('append, dedupe (newest wins), cap', () => {
   const f = file()
@@ -1548,7 +1548,7 @@ In `makeSuggester`, add the third parameter and at the top of the returned funct
     }
 ```
 
-In `cmdRun`: `const histFile = join(REPO, '.verness', 'history.jsonl')`,
+In `cmdRun`: `const histFile = join(REPO, '.finess', 'history.jsonl')`,
 `const history = loadHistory(histFile)`, pass `() => history` as the third argument to
 `makeSuggester`, and after `history.push(...)` call `appendHistory(histFile, answer.trim())`.
 **Do not** record lines of kind `shell` that contain `password`, `token` or `secret`
@@ -1558,7 +1558,7 @@ In `cmdRun`: `const histFile = join(REPO, '.verness', 'history.jsonl')`,
 
 ```bash
 npm test
-git add scripts/lib/history.mjs scripts/lib/prompt.mjs scripts/verness.mjs scripts/test/history.test.mjs
+git add scripts/lib/history.mjs scripts/lib/prompt.mjs scripts/finess.mjs scripts/test/history.test.mjs
 git commit -m "feat(repl): persisted history and recent-task suggestions (T-303)"
 ```
 
@@ -1568,7 +1568,7 @@ git commit -m "feat(repl): persisted history and recent-task suggestions (T-303)
 
 **Files:**
 - Create: `scripts/check-clean-clone.mjs`, `scripts/hooks/pre-push`
-- Modify: `scripts/verness.mjs` (a startup check), `package.json` (`"hooks:install"`), `docs/05-CONVENTIONS.md`
+- Modify: `scripts/finess.mjs` (a startup check), `package.json` (`"hooks:install"`), `docs/05-CONVENTIONS.md`
 - Test: `scripts/test/tracked-imports.test.mjs`
 
 **Interfaces:**
@@ -1630,11 +1630,11 @@ export function untrackedImports(root) {
 /** Clone HEAD into a temp dir and run `help` there. @returns {number} exit code. */
 function main() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const dir = mkdtempSync(join(tmpdir(), 'verness-clone-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-clone-'))
   try {
     const clone = spawnSync('git', ['clone', '--quiet', '--no-recurse-submodules', root, join(dir, 'r')], { stdio: 'inherit' })
     if (clone.status !== 0) return 1
-    const help = spawnSync(process.execPath, ['scripts/verness.mjs', 'help'], { cwd: join(dir, 'r'), encoding: 'utf8' })
+    const help = spawnSync(process.execPath, ['scripts/finess.mjs', 'help'], { cwd: join(dir, 'r'), encoding: 'utf8' })
     if (help.status !== 0) { console.error(help.stdout + help.stderr); return 1 }
     console.log('clean clone boots')
     return 0
@@ -1670,7 +1670,7 @@ pre-push check.
 
 ```bash
 npm test && node scripts/check-clean-clone.mjs
-git add scripts/check-clean-clone.mjs scripts/hooks/pre-push scripts/verness.mjs package.json docs/05-CONVENTIONS.md scripts/test/tracked-imports.test.mjs
+git add scripts/check-clean-clone.mjs scripts/hooks/pre-push scripts/finess.mjs package.json docs/05-CONVENTIONS.md scripts/test/tracked-imports.test.mjs
 git commit -m "chore: clean-clone pre-push hook and an untracked-import warning (T-311, T-312)"
 ```
 
@@ -1679,7 +1679,7 @@ git commit -m "chore: clean-clone pre-push hook and an untracked-import warning 
 ### Task 13: `stats --watch` and a probe history (T-123)
 
 **Files:**
-- Modify: `scripts/model.mjs` (`modelStats(cfg, opts)`), `scripts/verness.mjs` (pass flags; the `stats` builtin)
+- Modify: `scripts/model.mjs` (`modelStats(cfg, opts)`), `scripts/finess.mjs` (pass flags; the `stats` builtin)
 - Test: `scripts/test/model.probe-history.test.mjs`
 
 **Interfaces:**
@@ -1709,7 +1709,7 @@ test('a single probe has no trend', () => {
 ```
 
 Importing `scripts/model.mjs` must not run its CLI. Check the bottom of that file: if it runs
-`main()` unconditionally, guard it with the same `process.argv[1]` check `verness.mjs` uses before
+`main()` unconditionally, guard it with the same `process.argv[1]` check `finess.mjs` uses before
 writing the test.
 
 - [ ] **Step 2: Implement**
@@ -1747,7 +1747,7 @@ with a timestamp header and no clearing.
 
 ```bash
 npm test
-git add scripts/model.mjs scripts/verness.mjs scripts/test/model.probe-history.test.mjs
+git add scripts/model.mjs scripts/finess.mjs scripts/test/model.probe-history.test.mjs
 git commit -m "feat(model): stats --watch and probe history with a trend line (T-123)"
 ```
 
@@ -1775,6 +1775,6 @@ task in `03-BACKLOG.md`, and fix it with a test.
 
 ## Self-review checklist (run after the last task)
 - [ ] `npm test` passes; `node scripts/check-clean-clone.mjs` prints `clean clone boots`.
-- [ ] `printf '/help\n' | node scripts/verness.mjs | cat` lists `/btw`, `/config`, `/exit`.
+- [ ] `printf '/help\n' | node scripts/finess.mjs | cat` lists `/btw`, `/config`, `/exit`.
 - [ ] `docs/07-COMMAND-LAYER.md` no longer claims nothing is implemented.
 - [ ] Every WS-A line in `03-BACKLOG.md` is moved to `03-BACKLOG-DONE.md` with evidence.

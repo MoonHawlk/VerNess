@@ -1,6 +1,6 @@
 # Claude Code capability map
 
-Purpose: choose VerNess's command surface deliberately instead of accumulating it. Every row is a
+Purpose: choose FiNess's command surface deliberately instead of accumulating it. Every row is a
 user-facing Claude Code capability mapped to where it would live here.
 
 Target column:
@@ -15,7 +15,7 @@ contract; anything we copy should be re-checked against `claude --help` at imple
 
 ## Slash commands
 
-| Claude Code | What it does | Target | VerNess note |
+| Claude Code | What it does | Target | FiNess note |
 |---|---|---|---|
 | `/help` | list commands | L | generate from the registry so it cannot drift |
 | `/clear` | drop conversation context | L | start a fresh `--session-id` |
@@ -43,7 +43,7 @@ contract; anything we copy should be re-checked against `claude --help` at imple
 | `/statusline` | custom status line | N | no persistent TUI chrome in headless |
 | `/vim`, `/terminal-setup` | editor bindings | N | the REPL is line-based |
 | `/bug`, `/release-notes`, `/privacy-settings`, `/upgrade`, `/login`, `/logout` | account & product plumbing | N | product-specific |
-| `/install-github-app` | CI integration | N | later, if VerNess ever ships CI |
+| `/install-github-app` | CI integration | N | later, if FiNess ever ships CI |
 | `/loop`, `/schedule` | recurring / scheduled runs | S | `ctx.schedule` + `ctx.jobs` are already mounted |
 | `/artifacts` | published pages | N | out of scope |
 | `/code-review ultra` | multi-agent cloud review | P | the team concept, run locally |
@@ -51,7 +51,7 @@ contract; anything we copy should be re-checked against `claude --help` at imple
 
 ## Non-command capabilities
 
-| Capability | Target | VerNess note |
+| Capability | Target | FiNess note |
 |---|---|---|
 | CLI: `-p/--print`, `--output-format json` | L | `dsh --profile … "task" --json` exists; wire `run --json` |
 | CLI: `--resume`, `--continue`, `--model`, `--add-dir` | L | launcher flags mapping onto `dsh` flags |
@@ -61,7 +61,7 @@ contract; anything we copy should be re-checked against `claude --help` at imple
 | `#` memory-add prefix | L | the `/btw` sibling: `#` appends to persona/project notes |
 | Keybindings, chords, autocomplete | N | line-based REPL; `/help` and prefix matching substitute |
 | `CLAUDE.md` hierarchy + `@` imports | L | persona prompt + project brief assembled by the launcher |
-| `settings.json`, permission rules | L+S | `verness.config.json` is ours; enforcement is M4 |
+| `settings.json`, permission rules | L+S | `finess.config.json` is ours; enforcement is M4 |
 | Hooks (PreToolUse, Stop, SessionStart, …) | S | Cordis events cover the same ground with types |
 | Built-in tools (read/write/edit/bash/glob/grep/web) | S | inherited from the substrate; nothing to build |
 | Subagents with own tools/model | P+S | personas today, `ctx.subagents` providers later |
@@ -81,5 +81,5 @@ contract; anything we copy should be re-checked against `claude --help` at imple
 1. The high-value, low-cost surface is **L**: roughly a dozen commands that never call a model.
 2. Most **S** rows are already mounted in the substrate — they need *surfacing*, not building. Every
    one of those is a candidate to get wrong by reimplementing.
-3. `/agents`, `/permissions`, `/output-style`, `/review` all collapse into **one** VerNess concept:
+3. `/agents`, `/permissions`, `/output-style`, `/review` all collapse into **one** FiNess concept:
    the persona. That is the strongest signal that personas (M4) should precede command breadth.

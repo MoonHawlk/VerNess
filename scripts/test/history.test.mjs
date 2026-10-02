@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { appendHistory, loadHistory, recentTasks, storable } from '../lib/history.mjs'
 import { makeSuggester } from '../lib/prompt.mjs'
 
-const file = () => join(mkdtempSync(join(tmpdir(), 'verness-hist-')), 'sub', 'history.jsonl')
+const file = () => join(mkdtempSync(join(tmpdir(), 'finess-hist-')), 'sub', 'history.jsonl')
 
 test('append, dedupe (newest wins), cap', () => {
   const f = file()
@@ -22,7 +22,7 @@ test('missing file is empty history', () => {
 })
 
 test('BOM, CRLF and torn lines are tolerated', () => {
-  const f = join(mkdtempSync(join(tmpdir(), 'verness-hist-')), 'history.jsonl')
+  const f = join(mkdtempSync(join(tmpdir(), 'finess-hist-')), 'history.jsonl')
   writeFileSync(f, '﻿"one"\r\n{not json\r\n42\r\n"two"\r\n', 'utf8')
   assert.deepEqual(loadHistory(f), ['one', 'two'])
 })

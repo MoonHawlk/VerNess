@@ -1,13 +1,13 @@
 {
-  "name": "verness",
+  "name": "finess",
   "version": "0.4.0",
   "private": true,
-  "description": "VerNess — a model-agnostic, plugin-native AI execution harness built on the DeepSeek Harness (dsh) / Cordis substrate.",
+  "description": "FiNess — a model-agnostic, plugin-native AI execution harness built on the DeepSeek Harness (dsh) / Cordis substrate.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "bin": {
-    "verness": "scripts/cli.mjs"
+    "finess": "scripts/cli.mjs"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

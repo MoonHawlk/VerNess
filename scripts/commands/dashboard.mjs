@@ -17,7 +17,7 @@ export default {
     'backlog: every open task in docs/03-BACKLOG.md with a P0-P3 picker, filters, sort, and copy-as-markdown; the file itself rendered below',
     'sessions with turns, tool calls, tokens and wall time; click a row for its full timeline',
     'shadow decisions with model-vs-rules agreement and latency; team runs with per-task outcomes',
-    'a static file under .verness/ - no server, no network, regenerate any time',
+    'a static file under .finess/ - no server, no network, regenerate any time',
   ],
   /**
    * @param {object} ctx - command context.

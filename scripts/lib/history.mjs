@@ -4,7 +4,7 @@
  *
  * Source decision (T-303): the backlog says "from the session logs", but reading every log on each
  * keystroke is too slow and the logs also hold composed tasks (notes, briefs, attached files). What
- * the operator typed is the REPL's own input, so that is what is stored, at `.verness/history.jsonl`
+ * the operator typed is the REPL's own input, so that is what is stored, at `.finess/history.jsonl`
  * (git-ignored), read once at start-up and kept in memory.
  * @module scripts/lib/history
  */

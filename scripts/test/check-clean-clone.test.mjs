@@ -29,14 +29,14 @@ test('pushedCommits: local shas of pushed refs, deletions dropped, de-duplicated
   assert.deepEqual(pushedCommits(''), [])
 })
 
-test('VERNESS_SKIP_CLEAN_CLONE=1 skips the check', () => {
-  const r = run(['nosuchrev'], { env: { ...process.env, VERNESS_SKIP_CLEAN_CLONE: '1' } })
+test('FINESS_SKIP_CLEAN_CLONE=1 skips the check', () => {
+  const r = run(['nosuchrev'], { env: { ...process.env, FINESS_SKIP_CLEAN_CLONE: '1' } })
   assert.equal(r.code, 0, r.out)
   assert.match(r.out, /skipped/)
 })
 
 test('--hook with nothing pushed (only deletions) passes without cloning', () => {
-  const r = run(['--hook'], { input: `(delete) ${Z} refs/heads/x abc\n`, env: { ...process.env, VERNESS_SKIP_CLEAN_CLONE: '' } })
+  const r = run(['--hook'], { input: `(delete) ${Z} refs/heads/x abc\n`, env: { ...process.env, FINESS_SKIP_CLEAN_CLONE: '' } })
   assert.equal(r.code, 0, r.out)
   assert.equal(r.out.trim(), '')
 })

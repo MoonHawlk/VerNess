@@ -38,7 +38,7 @@ export default {
       verify: !args.includes('--no-verify'),
       fresh: !args.includes('--here'),
     })
-    info(`recorded in .verness/loops/ — ${res.rounds} round(s), outcome ${res.outcome}`)
+    info(`recorded in .finess/loops/ — ${res.rounds} round(s), outcome ${res.outcome}`)
     return res.outcome === 'done' ? 0 : 1
   },
 }

@@ -25,7 +25,7 @@ already speaks. So one code path (`scripts/model.mjs`) covers every platform, wi
 - **stats** — engine version, what is resident and how much memory it holds (GPU vs CPU split),
   expiry, the catalogue, and a live latency probe (round trip, tok/s, prompt-eval and load time).
 - **down** — evict the weights (`keep_alive: 0`, which is what actually frees RAM/VRAM), stop the
-  server **only if VerNess started it**, and clear run state. `--force` overrides that last rule.
+  server **only if FiNess started it**, and clear run state. `--force` overrides that last rule.
 
 ## Why not transformers / llama.cpp directly
 - `transformers`: adds a Python toolchain and per-OS wheels — the opposite of plug and play, for a
@@ -40,7 +40,7 @@ already speaks. So one code path (`scripts/model.mjs`) covers every platform, wi
   Check the repo's file list before changing `model.source`.
 - `ollama pull` can print `Error: ...` and still **exit 0** — another case where the exit code is not
   the signal. `up` verifies the outcome through `/api/tags`.
-- A server VerNess adopted (already running, or the OS-managed menu-bar/service app) is never killed
+- A server FiNess adopted (already running, or the OS-managed menu-bar/service app) is never killed
   by `down` without `--force`; on Windows the app may relaunch itself regardless.
 - `/api/ps` reports resident size including the context allocation, so a 610 MiB GGUF can show as
   ~5 GiB in memory. That is real memory held, not a reporting error — it is why `down` matters.

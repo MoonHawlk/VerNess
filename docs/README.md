@@ -1,6 +1,6 @@
-# VerNess — Documentation Index
+# FiNess — Documentation Index
 
-VerNess is a model-agnostic, plugin-native AI execution harness. It is **not** a new runtime:
+FiNess is a model-agnostic, plugin-native AI execution harness. It is **not** a new runtime:
 it is a capability layer (personas, skills, decisions, routing, evaluation, governance, data)
 built on top of the DeepSeek Harness (`dsh`) / Cordis substrate, using only public plugin seams.
 
@@ -33,5 +33,5 @@ rules), pick the first open task of a workstream in `03-BACKLOG.md`, open that w
 follow `05-CONVENTIONS.md`. Move finished tasks to `03-BACKLOG-DONE.md`.
 
 **Agents:** load `.claude/skills/terse/SKILL.md` for short, low-token replies (code, paths and errors
-stay exact), and `.claude/skills/verness-tools/SKILL.md` for the repo tools in `scripts/tools/`
+stay exact), and `.claude/skills/finess-tools/SKILL.md` for the repo tools in `scripts/tools/`
 (locate code and docs through the Engram graph, backlog IDs, tests, docs audit, profiles) instead of grep. **Releases:** `main` carries tags `v0.1.0` … `v0.4.0` (notes in `../CHANGELOG.md`); development continues on `epic`.

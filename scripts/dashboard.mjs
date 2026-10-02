@@ -119,12 +119,12 @@ function detail(summary) {
  * @returns {object[]} the records.
  */
 function readDecisions() {
-  return readShadow(join(REPO, '.verness', 'decisions'))
+  return readShadow(join(REPO, '.finess', 'decisions'))
 }
 
 /** @returns {object[]} recorded team runs, newest first. */
 function readTeamRuns() {
-  const root = join(REPO, '.verness', 'runs')
+  const root = join(REPO, '.finess', 'runs')
   if (!existsSync(root)) return []
   const runs = []
   for (const team of readdirSync(root)) {
@@ -207,7 +207,7 @@ function render(data) {
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VerNess — task dashboard</title>
+<title>FiNess — task dashboard</title>
 <style>
 :root{color-scheme:light dark;--bg:#fbfbfa;--fg:#1a1a18;--dim:#6b6b66;--line:#e3e3df;--card:#fff;--accent:#2f6f4f;--bad:#a33;--good:#2f6f4f}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#e8e8e4;--dim:#8f8f88;--line:#2a2a28;--card:#1c1c1a;--accent:#7fc0a0;--bad:#e08585;--good:#7fc0a0}}
@@ -252,7 +252,7 @@ details summary{cursor:pointer;color:var(--dim);font-size:12px;margin-top:8px}
 pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;font-size:11px;max-height:280px}
 footer{color:var(--dim);font-size:11px;margin-top:28px;border-top:1px solid var(--line);padding-top:10px}
 </style></head><body>
-<h1>VerNess — task dashboard</h1>
+<h1>FiNess — task dashboard</h1>
 <div class="sub">generated ${esc(generated)} · ${esc(totals.sessions)} sessions · click a row to open its timeline · regenerate with <span class="mono">/dashboard</span></div>
 
 <div class="cards">
@@ -291,12 +291,12 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <table><thead><tr><th>team</th><th>when</th><th class="n">tasks</th><th>outcome</th><th>transcripts</th></tr></thead>
 <tbody>${teamRows || '<tr><td colspan="5" class="dim">no team runs yet — /team run &lt;id&gt;</td></tr>'}</tbody></table>
 
-<footer>Backlog from <span class="mono">docs/03-BACKLOG.md</span>. Read from the substrate's durable session logs, <span class="mono">.verness/decisions/*.jsonl</span> and <span class="mono">.verness/runs/</span>. Static file, no server, no network.</footer>
+<footer>Backlog from <span class="mono">docs/03-BACKLOG.md</span>. Read from the substrate's durable session logs, <span class="mono">.finess/decisions/*.jsonl</span> and <span class="mono">.finess/runs/</span>. Static file, no server, no network.</footer>
 
 <script>
 const BACKLOG = ${JSON.stringify(backlog.tasks).replaceAll('<', '\\u003c')};
 (() => {
-  const KEY = 'verness.backlog.priority';
+  const KEY = 'finess.backlog.priority';
   let prio = {};
   try { prio = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { prio = {}; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prio)); } catch { /* storage blocked */ } };
@@ -365,7 +365,7 @@ document.querySelectorAll('.row').forEach(row => row.addEventListener('click', (
 
 /**
  * Build the dashboard from local records.
- * @param {object} cfg - the VerNess configuration (unused today; kept for future filters).
+ * @param {object} cfg - the FiNess configuration (unused today; kept for future filters).
  * @param {{open?: boolean, limit?: number}} [opts] - options.
  * @returns {string} the path written.
  */
@@ -386,8 +386,8 @@ export function buildDashboard(cfg, opts = {}) {
   }
   const backlog = readBacklog()
   const html = render({ sessions, decisions, teamRuns, totals, backlog, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
-  const out = join(REPO, '.verness', 'dashboard.html')
-  mkdirSync(join(REPO, '.verness'), { recursive: true })
+  const out = join(REPO, '.finess', 'dashboard.html')
+  mkdirSync(join(REPO, '.finess'), { recursive: true })
   writeFileSync(out, html, 'utf8')
   ok(`dashboard written (${human(Buffer.byteLength(html))}): ${out}`)
   info(`${totals.sessions} sessions · ${decisions.length} decisions · ${teamRuns.length} team runs · ${backlog.tasks.length} open tasks`)
@@ -400,7 +400,7 @@ export function buildDashboard(cfg, opts = {}) {
 
 // Standalone CLI: `node scripts/dashboard.mjs [--no-open] [--limit N]`.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const { loadConfigForCli } = await import('./verness.mjs')
+  const { loadConfigForCli } = await import('./finess.mjs')
   const at = process.argv.indexOf('--limit')
   buildDashboard(loadConfigForCli(), {
     open: !process.argv.includes('--no-open'),

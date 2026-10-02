@@ -2,11 +2,11 @@
 
 ## What we are building
 
-> **VerNess: a task-execution operating system for AI, in which an LLM is only one class of
+> **FiNess: a task-execution operating system for AI, in which an LLM is only one class of
 > compute resource — alongside decision models (Jev-like) and deterministic engines (SQL,
 > Python, Spark).**
 
-The substrate is the DeepSeek Harness (`dsh`) on Cordis. VerNess adds seven subsystems that
+The substrate is the DeepSeek Harness (`dsh`) on Cordis. FiNess adds seven subsystems that
 `dsh` deliberately does not own:
 
 1. **Personas** — executable identity = skills + tools + model policy + decision policy + memory + evaluators + security policy.

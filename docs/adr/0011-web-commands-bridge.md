@@ -13,13 +13,13 @@ and runs on the host without reaching the model. We wanted the quick-tools there
 second implementation of any command.
 
 ## Decision
-1. **One plugin runs the launcher.** `@verness/commands` (`packages/commands`, plain ESM like the
+1. **One plugin runs the launcher.** `@finess/commands` (`packages/commands`, plain ESM like the
    spike) registers each web-enabled quick-tool as a host command whose handler spawns
-   `node scripts/verness.mjs /<name> <args>` (no shell, `stdin` ignored, `NO_COLOR=1`,
-   `VERNESS_NO_PET=1`) and maps exit 0 to `success`, anything else to `error`, with stdout and
+   `node scripts/finess.mjs /<name> <args>` (no shell, `stdin` ignored, `NO_COLOR=1`,
+   `FINESS_NO_PET=1`) and maps exit 0 to `success`, anything else to `error`, with stdout and
    stderr in order and ANSI escapes stripped. The UI's abort signal kills the child; there is no
    fixed timeout. Every command keeps its one implementation and the launcher-built context.
-2. **The launcher publishes its list.** `node scripts/verness.mjs --list-commands` prints JSON
+2. **The launcher publishes its list.** `node scripts/finess.mjs --list-commands` prints JSON
    (`name`, `summary`, `usage`, `aliases`, `web`), aliases folded into their command, for the
    active persona. A command opts out of the web with `web: false`: `new`, `resume`, `web`/`ui`,
    `off`, `help` (and `exit`/`quit` where present). A `/`-prefixed word that names no command now
@@ -74,6 +74,6 @@ own Remote API (`POST /api/session/create`, `POST /api/commands/list`, the calls
 - Cancelling kills the launcher child; on Windows a grandchild it started (a `/team` dsh run) may
   outlive it.
 - End to end (2026-09-27, temporary `DSH_HOME`, port 3181): the web session's `commands/list` held 33
-  VerNess entries (commands and aliases) beside the substrate's six host commands and no `model` of
+  FiNess entries (commands and aliases) beside the substrate's six host commands and no `model` of
   ours; `/cost`, `/usage`, `/persona`
   and `/agents` replied with the same text as the terminal launcher.

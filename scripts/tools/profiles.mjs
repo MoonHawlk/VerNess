@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `profiles` — the dsh profiles VerNess manages (headless and web), as installed on THIS machine:
+ * `profiles` — the dsh profiles FiNess manages (headless and web), as installed on THIS machine:
  * bundles, dependencies, configured plugins vs installed ones, web bundles, undecided pnpm build
  * scripts, and the rows the generated patch inserts. The fastest way to see why a plugin or panel
  * is missing, on macOS or Windows alike.
@@ -22,9 +22,9 @@ profiles
   for the headless and web profiles under $DSH_HOME/profiles: exists?, bundles, dependencies,
   configured plugins and web bundles vs installed, undecided build scripts, patch insert rows`)
 
-const cfg = parseJsonc(readText('verness.config.json'))
+const cfg = parseJsonc(readText('finess.config.json'))
 const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-const name = cfg.profile?.name ?? 'verness'
+const name = cfg.profile?.name ?? 'finess'
 const web = cfg.profile?.webName ?? `${name}-web`
 const plugins = cfg.settings?.plugins ?? []
 const webBundles = cfg.settings?.webBundles ?? []

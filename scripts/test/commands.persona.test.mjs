@@ -14,7 +14,7 @@ import { loadCommands } from '../lib/commands.mjs'
 
 /** @returns {string} a temp repo root with `scripts/commands/` and `personas/` set up for the test. */
 function makeRoot() {
-  const root = mkdtempSync(join(tmpdir(), 'verness-commands-'))
+  const root = mkdtempSync(join(tmpdir(), 'finess-commands-'))
   mkdirSync(join(root, 'scripts', 'commands'), { recursive: true })
   writeFileSync(
     join(root, 'scripts', 'commands', 'help.mjs'),
@@ -79,7 +79,7 @@ test('a persona command named "help" is refused: the global wins', async () => {
 
 test('loadCommands({persona, root}) accepts a persona id string, resolved against the config', async () => {
   // When only an id string is passed (no commands array to hand), loadCommands cannot know which
-  // files to load — the persona plumbing in verness.mjs always passes a normalized persona object
+  // files to load — the persona plumbing in finess.mjs always passes a normalized persona object
   // (with a `commands` array). Passing a bare string with no commands is a no-op, not an error.
   const root = makeRoot()
   try {
@@ -105,7 +105,7 @@ test('loadCommands skips a persona command name that is not a safe path componen
   const root = makeRoot()
   try {
     const log = t.mock.method(console, 'log', () => {})
-    // Inline (verness.config.json) personas are never schema-validated (Ruling R4), so a
+    // Inline (finess.config.json) personas are never schema-validated (Ruling R4), so a
     // maliciously- or accidentally-crafted `commands` entry like "../evil" must be rejected before
     // it is ever joined into a path, rather than trusted like a file-based persona's commands.
     const persona = { id: 'scientist', commands: ['../evil'] }

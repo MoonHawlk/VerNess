@@ -256,7 +256,7 @@ export default {
     'label   blind labelling loop over unlabelled shadow records; saved as you go',
     '        --relabel <id | task words> re-asks matching records, labelled or not; the newest label wins',
     'report  accuracy, ECE and AUROC per question, model vs rules; --write publishes docs/research/decision-calibration.md',
-    'refit   stores held-out temperature refits in .verness/decisions/temperatures.json (needs 50+ labels)',
+    'refit   stores held-out temperature refits in .finess/decisions/temperatures.json (needs 50+ labels)',
     `gate    PASS or HOLD per question: n >= ${GATE.minLabels}, accuracy >= rules, ECE < rules ECE, ECE <= ${GATE.maxEce}, AUROC >= ${GATE.minAuroc}`,
   ],
   /**

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Model lifecycle for VerNess — the three things a local model needs, on any OS:
+ * Model lifecycle for FiNess — the three things a local model needs, on any OS:
  *
  *   up      install the engine if missing, start it, fetch the model (from Hugging Face), warm it
  *   stats   telemetry: what is loaded, how much memory it holds, latency, who owns the process
@@ -10,7 +10,7 @@
  * straight from Hugging Face (`hf.co/<repo>:<quant>`) — so one code path covers all three platforms
  * and the weights come from Hugging Face rather than a vendor-specific registry.
  *
- * Run state lives in `.verness/run/model.json` so `down` can tell a server WE started from one that
+ * Run state lives in `.finess/run/model.json` so `down` can tell a server WE started from one that
  * was already running (and must not be killed).
  * @module scripts/model
  */
@@ -24,7 +24,7 @@ import { startBackground } from './lib/util.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
-const RUN_DIR = join(REPO, '.verness', 'run')
+const RUN_DIR = join(REPO, '.finess', 'run')
 const RUN_FILE = join(RUN_DIR, 'model.json')
 
 const C = {
@@ -120,7 +120,7 @@ function installEngine() {
 
 /**
  * Bring the model up: engine present, server running, weights fetched, weights warm.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {string} [model] - the model to bring up; defaults to the configured one.
  * @returns {Promise<boolean>} whether the model is ready to serve requests.
  */
@@ -189,7 +189,7 @@ export async function modelUp(cfg, model) {
 
 /**
  * Print model telemetry: loaded models with their memory, catalogue, latency, and ownership.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {Promise<boolean>} whether the engine answered at all.
  */
 export async function modelStats(cfg) {
@@ -201,8 +201,8 @@ export async function modelStats(cfg) {
   console.log(paint(C.cyan, 'engine'))
   info(`ollama api ${ver} on ${apiRoot(base)}`)
   const run = readRunState()
-  if (run === undefined) info('run state: none recorded — this server was not brought up by VerNess')
-  else if (run.startedByUs === true) info(`run state: started by VerNess at ${run.at}, pid ${run.pid}`)
+  if (run === undefined) info('run state: none recorded — this server was not brought up by FiNess')
+  else if (run.startedByUs === true) info(`run state: started by FiNess at ${run.at}, pid ${run.pid}`)
   else info(`run state: adopted at ${run.at} — the server was already running, so \`down\` will not stop it`)
 
   const ps = await getJson(`${apiRoot(base)}/api/ps`)
@@ -246,9 +246,9 @@ export async function modelStats(cfg) {
 }
 
 /**
- * Take the model down: unload weights (freeing RAM/VRAM), stop the server if VerNess started it, and
+ * Take the model down: unload weights (freeing RAM/VRAM), stop the server if FiNess started it, and
  * clear the run state. A server we did not start is left running unless `force` is set.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {{force?: boolean}} [opts] - `force` stops the server even if someone else started it.
  * @returns {Promise<boolean>} whether the shutdown path completed.
  */
@@ -296,7 +296,7 @@ export async function modelDown(cfg, opts = {}) {
     if ((await engineVersion(base)) === undefined) ok('server stopped')
     else warn('the server is still answering — it may be managed by the OS (service or menu-bar app)')
   } else {
-    info('server left running: VerNess did not start it (use `down --force` to stop it anyway)')
+    info('server left running: FiNess did not start it (use `down --force` to stop it anyway)')
   }
 
   if (existsSync(RUN_FILE)) { rmSync(RUN_FILE, { force: true }); ok('run state cleared') }
@@ -304,11 +304,11 @@ export async function modelDown(cfg, opts = {}) {
 }
 
 /**
- * Load the VerNess configuration through the launcher, so both entry points read the same file.
+ * Load the FiNess configuration through the launcher, so both entry points read the same file.
  * @returns {Promise<object>} the merged configuration.
  */
 async function standaloneConfig() {
-  const { loadConfigForCli } = await import('./verness.mjs')
+  const { loadConfigForCli } = await import('./finess.mjs')
   return loadConfigForCli()
 }
 

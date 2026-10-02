@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { loadPersonas } from '../lib/personas.mjs'
 
 test('loadPersonas reports a schema issue as file:line:column path: message', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-personas-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-personas-'))
   try {
     writeFileSync(
       join(dir, 'broken.json'),
@@ -35,7 +35,7 @@ test('loadPersonas reports a schema issue as file:line:column path: message', ()
 })
 
 test('loadPersonas does not throw when a persona file parses to a non-object', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-personas-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-personas-'))
   try {
     writeFileSync(join(dir, 'a.json'), 'null\n', 'utf8')
     writeFileSync(join(dir, 'b.json'), '[]\n', 'utf8')
@@ -56,7 +56,7 @@ test('loadPersonas does not throw when a persona file parses to a non-object', (
 })
 
 test('loadPersonas reports the exact line:column when a comment and a trailing comma precede the error', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-personas-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-personas-'))
   try {
     writeFileSync(
       join(dir, 'broken.json'),
@@ -80,7 +80,7 @@ test('loadPersonas reports the exact line:column when a comment and a trailing c
 })
 
 test('loadPersonas accepts a valid v2 persona file and normalizes v2 fields', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-personas-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-personas-'))
   try {
     writeFileSync(
       join(dir, 'ok.json'),

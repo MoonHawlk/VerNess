@@ -17,7 +17,7 @@ const base = () => ({
   route: 'ollama-local',
   session: 'session-a55aee3c-7456-4bd4-b39b-aa77d350aff9',
   versions: {
-    verness: '0.0.1', commit: 'abc1234', node: '24.14.0',
+    finess: '0.0.1', commit: 'abc1234', node: '24.14.0',
     dsh: { installed: '0.1.7-rc.2', pinned: '0.1.7-rc.2' },
     engine: { name: 'ollama', version: '0.32.13' },
   },
@@ -116,7 +116,7 @@ test('wide terminal: art beside the panel, and the panel says what matters', () 
   const last = art[art.length - 1]
   assert.ok(wide.some(l => l.includes(last) && l.length > last.length + 4), 'side by side: text beside the bottom art row')
   const text = wide.join('\n')
-  for (const want of ['VerNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 0.32.13', 'up - qwen3:0.6b warm 800 MiB',
+  for (const want of ['FiNess 0.0.1 (abc1234)', 'dsh 0.1.7-rc.2 pinned', 'ollama 0.32.13', 'up - qwen3:0.6b warm 800 MiB',
     'decide  off', 'loop done 2h ago', 'team analysis-review 3d ago', 'a55aee3c', 'Ness: all workers awake']) {
     assert.ok(text.includes(want), `panel shows "${want}"`)
   }

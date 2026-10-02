@@ -63,7 +63,7 @@ async function commit() {
 
 /** @returns {{outcome: string, at: number, objective: string}|undefined} the newest `/loop-task` record. */
 function lastLoop() {
-  const dir = join(REPO, '.verness', 'loops')
+  const dir = join(REPO, '.finess', 'loops')
   if (!existsSync(dir)) return undefined
   const days = readdirSync(dir).filter(f => f.endsWith('.jsonl')).sort()
   for (const f of days.reverse()) {
@@ -80,7 +80,7 @@ function lastLoop() {
 
 /** @returns {{team: string, at: number}|undefined} the newest `/team run` output directory. */
 function lastTeamRun() {
-  const root = join(REPO, '.verness', 'runs')
+  const root = join(REPO, '.finess', 'runs')
   if (!existsSync(root)) return undefined
   let best
   for (const team of readdirSync(root)) {
@@ -97,7 +97,7 @@ function lastTeamRun() {
 /**
  * Probe everything the panel shows. Every probe runs concurrently; a failed probe becomes a
  * `down`/unknown value, never an exception, because a greeting must not be able to stop the boot.
- * @param {object} cfg - the merged VerNess configuration.
+ * @param {object} cfg - the merged FiNess configuration.
  * @param {{dsh?: string, commands?: number, session?: string}} [known] - facts the caller already
  *   holds: the installed `dsh` version line, the quick-tool count, the conversation id.
  * @returns {Promise<object>} the vitals `renderPet` draws.
@@ -132,7 +132,7 @@ export async function gatherVitals(cfg, known = {}) {
     route,
     session: known.session,
     versions: {
-      verness: pkg.version ?? '?',
+      finess: pkg.version ?? '?',
       commit: sha,
       node: process.versions.node,
       dsh: { installed: known.dsh, pinned: cfg.substrate?.version },
@@ -402,7 +402,7 @@ export const sideBySide = columns => columns !== undefined && columns >= ART_W +
 export function renderPet(v, opts = {}) {
   const { mood, says } = moodOf(v)
   const art = petArt(mood)
-  const title = [[v.name, 'bold'], [` - VerNess ${v.versions.verness}${v.versions.commit !== undefined ? ` (${v.versions.commit})` : ''}  `], [`${v.model} via ${v.route}`, 'dim']]
+  const title = [[v.name, 'bold'], [` - FiNess ${v.versions.finess}${v.versions.commit !== undefined ? ` (${v.versions.commit})` : ''}  `], [`${v.model} via ${v.route}`, 'dim']]
   const rows = [['', title], ...panelRows(v)]
   const label = Math.max(...rows.map(([l]) => l.length))
   const cols = opts.columns
@@ -444,12 +444,12 @@ export function renderPet(v, opts = {}) {
 
 /**
  * Should the pet greet at boot? Config `pet.enabled` (default true), overridden off by
- * `VERNESS_NO_PET=1`, and only on a real terminal so piped output stays clean.
+ * `FINESS_NO_PET=1`, and only on a real terminal so piped output stays clean.
  * @param {object} cfg - configuration.
  * @returns {boolean} whether to draw it.
  */
 export function petEnabled(cfg) {
-  if (process.env.VERNESS_NO_PET !== undefined && process.env.VERNESS_NO_PET !== '' && process.env.VERNESS_NO_PET !== '0') return false
+  if (process.env.FINESS_NO_PET !== undefined && process.env.FINESS_NO_PET !== '' && process.env.FINESS_NO_PET !== '0') return false
   return cfg.pet?.enabled !== false && process.stdout.isTTY === true
 }
 

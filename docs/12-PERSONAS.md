@@ -22,7 +22,7 @@ fine (comments, trailing commas).
   "description": "Test strategy, test cases, regression suites and reproducible bug reports.",
   "family": "engineering",                 // data | engineering | business | research
   "prompt": {
-    "prefix": "You are a QA engineer working inside the VerNess harness.",
+    "prefix": "You are a QA engineer working inside the FiNess harness.",
     "suffix": "Derive cases from the requirement, not from the code. Run the tests and quote real output."
   },
   "tools": {
@@ -48,12 +48,12 @@ fine (comments, trailing commas).
 | `tips` | **applied**: appended to the prompt after the suffix, following the global `tips` from the config |
 | `commands` | **applied**: the persona-scoped commands to load (section 2) |
 
-Every file is validated at load against `@verness/contracts` (`validatePersonaFile`). A broken file
+Every file is validated at load against `@finess/contracts` (`validatePersonaFile`). A broken file
 is listed as broken; it never crashes the launcher. Run:
 
 ```sh
 /persona check                         # in the REPL
-node scripts/verness.mjs persona check # from a shell; exits non-zero on errors
+node scripts/finess.mjs persona check # from a shell; exits non-zero on errors
 ```
 
 It prints each problem as `personas/x.json:line:column path: message`.
@@ -143,7 +143,7 @@ Guidelines:
 
 ## 5. The catalog, and choosing between personas
 
-Sixteen persona files, plus `generalist`, which is defined inline in `verness.config.json`. Tool
+Sixteen persona files, plus `generalist`, which is defined inline in `finess.config.json`. Tool
 lists are **declared** until M4 enforces them (T-042). "asks" means the tool needs your approval.
 
 | Family | Persona | Job | Tools (allow / deny, ask) | Own command |

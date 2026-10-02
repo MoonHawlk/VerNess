@@ -4,7 +4,7 @@
   "description": "Docs, READMEs, release notes and API reference, written from the code and verified against it.",
   "family": "business",
   "prompt": {
-    "prefix": "You are a technical writer working inside the VerNess harness.",
+    "prefix": "You are a technical writer working inside the FiNess harness.",
     "suffix": "Read the code or command before documenting it; every example must be one you have seen work or copied from a test. Write for the named reader, task-first, in short sentences. Match the repo's existing doc style and never invent flags, fields or behaviour."
   },
   "tools": { "allow": ["read", "grep", "glob", "write", "edit", "bash"], "deny": ["sql.write", "production.write", "web.fetch"], "approval": { "bash": "ask" } },

@@ -1,6 +1,6 @@
 /**
  * Operator context that steers a task without being one: `/btw` side notes, kept per session in
- * `.verness/run/notes-<session>.json`.
+ * `.finess/run/notes-<session>.json`.
  *
  * A note is sent ONCE, on the next task, then marked `sent`: every REPL turn continues one substrate
  * session, so the model keeps it in its own history. Resending would duplicate it in the log and
@@ -128,8 +128,8 @@ export function composeTask(task, extra = {}) {
 
 // --- The `#` project brief (T-147): durable, one file per checkout, survives sessions. ---
 
-/** @param {string} root - repo root. @returns {string} the brief file, `<root>/.verness/brief.md`. */
-export const briefFile = root => join(root, '.verness', 'brief.md')
+/** @param {string} root - repo root. @returns {string} the brief file, `<root>/.finess/brief.md`. */
+export const briefFile = root => join(root, '.finess', 'brief.md')
 
 /** @param {string} root - repo root. @returns {string} the brief, trimmed ('' when none). */
 export function readBrief(root) {
@@ -152,7 +152,7 @@ export function appendBrief(root, text, maxChars) {
   const outcome = (total, refused, reason) => ({ line, total, warn: total >= 0.8 * maxChars, refused, ...(reason === undefined ? {} : { reason }) })
   if (t === '') return outcome(cur.length, true, 'empty')
   if (next.length > maxChars) return outcome(cur.length, true, 'cap')
-  mkdirSync(join(root, '.verness'), { recursive: true })
+  mkdirSync(join(root, '.finess'), { recursive: true })
   writeFileSync(briefFile(root), `${next}\n`, 'utf8')
   return outcome(next.length, false)
 }

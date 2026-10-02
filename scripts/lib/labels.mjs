@@ -1,7 +1,7 @@
 /**
  * The labelled set (T-220 / T-260): shadow-mode decision records joined with human labels.
  *
- * Records live in `.verness/decisions/<day>.jsonl` (written by `logShadowDecision`); labels live
+ * Records live in `.finess/decisions/<day>.jsonl` (written by `logShadowDecision`); labels live
  * beside them in `labels.jsonl`, one `{id, question, label, at}` line each, append-only. The newest
  * label for an `(id, question)` wins, so a mistake is corrected by labelling again. `skip` is a
  * label: it marks a task that fits none of the options, and it is never asked again.

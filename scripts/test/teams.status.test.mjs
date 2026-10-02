@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import teamCmd from '../commands/team.mjs'
 import { latestRun, readRun, runTeam, statusRows } from '../lib/teams.mjs'
 
-const root = mkdtempSync(join(tmpdir(), 'verness-t170-'))
+const root = mkdtempSync(join(tmpdir(), 'finess-t170-'))
 after(() => rmSync(root, { recursive: true, force: true }))
 
 /**

@@ -1,8 +1,8 @@
 {
-  "name": "@verness/spike",
+  "name": "@finess/spike",
   "version": "0.0.1",
   "private": true,
-  "description": "M1 load-bearing spike: proves an out-of-tree VerNess plugin mounts into a dsh profile.",
+  "description": "M1 load-bearing spike: proves an out-of-tree FiNess plugin mounts into a dsh profile.",
   "type": "module",
   "main": "./index.js",
   "exports": { ".": "./index.js" },

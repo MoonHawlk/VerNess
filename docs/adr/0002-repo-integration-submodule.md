@@ -11,9 +11,9 @@ npm artifacts.
 
 ## Decision
 (a). `upstream/deepseek-harness` is a git submodule, pinned, never edited. Our plugins live in
-`packages/*` under the `@verness/*` scope and resolve `@deepseek-ai/*` from npm (they are
+`packages/*` under the `@finess/*` scope and resolve `@deepseek-ai/*` from npm (they are
 published, verified 2026-09-25: `@deepseek-ai/dsh@0.1.5-rc.3`, `@deepseek-ai/cordis@4.0.4`).
-Composition happens through a profile patch (`profiles/verness/cordis.patch.yml`) that `insert:`s
+Composition happens through a profile patch (`profiles/finess/cordis.patch.yml`) that `insert:`s
 our package specifiers — the documented mechanism for out-of-tree plugins
 (`.refs/deepseek-harness/packages/boot/app-boot/README.md:65`).
 

@@ -13,7 +13,7 @@ import {
   NEW_KEY, addNote, clearNotes, composeTask, dropNote, markSent, markUnsent, moveNotes, notesFile, pendingNotes, readNotes,
 } from '../lib/notes.mjs'
 
-const tmp = () => mkdtempSync(join(tmpdir(), 'verness-notes-'))
+const tmp = () => mkdtempSync(join(tmpdir(), 'finess-notes-'))
 
 test('add, read, drop, clear', () => {
   const d = tmp()

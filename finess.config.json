@@ -1,6 +1,6 @@
-// VerNess setup file — the one place for day-to-day adjustments.
+// FiNess setup file — the one place for day-to-day adjustments.
 // JSON with // comments and trailing commas allowed. Every field is optional:
-// anything omitted falls back to the defaults in scripts/verness.mjs.
+// anything omitted falls back to the defaults in scripts/finess.mjs.
 //
 //   ./turn_on.sh            (macOS/Linux)      .\turn_on.ps1        (Windows)
 //   ./turn_on.sh setup      first-time install / repair
@@ -19,7 +19,7 @@
 
   // ------------------------------------------------------------------ profile
   "profile": {
-    "name": "verness",
+    "name": "finess",
     // Template the profile is created from: headless (one-shot tasks, the
     // default) | web (browser UI) | acp | sdk. Changing this needs a re-run of
     // `setup`; an existing profile is never recreated.
@@ -75,7 +75,7 @@
     "active": "generalist",
     "definitions": {
       "generalist": {
-        "prefix": "You are a careful engineering assistant working inside the VerNess harness.",
+        "prefix": "You are a careful engineering assistant working inside the FiNess harness.",
         "suffix": "State what you verified and what you assumed. Never claim a command succeeded unless you ran it.",
         "tools": { "allow": [], "deny": [] },
         "skills": [],
@@ -87,7 +87,7 @@
   // Short standing guidance appended to the active persona's suffix. Keep them
   // few and concrete — every line costs tokens on every single turn.
   "tips": [
-    "Working directory is the VerNess repo; upstream/ is a read-only submodule.",
+    "Working directory is the FiNess repo; upstream/ is a read-only submodule.",
     "Prefer small, verifiable steps over long plans.",
   ],
 
@@ -110,14 +110,14 @@
     "apiKeyEnv": "LAYA_API_KEY",
     "timeoutMs": 20000,
     // pip install "laya[serve]" into this venv; `decision up` does it for you.
-    "venv": ".verness/py",
+    "venv": ".finess/py",
     "checkpoint": "english",
   },
 
   // ---------------------------------------------------------------------- pet
   // The companion that greets you at boot with versions and workers (model engine,
   // decision sidecar, last loop/team run). `/pet` redraws it with fresh probes.
-  // Set enabled to false to boot with the one-line banner; VERNESS_NO_PET=1 does
+  // Set enabled to false to boot with the one-line banner; FINESS_NO_PET=1 does
   // the same for a single run. It only draws on a real terminal, never in a pipe.
   // animate (default true) lets her move; set it to false for a still drawing. It
   // is off anyway when NO_COLOR or CI is set or the terminal is too narrow for the
@@ -136,10 +136,10 @@
     // (e.g. ["web"]) limits a row to profiles of those templates; `repoConfig`
     // passes the checkout path to the plugin as `config.repo`.
     "plugins": [
-      { "id": "verness-spike", "package": "@verness/spike", "path": "packages/spike", "enabled": true },
+      { "id": "finess-spike", "package": "@finess/spike", "path": "packages/spike", "enabled": true },
       // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
       // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
-      { "id": "verness-commands", "package": "@verness/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },
+      { "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },
     ],
     // Browser-UI bundles, added to the WEB profile only with `dsh plugin add` so their own patch
     // applies (a plain plugin row would skip it and also land in the headless profile).

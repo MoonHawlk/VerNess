@@ -4,8 +4,8 @@ Two files are all you need day to day:
 
 | File | Role |
 |---|---|
-| `verness.config.json` | **the setup file** — personas, tips, model, plugins, general settings |
-| `verness` (or `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd`) | **the launcher** — the `verness` bin and the thin wrappers all run `scripts/cli.mjs`, which checks Node and then loads `scripts/verness.mjs` |
+| `finess.config.json` | **the setup file** — personas, tips, model, plugins, general settings |
+| `finess` (or `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd`) | **the launcher** — the `finess` bin and the thin wrappers all run `scripts/cli.mjs`, which checks Node and then loads `scripts/finess.mjs` |
 
 The launcher is plain Node (`^22.19.0 || >=24`; 23.x is rejected; the substrate already requires 22.19), so the same logic runs on
 Windows, macOS and Linux. The only platform-specific code is path resolution and the Windows `.cmd`
@@ -45,22 +45,22 @@ but it is a user-wide policy change — the first two options change nothing).
 
 npm equivalents exist for habit: `npm start`, `npm run setup|doctor|sync|graph|model:up|model:stats|model:down`.
 
-### One `verness` command
+### One `finess` command
 
 `package.json` exposes the launcher as a bin, so after linking it once every example above can be
-written `verness <subcommand>` from any directory (`verness`, `verness web`, `verness doctor`, …):
+written `finess <subcommand>` from any directory (`finess`, `finess web`, `finess doctor`, …):
 
 ```sh
-npm link          # from the repo root (npm ships with Node): puts `verness` on PATH, pointing at this checkout
-verness doctor
+npm link          # from the repo root (npm ships with Node): puts `finess` on PATH, pointing at this checkout
+finess doctor
 ```
 The link points at the checkout you ran it from, so link the clone you actually use (not a scratch
-worktree). Remove it with `npm unlink -g verness`. (pnpm 11 dropped `pnpm link -g` — its `link`
+worktree). Remove it with `npm unlink -g finess`. (pnpm 11 dropped `pnpm link -g` — its `link`
 now only takes a directory — so `npm link` is the documented way.) The `turn_on.*`
 wrappers keep working and stay the zero-install way in: they only check that `node` is on PATH.
 
 `scripts/cli.mjs` checks the Node version *before* loading the launcher, so an old Node gets a
-plain `error: VerNess needs Node 22.19.0+ …` instead of a module-link error from the `.ts` contracts.
+plain `error: FiNess needs Node 22.19.0+ …` instead of a module-link error from the `.ts` contracts.
 It also warns on stderr (`!! scripts/lib/x.mjs is imported by the launcher but not tracked by git`)
 when a `scripts/lib` module the launcher reaches through its imports is not in git — it would run
 here but a clone would not start. One `git ls-files`, overlapped with loading the launcher; silent
@@ -85,7 +85,7 @@ unchanged beside it.
   templates, and only plugin rows limited to one surface (`"surfaces": ["web"]`) differ.
 - `setup` creates it, and the first `web` creates it if `setup` has not.
 - It boots through the same checks as the REPL (`prepareBoot` → `prepareRoute` in
-  `scripts/verness.mjs`): a fresh patch, the route's API key present in `.env`, and for a local
+  `scripts/finess.mjs`): a fresh patch, the route's API key present in `.env`, and for a local
   route the engine up and the model pulled. It also runs in the same sandbox mode
   (`DSH_PERMISSION_MODE`, chosen with `/access`).
 - **Persona, route, model and sandbox mode are read once, when the server starts.** After
@@ -93,14 +93,14 @@ unchanged beside it.
 - Flags pass through to the web app: `--port <n>`, `--no-open`, `--host <host>`. Any other word
   after `web` is passed through too, never read as a launcher command.
 - The server is token-gated. It opens the browser for you; otherwise open the printed URL, since
-  it carries the login token. Pick the `VerNess` workspace, then type in the bar. Ctrl+C stops it. Launched as `/web` from
+  it carries the login token. Pick the `FiNess` workspace, then type in the bar. Ctrl+C stops it. Launched as `/web` from
   the REPL, it also ends the REPL, which shares the console.
 
 ### Quick-tools in the message bar (ADR-0011)
-Type `/` in the bar: the VerNess quick-tools are listed beside the substrate's own commands, and run
-without a model call, like in the REPL. The `@verness/commands` plugin (`packages/commands`, web
-profile only) reads `node scripts/verness.mjs --list-commands` once at server start and runs each
-command as `node scripts/verness.mjs /<name> <args>`; the reply is the same text the REPL prints.
+Type `/` in the bar: the FiNess quick-tools are listed beside the substrate's own commands, and run
+without a model call, like in the REPL. The `@finess/commands` plugin (`packages/commands`, web
+profile only) reads `node scripts/finess.mjs --list-commands` once at server start and runs each
+command as `node scripts/finess.mjs /<name> <args>`; the reply is the same text the REPL prints.
 
 - **Works on the web:** every quick-tool, its aliases, and the active persona's own commands
   (`/cost`, `/usage`, `/persona`, `/agents`, `/decide`, `/dd`, `/testplan`, ...).
@@ -109,8 +109,8 @@ command as `node scripts/verness.mjs /<name> <args>`; the reply is the same text
   would answer), `/help` (the web `/` menu is the list), `/btw` (its notes are composed only into the
   terminal REPL's next task).
 - **The substrate keeps its names.** `/model`, `/file`, `/compact`, `/export`, `/feedback`, `/goal`,
-  `/permission` and `/plan` stay the web UI's own; VerNess's `/model` is a terminal command there. The
-  server log says so once: `verness-commands: /model left to the substrate`.
+  `/permission` and `/plan` stay the web UI's own; FiNess's `/model` is a terminal command there. The
+  server log says so once: `finess-commands: /model left to the substrate`.
 - **Restart rule.** `/persona`, `/api`, `/models` and `/access` change state the server read at boot;
   their reply ends with `restart the web UI to apply (./turn_on.sh off, then web)`. The command list
   also follows the persona active at boot, so a persona's commands appear after that restart.
@@ -124,19 +124,19 @@ command as `node scripts/verness.mjs /<name> <args>`; the reply is the same text
    command line matches `profile <web profile name>` (`pgrep -f`), so a UI started with
    `web --port <n>` is found too. Windows: the owner of the port-6173 listener, via PowerShell
    (port only, so a UI on another port must be stopped with Ctrl+C).
-2. **The decision sidecar** (`decisionDown`), if VerNess started it.
+2. **The decision sidecar** (`decisionDown`), if FiNess started it.
 3. **The local model** (`modelDown`): weights are unloaded (RAM/VRAM freed), and the engine server
-   is stopped only if VerNess started it.
+   is stopped only if FiNess started it.
 
-`off --force` also stops servers VerNess did not start, e.g. an Ollama you launched yourself.
+`off --force` also stops servers FiNess did not start, e.g. an Ollama you launched yourself.
 
 Why it exists: `web down` does not stop anything — `web` passes trailing words to the web app and
 boots the web UI again — and `down` alone only handles the model.
 
 ## The setup file
 
-`verness.config.json` is JSON with `//` comments and trailing commas allowed. Every field is
-optional; anything omitted falls back to `DEFAULTS` in `scripts/verness.mjs`.
+`finess.config.json` is JSON with `//` comments and trailing commas allowed. Every field is
+optional; anything omitted falls back to `DEFAULTS` in `scripts/finess.mjs`.
 
 | Section | What it controls |
 |---|---|
@@ -160,10 +160,10 @@ existing `system-prompt` seam — real and useful, but `tools.allow`/`tools.deny
 plugin on `tools/pre-execute`, and nothing in this file needs to change.
 
 Since M2, persona files (`personas/<id>.json`, JSONC) are **validated at load** against the
-`@verness/contracts` shape; a broken file is listed, not a crash. `/persona check` (or
-`node scripts/verness.mjs persona check`) prints each issue as `personas/x.json:line:column path: message`.
+`@finess/contracts` shape; a broken file is listed, not a crash. `/persona check` (or
+`node scripts/finess.mjs persona check`) prints each issue as `personas/x.json:line:column path: message`.
 A persona can also add its own commands (`personas/<id>/commands/<name>.mjs`, e.g. `/hypotheses`);
-global commands win on a name clash. Inline `verness.config.json` definitions are not validated.
+global commands win on a name clash. Inline `finess.config.json` definitions are not validated.
 Step-by-step guide: `docs/12-PERSONAS.md`.
 
 ### Developing the launcher and contracts
@@ -178,7 +178,7 @@ the config, never the patch: the next `sync` overwrites it. See ADR-0006.
 ## Adding your own plugin
 1. Create `packages/<name>/` with a `package.json` (`main`, `type: module`) and a plugin entry
    exporting `name` / `inject` / `apply` — copy `packages/spike/`.
-2. Add a row to `settings.plugins`: `{ "id": "my-thing", "package": "@verness/my-thing", "path": "packages/my-thing" }`.
+2. Add a row to `settings.plugins`: `{ "id": "my-thing", "package": "@finess/my-thing", "path": "packages/my-thing" }`.
 3. `./turn_on.sh setup` (needed once, so pnpm records the dependency), then `./turn_on.sh`.
 Editing an existing file needs no reinstall — pnpm hardlinks local packages. **Adding or renaming a
 file does**, so re-run `setup`.
@@ -193,12 +193,12 @@ endpoint, and it pulls GGUF straight from a HF repo).
 ./turn_on.sh up       # engine installed? server up? weights pulled from HF? warm? -> ready
 ./turn_on.sh stats    # what is resident, how much memory, tok/s, latency, who owns the server
 ./turn_on.sh down     # evict the weights, free the memory, stop the engine we started
-./turn_on.sh down --force   # also stop a server VerNess did not start
+./turn_on.sh down --force   # also stop a server FiNess did not start
 ./turn_on.sh off      # web UI + decision sidecar + model in one step (see "Stopping everything")
 ```
 Aliases: `npm run model:up | model:stats | model:down`, or `node scripts/model.mjs up|stats|down`.
 
-Configure it in `verness.config.json` under `model`:
+Configure it in `finess.config.json` under `model`:
 
 | Field | Meaning |
 |---|---|

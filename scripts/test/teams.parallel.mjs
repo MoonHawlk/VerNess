@@ -90,7 +90,7 @@ try {
     check('spawn failure resolves with code 1', bad.code === 1, `code ${bad.code}`)
   }
 } finally {
-  rmSync(join(REPO, '.verness', 'runs', team.id), { recursive: true, force: true })
+  rmSync(join(REPO, '.finess', 'runs', team.id), { recursive: true, force: true })
 }
 
 if (failed > 0) { console.log(`${failed} check(s) failed`); process.exit(1) }

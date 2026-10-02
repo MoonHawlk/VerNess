@@ -51,7 +51,7 @@ Dispatch prompt = goal, inputs (paths), constraints, expected return shape. One 
 
 ```
 Goal: find why dashboard wall time = 0.
-Inputs: scripts/dashboard.mjs, .verness/sessions/*.jsonl
+Inputs: scripts/dashboard.mjs, .finess/sessions/*.jsonl
 Constraint: read-only.
 Return: cause + file:line, <=5 lines.
 ```

@@ -21,7 +21,7 @@ import { applyTemperature } from './calibration.mjs'
 import { REPO } from './util.mjs'
 
 /** Where shadow-mode decisions are recorded (gitignored). */
-export const decisionsDir = () => join(REPO, '.verness', 'decisions')
+export const decisionsDir = () => join(REPO, '.finess', 'decisions')
 
 /**
  * The three routing questions, all `choice` with small option sets — Laya's strong regime. No
@@ -61,7 +61,7 @@ export const ROUTING_QUESTIONS = {
   },
 }
 
-/** @param {object} cfg - the VerNess configuration. @returns {object} the decisions config block. */
+/** @param {object} cfg - the FiNess configuration. @returns {object} the decisions config block. */
 export function decisionConfig(cfg) {
   const d = cfg.decisions ?? {}
   return {

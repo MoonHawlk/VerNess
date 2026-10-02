@@ -14,7 +14,7 @@ expensive intelligence is only invoked where cheap computation could not decide 
 
 | Piece | State | Where |
 |---|---|---|
-| Substrate + profile + launcher | working | `./turn_on.cmd`, `scripts/verness.mjs` |
+| Substrate + profile + launcher | working | `./turn_on.cmd`, `scripts/finess.mjs` |
 | Local generative model (Qwen3 0.6B, HF GGUF) | working, `up`/`stats`/`down` | `scripts/model.mjs`, ADR-0007 |
 | Personas as files, teams, quick-tool registry | working (wired 2026-09-26) | `scripts/commands/`, `scripts/lib/` |
 | Decision layer | sidecar, shadow logging, blind labelling, calibration report, refit and the gate as code working (WS-E Tasks 1–4; `/dd gate` reports only); the gate needs 50+ labels per question to pass (T-392) | `scripts/lib/decisions.mjs`, `docs/superpowers/plans/2026-09-26-05-decision-calibration-routing.md` |
@@ -77,7 +77,7 @@ task -> rules decide (as today)          <- what actually runs
 ```
 
 1. **Phase 1 — shadow.** Every task asks Laya and logs `{question, answer, answer_confidence,
-   rule_answer, what_actually_happened}` to `.verness/decisions/*.jsonl`. Zero behaviour change.
+   rule_answer, what_actually_happened}` to `.finess/decisions/*.jsonl`. Zero behaviour change.
 2. **Phase 2 — measure.** After ~200 logged decisions, label them and report accuracy, ECE and
    AUROC against the rule baseline (T-220..T-222). Refit one temperature per (question type, option
    count) — the card measures ECE 0.466 → 0.081 from exactly this.
@@ -112,10 +112,10 @@ falls back to rules.
 #    T-140 REPL "/" dispatch  ->  T-141 writePatch honours persona state  ->  T-146 builtins.model
 
 # 2. stand up the decision sidecar (T-210..T-213) — first non-Node dependency
-python -m venv .verness/py            # Python 3.12.3 present, needs >=3.10
-.verness\py\Scripts\pip install "laya[serve]"     # pulls torch + transformers; large download
+python -m venv .finess/py            # Python 3.12.3 present, needs >=3.10
+.finess\py\Scripts\pip install "laya[serve]"     # pulls torch + transformers; large download
 $env:LAYA_HOST="127.0.0.1"; $env:LAYA_API_KEY=<generated>   # never bind 0.0.0.0 (ADR-0009)
-.verness\py\Scripts\laya-serve
+.finess\py\Scripts\laya-serve
 
 # 3. confirm the contract against the LIVE server, not the model card (T-200)
 curl -s http://127.0.0.1:8000/health
@@ -130,7 +130,7 @@ Expect **193–464 ms per call on CPU** (32.8 ms is the T4 figure). Respect
 ## Task block
 
 - **T-250** Shadow-mode logger: ask the three questions per task, log answer + `answer_confidence`
-  + rule answer + outcome to `.verness/decisions/*.jsonl`. No behaviour change.
+  + rule answer + outcome to `.finess/decisions/*.jsonl`. No behaviour change.
 - **T-251** Rule baseline for all three questions (keyword/length/path heuristics) — the thing Laya
   must beat, and the thing that runs whenever confidence is low.
 - **T-252** `/decide` extended: run the three routing questions against the current input and print

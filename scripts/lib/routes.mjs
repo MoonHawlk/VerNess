@@ -5,10 +5,10 @@
  *   local     the `model` block of the config: an OpenAI-compatible engine on this machine (Ollama),
  *             serving every model registered with `/models add` plus the configured one
  *   catalog   a provider the route adapter (pi-ai) ships a catalog for: its endpoint, protocol and
- *             model list come from the installed adapter, so VerNess only names the key variable
+ *             model list come from the installed adapter, so FiNess only names the key variable
  *   declared  an `extraRoutes` entry with its own `api` + `baseURL` (any OpenAI-compatible gateway)
  *
- * Precedence, highest first: an explicit `/api use` or `/model` choice (`.verness/state.json`), then
+ * Precedence, highest first: an explicit `/api use` or `/model` choice (`.finess/state.json`), then
  * the active persona's preference, then `activeRoute` in the config, then the local route. A model
  * chosen for one route is never sent to another — that is what used to produce `UNKNOWN_MODEL`.
  *
@@ -39,7 +39,7 @@ export const ACCESS_MODES = {
 const dshHome = () => process.env.DSH_HOME ?? join(homedir(), '.dsh')
 
 /**
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {string} the installed route adapter's `dist` directory inside the profile.
  */
 const adapterDist = cfg => join(dshHome(), 'profiles', cfg.profile.name, 'node_modules', '@earendil-works', 'pi-ai', 'dist')
@@ -84,7 +84,7 @@ let catalogCache
 
 /**
  * The providers the installed adapter ships a catalog for.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {Map<string, {models: string[], apis: string[]}>} provider id -> model ids; empty before setup.
  */
 export function catalogProviders(cfg) {
@@ -113,7 +113,7 @@ const keyCache = new Map()
 /**
  * The environment variable a provider's key is read from, as the installed adapter defines it.
  * Asking the adapter with an environment where every variable "exists" makes it list them all.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {string} provider - catalog provider id.
  * @returns {Promise<string|undefined>} the variable name; undefined for providers using ambient
  *   credentials (cloud SDK logins) rather than a key.
@@ -135,8 +135,8 @@ export async function keyEnvFor(cfg, provider) {
 
 /**
  * Every route the configuration and state know about, by name.
- * @param {object} cfg - the VerNess configuration.
- * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.finess/state.json` unless a test passes one.
  * @returns {Record<string, object>} route specs, each with a `kind`.
  */
 export function knownRoutes(cfg, { state = readState() } = {}) {
@@ -155,8 +155,8 @@ export function knownRoutes(cfg, { state = readState() } = {}) {
 
 /**
  * Model ids the local engine is registered to serve: the configured one plus every `/models add`.
- * @param {object} cfg - the VerNess configuration.
- * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.finess/state.json` unless a test passes one.
  * @returns {string[]} model ids, configured one first.
  */
 export function localModels(cfg, { state = readState() } = {}) {
@@ -169,8 +169,8 @@ export function localModels(cfg, { state = readState() } = {}) {
 /**
  * Resolve the route and model the next run uses. Every surface (patch, run, doctor, prompt status)
  * reads this, so they can never disagree.
- * @param {object} cfg - the VerNess configuration.
- * @param {{state?: object}} [opts] - the launcher state; `.verness/state.json` unless a test passes one.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {{state?: object}} [opts] - the launcher state; `.finess/state.json` unless a test passes one.
  * @returns {{name: string, route: object, model: string|undefined, source: string, error?: string}}
  */
 export function effectiveRoute(cfg, { state = readState() } = {}) {
@@ -194,7 +194,7 @@ export function effectiveRoute(cfg, { state = readState() } = {}) {
 
 /**
  * The environment a run needs for the effective route and access mode.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {{env: Record<string,string>, missingKey?: string}} extra variables, and the
  *   name of a required key that is not set, if any.
  */

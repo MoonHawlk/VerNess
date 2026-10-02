@@ -14,7 +14,7 @@ import { appendLabel, labelCounts, latestGate, matchRecords, parseLabelInput, re
 
 /** @param {(dir: string) => void} fn - body run against a fresh temp directory. */
 function inTemp(fn) {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-labels-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-labels-'))
   try { fn(dir) } finally { rmSync(dir, { recursive: true, force: true }) }
 }
 
@@ -27,7 +27,7 @@ test('readShadow skips bad lines, derives legacy ids and sorts oldest first', ()
 }))
 
 test('readShadow on a missing directory is empty', () => {
-  assert.deepEqual(readShadow(join(tmpdir(), 'verness-labels-does-not-exist')), [])
+  assert.deepEqual(readShadow(join(tmpdir(), 'finess-labels-does-not-exist')), [])
 })
 
 test('readLabels: later lines win, per question', () => inTemp(dir => {

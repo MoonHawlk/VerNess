@@ -13,7 +13,7 @@ export default {
   summary: 'decision engine lifecycle: /decision up | stats | down [--force]',
   usage: '/decision up | stats | down [--force]',
   details: [
-    'up    installs laya[serve] into .verness/py if needed, then starts it on loopback with a key',
+    'up    installs laya[serve] into .finess/py if needed, then starts it on loopback with a key',
     'stats checkpoints loaded, measured p50 latency, and a sample typed answer',
     'down  stops the sidecar we started and releases its checkpoints',
   ],

@@ -4,7 +4,7 @@
  * pnpm 11 refuses to finish an install while any dependency's install script is undecided
  * (`ERR_PNPM_IGNORED_BUILDS`, exit 1): it writes `<pkg>: set this to true or false` placeholders into
  * the profile's `pnpm-workspace.yaml` and stops. That silently broke adding
- * `@linxin666/dsh-web-all`. The decisions therefore live in `verness.config.json`
+ * `@linxin666/dsh-web-all`. The decisions therefore live in `finess.config.json`
  * (`settings.allowBuilds`) and setup writes them into every profile before installing.
  * @module scripts/lib/profile-setup
  */

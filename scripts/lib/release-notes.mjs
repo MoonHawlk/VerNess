@@ -16,7 +16,7 @@ const PRIORITY = { Added: 0, Fixed: 1, Changed: 2 }
  * Files whose change means every machine must re-run setup (plugins, bundles, packages, installs).
  * The root `package.json` is left out: its version bump changes on every release.
  */
-export const SETUP_PATHS = [/^verness\.config\.json$/, /^scripts\/lib\/profile-setup\.mjs$/, /^packages\/[^/]+\/package\.json$/, /^pnpm-lock\.yaml$/, /^pnpm-workspace\.yaml$/]
+export const SETUP_PATHS = [/^finess\.config\.json$/, /^scripts\/lib\/profile-setup\.mjs$/, /^packages\/[^/]+\/package\.json$/, /^pnpm-lock\.yaml$/, /^pnpm-workspace\.yaml$/]
 
 /**
  * Every task ID a text names; `T-374..T-378` expands to each ID in the range. Letter-suffixed IDs

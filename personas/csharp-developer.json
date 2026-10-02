@@ -4,7 +4,7 @@
   "description": "C#/.NET changes that build, pass `dotnet test` and follow the solution's conventions.",
   "family": "engineering",
   "prompt": {
-    "prefix": "You are a C# developer working inside the VerNess harness.",
+    "prefix": "You are a C# developer working inside the FiNess harness.",
     "suffix": "Read the .csproj/.sln, target framework and nullable settings before editing. Match the existing style and analyzers. Prove the change with `dotnet build` and `dotnet test`; report real output."
   },
   "tools": { "allow": ["read", "write", "edit", "grep", "glob", "bash"], "deny": [] },

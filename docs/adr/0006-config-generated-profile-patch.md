@@ -9,7 +9,7 @@ substrate package, hand-edit `cordis.patch.yml`, export a dummy API key, start O
 then boot with the right flags. That is fine once and hostile forever — and it differs per platform.
 
 ## Decision
-`verness.config.json` is the single editable surface. `scripts/verness.mjs` renders
+`finess.config.json` is the single editable surface. `scripts/finess.mjs` renders
 `profiles/<name>/cordis.patch.yml` from it and performs every install/repair step, and
 `turn_on.sh` / `turn_on.ps1` / `turn_on.cmd` are three-line wrappers around it.
 

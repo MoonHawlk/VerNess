@@ -11,7 +11,7 @@ Two things used to take a config edit, a `sync` and some luck:
 - **a hosted model** — hand-write an `extraRoutes` entry, then edit `activeRoute` in the commented
   config file, and discover that the REPL froze its route at boot.
 
-Now both are one command, and the choice is state (`.verness/state.json`), never a config rewrite.
+Now both are one command, and the choice is state (`.finess/state.json`), never a config rewrite.
 
 ## Quick start
 
@@ -118,11 +118,11 @@ First thing to do with a key: T-357.
 
 ## Limits, stated plainly
 
-- Cost: VerNess reports provider-reported tokens (`/usage`, `/cost`) and never estimates dollars.
+- Cost: FiNess reports provider-reported tokens (`/usage`, `/cost`) and never estimates dollars.
 - The catalog is whatever adapter version the profile installed; a newer model id appears after the
   substrate pin moves (ADR-0002). Until then an `extraRoutes` entry can declare it by hand.
 - A conversation that switches provider mid-session keeps its history, but provider-specific replay
   state (signatures, native response ids) degrades to neutral content — the adapter's documented
   behaviour.
-- `/models add` needs the engine; it starts it if needed, but only the engine VerNess started is
+- `/models add` needs the engine; it starts it if needed, but only the engine FiNess started is
   stopped by `/down`.

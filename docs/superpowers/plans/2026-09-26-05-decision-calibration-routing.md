@@ -13,7 +13,7 @@ router.
 **Architecture:** Everything stays in the launcher until WS-G M3 ports it into a plugin:
 `scripts/lib/calibration.mjs` (pure metrics + refit), `scripts/lib/routing.mjs` (pure composite and
 capability router), a `/decisions` command for labelling and reports, and `/routing` for recent
-decisions. The live paths (`shadowRoute` in `scripts/verness.mjs`, the loop verdict) call one
+decisions. The live paths (`shadowRoute` in `scripts/finess.mjs`, the loop verdict) call one
 function, `decideRouting()`, which returns the answer that is **applied** plus the shadow record.
 Until the gate passes for a question, the applied answer is the rules' answer.
 
@@ -57,7 +57,7 @@ Inherit the master plan. Also:
 | `scripts/commands/decisions-cmd.mjs` | create | `/decisions label | report | refit | gate` (the file name avoids a clash with `decision.mjs`) |
 | `scripts/lib/routing.mjs` | create | `decideRouting` (composite + bands), `routeModel` (capability router) |
 | `scripts/commands/routing.mjs` | create | `/routing` |
-| `scripts/verness.mjs` | modify | `shadowRoute` → `decideRouting`; route overlay when applied |
+| `scripts/finess.mjs` | modify | `shadowRoute` → `decideRouting`; route overlay when applied |
 | `scripts/commands/cost.mjs` | modify | decision accounting (T-232) |
 | `scripts/loop-task.mjs` | modify | shadow the round verdict question (T-231, T-326) |
 | `docs/research/decision-calibration.md` | create | published numbers |
@@ -66,7 +66,7 @@ Inherit the master plan. Also:
 
 ### Task 1: Log what calibration needs (prerequisite for T-220..T-222)
 
-**Files:** `scripts/lib/decisions.mjs`, `scripts/verness.mjs` (`shadowRoute`), `scripts/commands/decide.mjs`; test `scripts/test/decisions.log.test.mjs`
+**Files:** `scripts/lib/decisions.mjs`, `scripts/finess.mjs` (`shadowRoute`), `scripts/commands/decide.mjs`; test `scripts/test/decisions.log.test.mjs`
 
 **Interfaces:**
 - `optionHash(question): string`: first 8 hex characters of sha256 over `JSON.stringify(Object.keys(question.criteria).sort())`.
@@ -117,7 +117,7 @@ readable; Task 2 treats them as having no probabilities.
 **Files:** create `scripts/lib/labels.mjs`, `scripts/commands/decisions-cmd.mjs`; test `scripts/test/labels.test.mjs`
 
 **Interfaces:**
-- `readShadow(dir): Record[]`: every `.verness/decisions/<day>.jsonl` record, skipping bad lines.
+- `readShadow(dir): Record[]`: every `.finess/decisions/<day>.jsonl` record, skipping bad lines.
   Records without `id` get a derived id `legacy-<at>` so they can still be labelled.
 - `readLabels(dir): Map<string, Record<question, string|'skip'>>` from `labels.jsonl`. Later lines win.
 - `appendLabel(dir, {id, question, label})`: one JSON line `{id, question, label, at}`.
@@ -220,7 +220,7 @@ test('fit: an over-confident model gets T > 1 and lower NLL', () => {
 `n | model acc | model ECE | AUROC | refit ECE | T | rules acc | rules ECE`. With `--write`, also write
 `docs/research/decision-calibration.md`: date, machine, checkpoint, `n` per question, the table, and
 a one-paragraph reading that follows the style of `08-DECISION-LAYER-LAYA.md`.
-- [x] **Step 4: `/decisions-data refit`** writes `.verness/decisions/temperatures.json` =
+- [x] **Step 4: `/decisions-data refit`** writes `.finess/decisions/temperatures.json` =
 `{ "<question>:<hash>": {T, n, at} }` for the questions whose refit was kept. Make `readAnswer`
 accept an optional `temperatures` map and, when an entry matches, apply it to `probabilities` and
 recompute `confidence` as the (new) max probability. `shadowRoute` loads the file once per REPL
@@ -252,7 +252,7 @@ start. **Log both the raw and the refit confidence** (`confidenceRaw`, `confiden
 
 ### Task 5: Composite decisions with confidence bands (T-204, T-205, T-262)
 
-**Files:** create `scripts/lib/routing.mjs`; modify `scripts/verness.mjs` (`shadowRoute` → uses `decideRouting`), `DEFAULTS.decisions`; test `scripts/test/routing.composite.test.mjs`
+**Files:** create `scripts/lib/routing.mjs`; modify `scripts/finess.mjs` (`shadowRoute` → uses `decideRouting`), `DEFAULTS.decisions`; test `scripts/test/routing.composite.test.mjs`
 
 **Interfaces:**
 - Config (`DEFAULTS.decisions` additions): `apply: { pipeline: false, level: false, tier: false }`,
@@ -288,8 +288,8 @@ order `pipeline`, `level`, `tier` comes from the handoff.
 
 ### Task 6: Capability router (T-253) and the `standard` pipeline executor (T-254)
 
-**Files:** `scripts/lib/routing.mjs` (`routeModel`), `scripts/verness.mjs` (overlay when routing
-applies), `verness.config.json` is **not** edited; document the new keys in
+**Files:** `scripts/lib/routing.mjs` (`routeModel`), `scripts/finess.mjs` (overlay when routing
+applies), `finess.config.json` is **not** edited; document the new keys in
 `docs/06-SETUP-AND-LAUNCHER.md`; test `scripts/test/routing.model.test.mjs`
 
 **Interfaces:**

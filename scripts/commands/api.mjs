@@ -8,7 +8,7 @@
  *   /api local                      back to the local model
  *
  * Providers come from the route adapter installed in the profile (pi-ai's catalog): endpoint,
- * protocol and model list are its business, so VerNess names no vendor and writes only the key
+ * protocol and model list are its business, so FiNess names no vendor and writes only the key
  * variable into the profile patch. Keys belong in the gitignored `.env` — never on this command line,
  * which lands in history.
  *

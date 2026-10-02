@@ -1,6 +1,6 @@
 /**
  * Source attribution for `/config`: for each resolved value, the layer that owns it — a built-in
- * default, `verness.config.json`, `.verness/state.json`, a persona file, or the environment.
+ * default, `finess.config.json`, `.finess/state.json`, a persona file, or the environment.
  *
  * Pure functions over already-loaded data, so they need neither the launcher (which cannot be
  * imported from a command while its REPL runs) nor its `DEFAULTS`: the config is merged per
@@ -11,8 +11,8 @@
 
 export const SOURCE = {
   default: 'built-in default',
-  file: 'verness.config.json',
-  state: '.verness/state.json',
+  file: 'finess.config.json',
+  state: '.finess/state.json',
   env: 'environment',
 }
 
@@ -48,7 +48,7 @@ const has = (o, k) => isObject(o) && Object.hasOwn(o, k)
 
 /**
  * The owner of one `section.field` (or top-level `key`) of the merged config.
- * @param {object|undefined} raw - the parsed `verness.config.json`, or `undefined` when absent.
+ * @param {object|undefined} raw - the parsed `finess.config.json`, or `undefined` when absent.
  * @param {string} section - the top-level key.
  * @param {string} [field] - the field inside it.
  * @returns {string} a `SOURCE` label.
@@ -61,7 +61,7 @@ export function fileOrDefault(raw, section, field) {
 /**
  * Every setting of the merged config, one row per `section.field`, with its owner.
  * @param {object} cfg - the merged configuration (defaults + file).
- * @param {object|undefined} raw - the parsed `verness.config.json`.
+ * @param {object|undefined} raw - the parsed `finess.config.json`.
  * @returns {{key: string, value: unknown, source: string}[]} rows, values masked.
  */
 export function settingRows(cfg, raw) {
@@ -83,8 +83,8 @@ export function settingRows(cfg, raw) {
  * that decided each one.
  * @param {object} input - everything already resolved by the caller.
  * @param {object} input.cfg - the merged configuration.
- * @param {object|undefined} input.raw - the parsed `verness.config.json`.
- * @param {object} input.state - the parsed `.verness/state.json` (`{}` when absent).
+ * @param {object|undefined} input.raw - the parsed `finess.config.json`.
+ * @param {object} input.state - the parsed `.finess/state.json` (`{}` when absent).
  * @param {{id: string, source: string, model?: object}|undefined} input.persona - the active persona.
  * @param {{name: string, route?: object, model?: string, source: string}} input.effective - the
  *   `effectiveRoute(cfg)` result.

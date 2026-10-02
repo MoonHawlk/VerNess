@@ -53,7 +53,7 @@ what the launcher chooses to resend. `/btw` makes that explicit and bounded.
 | `/btw clear` | empty the buffer |
 | `/btw drop <n>` | remove one note |
 
-- Buffer persists at `.verness/run/notes-<sessionId>.json` so a crash does not lose it.
+- Buffer persists at `.finess/run/notes-<sessionId>.json` so a crash does not lose it.
 - A note is sent **once**, prefixed onto the next task as a delimited block
   (`Side notes from the operator (context, not tasks):`), then marked `sent` (only when the run exits 0).
   Every REPL turn continues one substrate session, so the model already has it in history; resending
@@ -72,27 +72,27 @@ what the launcher chooses to resend. `/btw` makes that explicit and bounded.
 
 | Input | Does |
 |---|---|
-| `#<note>` | append `- <note>` to `.verness/brief.md` (cap `notes.briefMaxChars`, default 4000, warning at 80%) |
+| `#<note>` | append `- <note>` to `.finess/brief.md` (cap `notes.briefMaxChars`, default 4000, warning at 80%) |
 | `#` | show the brief |
 | `##…` | escape: send the line as a task with one `#` removed (`##123 is broken` sends `#123 is broken`) |
 
 The brief is standing context that survives sessions. It is prefixed before any `/btw` notes as
 `Project brief from the operator (standing context, not tasks):`. A new session's first task gets the
 whole brief; a continuing session gets only the lines added since its last task. Edit or empty
-`.verness/brief.md` by hand to change or clear it. REPL only: `turn_on "#x"` is a task.
+`.finess/brief.md` by hand to change or clear it. REPL only: `turn_on "#x"` is a task.
 
 ## Personas as files (T-140..T-143, built in M2 as T-162..T-165)
 
 A persona is one file, `personas/<id>.json` (JSONC: comments and trailing commas allowed). Files win
-over inline `verness.config.json` definitions with the same id. The shape is `PersonaFile` in
-`@verness/contracts` (`packages/contracts/src/persona.ts`), e.g. `personas/data-scientist.json`:
+over inline `finess.config.json` definitions with the same id. The shape is `PersonaFile` in
+`@finess/contracts` (`packages/contracts/src/persona.ts`), e.g. `personas/data-scientist.json`:
 
 ```json
 {
   "id": "data-scientist",
   "name": "Data Scientist",
   "description": "Statistical analysis, experiment design, modelling and data investigation.",
-  "prompt": { "prefix": "You are a data scientist working inside the VerNess harness. …", "suffix": "…" },
+  "prompt": { "prefix": "You are a data scientist working inside the FiNess harness. …", "suffix": "…" },
   "tools": {
     "allow": ["read", "grep", "glob", "bash", "python.execute", "sql.query", "data.profile", "artifact.create"],
     "deny": ["production.write", "sql.write"]
@@ -108,7 +108,7 @@ Optional fields: `model`, `models.requirements` (capability levels, see `capabil
 `tools.approval` (tool → approver).
 
 - **Validated at load** by `validatePersonaFile`. A broken file is listed as broken and never crashes
-  the launcher. `/persona check` (or `node scripts/verness.mjs persona check`) prints one line per
+  the launcher. `/persona check` (or `node scripts/finess.mjs persona check`) prints one line per
   issue as `personas/x.json:L:C path: message` and exits non-zero on errors.
 - **Persona commands**: each name in `commands` loads `personas/<id>/commands/<name>.mjs` (same
   module shape as a global command) after the globals. Globals win; a collision is refused with a
@@ -123,7 +123,7 @@ M4–M7 land. Any command that displays them must label them as declared, or the
 A team is a named set of personas plus a task list: `teams/<id>.json`. v1 runs tasks **sequentially**
 by default (`--parallel N` overlaps independent tasks since T-144),
 each in its own `dsh` session under its own persona, collecting per-task status, artifacts and usage
-into `.verness/runs/<timestamp>/`. That is a launcher loop, and it will be labelled as one — the real
+into `.finess/runs/<timestamp>/`. That is a launcher loop, and it will be labelled as one — the real
 implementation belongs on `ctx.subagents` and `ctx.jobs` (T-154), which already exist upstream.
 
 `/team status [<id>]` (T-170) prints the newest run of team `<id>`, or of any team: one row per task
@@ -142,11 +142,11 @@ same weights, so "parallel" can be slower than sequential on a single machine.
 ## `/dashboard` — the task board (T-389)
 
 `/dashboard` (alias `/dash`; `node scripts/dashboard.mjs` from a shell) writes a static
-`.verness/dashboard.html` and opens it. No server, no network, zero tokens.
+`.finess/dashboard.html` and opens it. No server, no network, zero tokens.
 
 - **Backlog** first: every `- [ ] T-NNN` line of `docs/03-BACKLOG.md`, grouped by workstream, with
   subtasks under their parent. Each gets a P0–P3 picker saved in the browser's localStorage
-  (`verness.backlog.priority`), so priorities survive regenerating the page; filter by workstream or
+  (`finess.backlog.priority`), so priorities survive regenerating the page; filter by workstream or
   priority, sort, and *copy as markdown* to paste the ranked list back into a doc or a prompt. The
   backlog file itself is rendered below (`scripts/lib/backlog.mjs`, no dependency).
 - Then sessions (turns, tool calls, tokens, wall time, click-through timeline), shadow decisions and
@@ -181,18 +181,18 @@ Why and how: `docs/08-DECISION-LAYER-LAYA.md`.
 |---|---|
 | `/exit` (alias `/quit`) | ends the prompt, like an empty line (T-148) |
 | `/pers`, `/mo` | a unique prefix (or one every candidate extends: `/mo` is `/model`, not `/models`) of a name or alias runs that command; an exact name always wins; an ambiguous prefix (`/d`: `/dashboard`, `/decide`, …) lists the candidates and runs nothing (T-182) |
-| `/config [<filter>]` | the resolved configuration and, for each value, its owner: built-in default, `verness.config.json`, `.verness/state.json`, a persona file or the environment; read-only, credentials masked (T-180) |
+| `/config [<filter>]` | the resolved configuration and, for each value, its owner: built-in default, `finess.config.json`, `.finess/state.json`, a persona file or the environment; read-only, credentials masked (T-180) |
 | `//etc/hosts is odd` | a leading `//` sends the line to the model with one slash removed, never to the registry (T-182) |
 | `/btw <note>` | a side note for the next task (see `/btw` above) (T-130) |
 | `#<note>`, `#`, `##…` | append to / show the project brief; `##` escapes a leading `#` (T-147) |
-| plain text, 3+ characters | the dropdown suggests up to 6 earlier tasks that start with it (case-insensitive), newest first, labelled `recent`, from the persisted input history `.verness/history.jsonl` (cap 500; credential-looking lines are never written); lines starting with `/` or `#` are never suggested; Up/Down reaches earlier runs (T-303) |
+| plain text, 3+ characters | the dropdown suggests up to 6 earlier tasks that start with it (case-insensitive), newest first, labelled `recent`, from the persisted input history `.finess/history.jsonl` (cap 500; credential-looking lines are never written); lines starting with `/` or `#` are never suggested; Up/Down reaches earlier runs (T-303) |
 | `/usage --by day` | tokens per local day and route across counted sessions (with `--all` / `--limit N`): day, route, model, sessions, calls, input and output tokens, newest day first. Each call is dated by its `assistant/message` event time (fallback: session `createdAt`, then log mtime) and bucketed by the local calendar date, never UTC; the header prints the offset. Any other `--by` value exits 1 (T-137) |
 
 ## On the web: the commands bridge (ADR-0011)
 
 The same command files answer in the web UI's message bar, with no second implementation. The
-`@verness/commands` plugin (`packages/commands`, web profile only) registers each command with the
-web UI's own slash-command registry and runs it as `node scripts/verness.mjs /<name> <args>`:
+`@finess/commands` plugin (`packages/commands`, web profile only) registers each command with the
+web UI's own slash-command registry and runs it as `node scripts/finess.mjs /<name> <args>`:
 exit 0 is a success reply, anything else an error reply, the text is what the REPL prints (ANSI
 stripped). User guide: `docs/06-SETUP-AND-LAUNCHER.md` (*Quick-tools in the message bar*).
 
@@ -205,7 +205,7 @@ What a command file controls:
 - A command that prompts gets no terminal there: stdin is closed. Refuse cleanly, as
   `/dd label` does ("labelling needs a terminal"), rather than waiting.
 
-The list comes from `node scripts/verness.mjs --list-commands` (JSON: `name`, `summary`, `usage`,
+The list comes from `node scripts/finess.mjs --list-commands` (JSON: `name`, `summary`, `usage`,
 `aliases`, `web`; the active persona's commands included). A name the web UI already owns
 (`/model`, `/file`, `/compact`, `/export`, `/feedback`, `/goal`, `/permission`, `/plan`) is never
 registered, so the substrate's version keeps working. From the command line, an unknown `/word` is now
@@ -223,7 +223,7 @@ an error rather than a task, so a stale web entry can never start a model run.
 3. **Never invent a cost.** Report tokens and duration. Cost is `0` on a local route; a paid route
    needs a price table the operator writes. No estimated dollars from a guessed rate.
 4. **Config is commented JSONC.** Commands that mutate settings must not destroy those comments.
-   Decision (T-131): mutable state goes to a separate `verness.state.json` and the commented file
+   Decision (T-131): mutable state goes to a separate `finess.state.json` and the commented file
    stays operator-owned. Simpler and lossless; the alternative is a surgical JSONC rewriter.
 5. **Persona switching must be atomic** — write state, regenerate patch, sync, confirm. A
    half-applied switch silently answers as the wrong identity.

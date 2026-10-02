@@ -1,6 +1,6 @@
 /**
  * `/config` source attribution (T-180): each value is owned by the layer that set it — built-in
- * default, `verness.config.json`, `.verness/state.json`, a persona file or the environment — and a
+ * default, `finess.config.json`, `.finess/state.json`, a persona file or the environment — and a
  * credential is never shown, however deeply it is nested.
  */
 import { test } from 'node:test'

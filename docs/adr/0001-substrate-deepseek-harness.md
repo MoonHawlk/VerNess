@@ -11,7 +11,7 @@ foundations: build a new runtime, fork Hermes, or build on the DeepSeek Harness 
 `dsh` is the execution kernel. Hermes is a *capability source* (skills, memory, routing, MCP
 ideas), Anthropic's `cwc-long-running-agents` a *control-pattern source* (goal, generator/evaluator,
 verification), Jev a *decision substrate* behind our own contract. None of them is a competing
-runtime inside VerNess.
+runtime inside FiNess.
 
 ## Why
 `dsh` already ships every seam we would otherwise build: `ctx.llm`, `ctx.tools`, `ctx.sessions`,

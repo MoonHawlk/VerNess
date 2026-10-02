@@ -21,7 +21,7 @@
   into it with `git merge --no-ff`, so each branch stays visible as one unit in the history.
 - A release is `epic` merged into `main` (`--no-ff`), with `package.json` `version` bumped **and the
   release notes written** in the same merge (a new `CHANGELOG.md` entry: Added / Changed / Fixed /
-  Upgrade, each line with its task ID; plus a row in the README's Releases table), and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
+  Upgrade, each line with its task ID; plus a row in the README's Releases table), and a tag on the merge commit: `git tag -a vX.Y.Z -m "FiNess vX.Y.Z"`, then
   `git push origin main epic --follow-tags`.
 - Start the notes from `node scripts/tools/release-notes.mjs` (a draft from the done tasks since the last tag), then edit it by hand.
 - Versions follow semver while pre-1.0: a release with new commands or config fields bumps the
@@ -29,15 +29,15 @@
 - Before merging `epic` into `main`, run the clean-clone check below on `epic`.
 
 ## Finding things
-- Locate code and docs with `scripts/tools/` (skill `.claude/skills/verness-tools/`): `where.mjs` for
+- Locate code and docs with `scripts/tools/` (skill `.claude/skills/finess-tools/`): `where.mjs` for
   code (Engram graph) and docs, `backlog.mjs` for task IDs, `tests.mjs`, `docs.mjs`, `profiles.mjs`.
   Rebuild the code graph after code changes (`graph.mjs --rebuild`). Tools are Node only, so they
   behave the same on macOS and Windows.
 
 ## Code
 - TypeScript ESM, explicit `.ts` import specifiers (upstream convention).
-- Package name `@verness/<name>`, directory `packages/<name>/`, `type: module`. Plain-ESM plugins
-  (`packages/spike`) point `main` at their `.mjs`; `@verness/contracts` ships `src/*.ts` run by Node's
+- Package name `@finess/<name>`, directory `packages/<name>/`, `type: module`. Plain-ESM plugins
+  (`packages/spike`) point `main` at their `.mjs`; `@finess/contracts` ships `src/*.ts` run by Node's
   type stripping (no build, no `lib/`). A package that needs a build adds `lib/` and says so in its README.
 - `@deepseek-ai/cordis` in both `peerDependencies` and `devDependencies` with the same range.
 - Every registration must be an effect that disposes (`ctx.effect`, `ctx.on`, registry `.register`).
@@ -58,12 +58,12 @@ the repo could not start at all. Everything passed locally the whole time.
 Before claiming a feature ships:
 
 ```sh
-git clone . "$(mktemp -d)/fresh" && cd "$_" && node scripts/verness.mjs help
+git clone . "$(mktemp -d)/fresh" && cd "$_" && node scripts/finess.mjs help
 ```
 
 The same check, cross-platform and self-cleaning: `node scripts/check-clean-clone.mjs [rev...]`
 (or `npm run check:clean-clone`) clones into a temp dir, checks out the commit (default `HEAD`),
-runs `verness help` and removes the clone. To run it on every push, opt in once per checkout:
+runs `finess help` and removes the clone. To run it on every push, opt in once per checkout:
 
 ```sh
 git config core.hooksPath scripts/hooks   # undo: git config --unset core.hooksPath
@@ -71,7 +71,7 @@ git config core.hooksPath scripts/hooks   # undo: git config --unset core.hooksP
 
 `scripts/hooks/pre-push` is a one-line `sh` shim over the Node script (works in Git for Windows
 and on macOS); it checks each pushed commit and blocks the push if one cannot start. Skip once with
-`VERNESS_SKIP_CLEAN_CLONE=1 git push` or `git push --no-verify`.
+`FINESS_SKIP_CLEAN_CLONE=1 git push` or `git push --no-verify`.
 
 If a new directory of source ever appears, check `git ls-files` covers it rather than trusting a
 clean `git status` — an ignored file is invisible to both.

@@ -15,7 +15,7 @@ export default {
   usage: '/pet',
   details: [
     'the pet also greets you at boot; turn that off with "pet": { "enabled": false } in',
-    'verness.config.json, or VERNESS_NO_PET=1 for one run',
+    'finess.config.json, or FINESS_NO_PET=1 for one run',
     'moods: happy (all good), sleepy (engine up, no model warm), worried (something is wrong)',
   ],
   /**

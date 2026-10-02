@@ -56,9 +56,9 @@ Inherit the master plan. Also:
 | `scripts/lib/pet.mjs` | modify | export `PET_MOODS`; `petFrames(mood)` returns frames + timings; vitals read live workers |
 | `scripts/lib/pet-anim.mjs` | create | `createAnimator()`: scheduling, pausing, in-place repaint |
 | `scripts/lib/prompt.mjs` | modify | `onRender` hook so the animator can pause |
-| `scripts/lib/heartbeat.mjs` | create | `.verness/live/*.json` writer/reader |
+| `scripts/lib/heartbeat.mjs` | create | `.finess/live/*.json` writer/reader |
 | `scripts/loop-task.mjs`, `scripts/lib/teams.mjs` | modify | write heartbeats |
-| `scripts/verness.mjs` | modify | start/stop the animator; stamp and check the profile patch owner |
+| `scripts/finess.mjs` | modify | start/stop the animator; stamp and check the profile patch owner |
 | `scripts/test/pet.render.test.mjs` | rename + rewrite | mood-agnostic render test |
 | `scripts/test/pet.anim.test.mjs` | create | fake-clock animator test |
 | `scripts/test/heartbeat.test.mjs`, `scripts/test/profile-owner.test.mjs` | create | |
@@ -99,7 +99,7 @@ const NOW = Date.parse('2026-09-26T12:00:00Z')
 const base = () => ({
   name: 'Ness', persona: 'generalist', model: 'qwen3:0.6b', route: 'ollama-local',
   session: 'session-a55aee3c-7456-4bd4-b39b-aa77d350aff9',
-  versions: { verness: '0.0.1', commit: 'abc1234', node: '24.14.0', dsh: { installed: '0.1.7-rc.2', pinned: '0.1.7-rc.2' }, engine: { name: 'ollama', version: '0.32.13' } },
+  versions: { finess: '0.0.1', commit: 'abc1234', node: '24.14.0', dsh: { installed: '0.1.7-rc.2', pinned: '0.1.7-rc.2' }, engine: { name: 'ollama', version: '0.32.13' } },
   workers: { engine: { up: true, loaded: [{ name: 'qwen3:0.6b', vram: 800 * 2 ** 20 }] }, decision: { up: false, enabled: false } },
   roster: { personas: 5, teams: 1, commands: 18 },
   recent: {}, now: NOW,
@@ -244,8 +244,8 @@ tables, `BOOT_FRAMES` and `IDLE_FRAMES`, and point `petFrames` at `IDLE_FRAMES`.
 **Files:**
 - Create: `scripts/lib/pet-anim.mjs`
 - Modify: `scripts/lib/prompt.mjs` (`readLineWithSuggestions` accepts `onRender?: (phase: 'before'|'after') => void`)
-- Modify: `scripts/verness.mjs` (`cmdRun`: start after drawing the pet, stop on the first submitted line; `/pet` restarts it)
-- Modify: `verness.config.json` is **not** edited; add `pet: { enabled: true, name: 'Ness', animate: true }` to `DEFAULTS`
+- Modify: `scripts/finess.mjs` (`cmdRun`: start after drawing the pet, stop on the first submitted line; `/pet` restarts it)
+- Modify: `finess.config.json` is **not** edited; add `pet: { enabled: true, name: 'Ness', animate: true }` to `DEFAULTS`
 - Test: `scripts/test/pet.anim.test.mjs`
 
 **Interfaces:**
@@ -473,7 +473,7 @@ import { join } from 'node:path'
 
 import { readLive, startHeartbeat } from '../lib/heartbeat.mjs'
 
-const dir = () => mkdtempSync(join(tmpdir(), 'verness-live-'))
+const dir = () => mkdtempSync(join(tmpdir(), 'finess-live-'))
 
 test('a running heartbeat is live; stopping removes it', () => {
   const d = dir()
@@ -494,9 +494,9 @@ test('stale or dead entries are dropped and cleaned up', () => {
 
 - [ ] **Step 2: Implement** as specified (≈40 lines; `mkdirSync` the dir; `timer.unref()` so a
 heartbeat never keeps the process alive; register the stop function on `process.once('exit')`).
-- [ ] **Step 3: Wire it.** `loop-task.mjs`: `const stopBeat = startHeartbeat(join(REPO, '.verness', 'live'), { kind: 'loop', label: objective.slice(0, 40) })`
+- [ ] **Step 3: Wire it.** `loop-task.mjs`: `const stopBeat = startHeartbeat(join(REPO, '.finess', 'live'), { kind: 'loop', label: objective.slice(0, 40) })`
 at the start of the loop, and `stopBeat()` in a `finally`. `runTeam`: the same with
-`{ kind: 'team', label: team.id }`. `gatherVitals`: `workers.live = readLive(join(REPO, '.verness', 'live'))`.
+`{ kind: 'team', label: team.id }`. `gatherVitals`: `workers.live = readLive(join(REPO, '.finess', 'live'))`.
 Add a render-test case with two live workers, and assert the line fits at 64 columns.
 - [ ] **Step 4: Commit** — `feat(pet): show running loops and team runs as live workers (T-334)`
 
@@ -509,13 +509,13 @@ Add a render-test case with two live workers, and assert the line fits at 64 col
 first one's live profile.
 
 **Files:**
-- Modify: `scripts/verness.mjs` (`writePatch` stamps an owner line; `syncPatch` checks it; `cmdDoctor` shows it)
+- Modify: `scripts/finess.mjs` (`writePatch` stamps an owner line; `syncPatch` checks it; `cmdDoctor` shows it)
 - Create: `scripts/lib/profile-owner.mjs`
 - Test: `scripts/test/profile-owner.test.mjs`
 
 **Interfaces:**
-- `OWNER_PREFIX = '# verness-owner: '`
-- `ownerLine(repo: string): string` → `# verness-owner: <absolute repo path>`
+- `OWNER_PREFIX = '# finess-owner: '`
+- `ownerLine(repo: string): string` → `# finess-owner: <absolute repo path>`
 - `readOwner(patchText: string): string|undefined`
 - `ownershipConflict(patchText: string|undefined, repo: string, exists: (p: string) => boolean): {conflict: boolean, owner?: string}`.
   It is a conflict only when an owner is recorded, differs from `repo`, **and** that path still
@@ -524,7 +524,7 @@ first one's live profile.
   then continue in the REPL. In the plain `sync` CLI verb, refuse and print `re-run with: sync --force`.
   `cmdDoctor` gains a row `owner  <path>  (this checkout | other checkout)`.
 - Document the real fix in `docs/06-SETUP-AND-LAUNCHER.md`: give each checkout its own profile by
-  setting `profile.name` in that checkout's config (for example `verness-wt1`), then run `setup`.
+  setting `profile.name` in that checkout's config (for example `finess-wt1`), then run `setup`.
 
 - [ ] **Step 1: Failing test**
 
@@ -553,6 +553,6 @@ pushes `ownerLine(REPO)` as its first line. `syncPatch` reads the destination fi
 overwriting it (`existsSync`), checks for a conflict, and applies the rule above. Thread a `force`
 flag from `dispatch` (`case 'sync': syncPatch(cfg, { force: rest.includes('--force'), strict: true })`)
 and from the REPL/boot callers (`strict: false`, warn only).
-- [ ] **Step 3: Tests, then a manual check with a second worktree** (`git worktree add ../vn2 && cd ../vn2 && node scripts/verness.mjs sync`
+- [ ] **Step 3: Tests, then a manual check with a second worktree** (`git worktree add ../vn2 && cd ../vn2 && node scripts/finess.mjs sync`
 → refused with the owner's path). Remove the worktree afterwards.
 - [ ] **Step 4: Commit** — `fix(profile): record which checkout owns the shared patch and warn on takeover (T-336)`

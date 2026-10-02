@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# VerNess launcher (macOS/Linux). Windows: use turn_on.ps1 or turn_on.cmd.
-# Everything is configured in verness.config.json — see docs/06-SETUP-AND-LAUNCHER.md.
+# FiNess launcher (macOS/Linux). Windows: use turn_on.ps1 or turn_on.cmd.
+# Everything is configured in finess.config.json — see docs/06-SETUP-AND-LAUNCHER.md.
 set -e
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 if ! command -v node >/dev/null 2>&1; then

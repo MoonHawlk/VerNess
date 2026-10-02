@@ -25,13 +25,13 @@ Thumbs.db
 # Logs & temp
 *.log
 .tmp/
-verness-spike.log
+finess-spike.log
 
 # Engram generated artifacts (see docs/adr/0005-engram-knowledge-graph.md)
 .engram/
 
 # Launcher run state (pids, logs) — see scripts/model.mjs
-.verness/
+.finess/
 
 # Claude Code local session state
 .claude/*

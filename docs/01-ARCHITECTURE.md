@@ -3,7 +3,7 @@
 ## Layer model
 
 ```
-        VerNess capability layer  (our code, all Cordis plugins)
+        FiNess capability layer  (our code, all Cordis plugins)
    personas · skills · decisions · routing · supervisor · evaluation · governance · data
         ───────────────────────────────────────────────────────────────────────────
         DeepSeek Harness (dsh)  — agent loop, tools, sessions, sandbox, approvals,
@@ -18,9 +18,9 @@ Capability sources: **Hermes** → skills/memory/routing/MCP ideas (adapters, no
 
 ## Contract → substrate seam map
 
-Every VerNess subsystem attaches through a documented seam. No agent-loop edits.
+Every FiNess subsystem attaches through a documented seam. No agent-loop edits.
 
-| VerNess subsystem | `ctx` surface | Attaches via | Upstream anchor |
+| FiNess subsystem | `ctx` surface | Attaches via | Upstream anchor |
 |---|---|---|---|
 | Personas | `ctx.personas` (new Service) | `system-prompt/assemble` (waterfall), agent presets | `packages/core/system-prompt/src/index.ts:31`; `packages/preset/agent-preset-registry` |
 | Tool policy (persona allow/deny/approval) | — | `tools/pre-execute` (waterfall, return without `next()` = deny/ask) + `ctx.tools.guard()` + `ctx.approval` | `packages/core/tools/src/index.ts:153`; `docs/tool-execution-pipeline.md` |
@@ -75,12 +75,12 @@ Example budget shape for 500M rows: `500M → SQL → 100M → stats → 100k �
 ## Repository topology (see ADR-0002)
 
 ```
-VerNess/
+FiNess/
 ├── upstream/deepseek-harness/     # git submodule, pinned, READ-ONLY (never edited)
-├── packages/                      # our plugins, npm scope @verness/*
+├── packages/                      # our plugins, npm scope @finess/*
 │   ├── contracts/  decisions/  personas/  skills/  routing/
 │   ├── supervisor/ evaluation/ governance/ data/
-├── profiles/verness/              # cordis.patch.yml + package.json (the composed profile)
+├── profiles/finess/              # cordis.patch.yml + package.json (the composed profile)
 ├── personas/                      # persona JSON/JSONC definitions (+ <id>/commands/*.mjs)
 ├── skills/                        # SKILL.md trees
 └── docs/                          # this plan

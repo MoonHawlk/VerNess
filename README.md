@@ -1,15 +1,15 @@
-# VerNess
+# FiNess
 
 > A model-agnostic, plugin-native AI execution harness — where an LLM is only one class of compute resource.
 
-Built on the **DeepSeek Harness (dsh)** / Cordis substrate. VerNess adds the seven subsystems that `dsh` deliberately leaves open: personas, skills, decisions, routing, evaluation, governance, and a data plane.
+Built on the **DeepSeek Harness (dsh)** / Cordis substrate. FiNess adds the seven subsystems that `dsh` deliberately leaves open: personas, skills, decisions, routing, evaluation, governance, and a data plane.
 
 ---
 
 ## Table of Contents
 
-- [What is VerNess?](#what-is-verNess)
-- [VerNess, explained simply](#verness-explained-simply)
+- [What is FiNess?](#what-is-fiNess)
+- [FiNess, explained simply](#finess-explained-simply)
 - [Setup](#setup)
 - [Usage](#usage)
 - [Features](#features)
@@ -23,22 +23,22 @@ Built on the **DeepSeek Harness (dsh)** / Cordis substrate. VerNess adds the sev
 
 ---
 
-## What is VerNess?
+## What is FiNess?
 
-VerNess treats an LLM as one node in a multi-compute pipeline. A task first passes through cheap deterministic engines (SQL, Polars, DuckDB), then a decision model (rules or a small classifier), and only reaches a generative LLM if cheaper computation cannot resolve it.
+FiNess treats an LLM as one node in a multi-compute pipeline. A task first passes through cheap deterministic engines (SQL, Polars, DuckDB), then a decision model (rules or a small classifier), and only reaches a generative LLM if cheaper computation cannot resolve it.
 
-The system is fully plugin-native: every capability — models, tools, skills, sessions, the UI — is a Cordis plugin. VerNess adds plugins on top of `dsh` without touching the substrate.
+The system is fully plugin-native: every capability — models, tools, skills, sessions, the UI — is a Cordis plugin. FiNess adds plugins on top of `dsh` without touching the substrate.
 
 ---
 
-## VerNess, explained simply
+## FiNess, explained simply
 
 > For a curious 12-year-old, or anyone who has used a chatbot but never written code.
 
-VerNess is an AI helper that runs on your own computer. You type a job, and an AI does it. The big
-idea is to **save effort**: most jobs do not need a giant, expensive AI brain, so VerNess wants to
+FiNess is an AI helper that runs on your own computer. You type a job, and an AI does it. The big
+idea is to **save effort**: most jobs do not need a giant, expensive AI brain, so FiNess wants to
 try the cheapest way that works first (a simple rule, a small quick helper, a plain calculation)
-and only call a big AI when it has to. **That is the goal, not today's reality.** Today VerNess is a
+and only call a big AI when it has to. **That is the goal, not today's reality.** Today FiNess is a
 place to type, a set of AI "job hats", lots of free quick-commands, and a small helper called Laya
 that is still *practising*. It is built on top of another program, the **DeepSeek Harness**, which
 talks to the AI, runs its tools and saves conversations.
@@ -47,7 +47,7 @@ talks to the AI, runs its tools and saves conversations.
 
 | Part | Think of it as... |
 |---|---|
-| **The prompt (REPL)**: `verness>`, where you type | The front desk of a school |
+| **The prompt (REPL)**: `finess>`, where you type | The front desk of a school |
 | **The model**: the AI brain that writes answers, either local (free, through Ollama) or hosted (a company's servers, costs money) | The student who does the homework |
 | **Personas**: 17 job hats (data scientist, QA engineer, HR specialist, ...) that change the AI's instructions | Same student, different hat |
 | **Persona commands**: free checklists that appear only while one hat is on | A tool that hangs on one hat |
@@ -81,12 +81,12 @@ nothing because the AI is not involved.
   `/dotnet-check` (C#; prints the steps, does not run them) · `/release-check` (DevOps) ·
   `/threats` (security) · `/a11y` (frontend) · `/jd-check` (HR) · `/prd` (product) ·
   `/release-notes` (writer) · `/raid` (project manager) · `/triage` (support)
-- **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`, or `verness` once linked with
+- **from the shell**: `./turn_on.sh` (or `.\turn_on.cmd`, or `finess` once linked with
   `npm link` — see [06](docs/06-SETUP-AND-LAUNCHER.md)) followed by nothing to start ·
   `"a task"` for one task · `setup` · `doctor` · `up` · `down` · `off` · `web` · `sync` ·
   `decision up`
 
-### A day with VerNess
+### A day with FiNess
 
 Start with `.\turn_on.cmd` and Ness says hello. Put on a hat with `/persona qa-engineer`, and
 `/testplan` appears. Get a free checklist with `/testplan login page`. Ask the AI to write the
@@ -100,7 +100,7 @@ because of it. `/cost` shows zero on a local model. Grade Laya with `/dd label`,
   pick the model yourself.
 - Laya does not decide anything, and its gate is not built.
 - Each hat's list of allowed tools is written down but not enforced until M4.
-- The VerNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look, and
+- The FiNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look, and
   quick-commands do not appear in its `/` menu yet.
 - `/btw`, `/config`, `/exit` and other planned commands are in `docs/03-BACKLOG.md`.
 
@@ -134,9 +134,9 @@ This command:
 2. Installs `pnpm` and `@deepseek-ai/dsh` globally (pinned versions)
 3. Fetches the `upstream/deepseek-harness` submodule
 4. Creates **two profiles** in `~/.dsh/profiles/`:
-   - `verness` — headless/CLI profile
-   - `verness-web` — browser UI profile (`@deepseek-ai/dsh-web-app`)
-5. Installs the plugins listed in `verness.config.json` (`@verness/spike`, …)
+   - `finess` — headless/CLI profile
+   - `finess-web` — browser UI profile (`@deepseek-ai/dsh-web-app`)
+5. Installs the plugins listed in `finess.config.json` (`@finess/spike`, …)
 6. Starts Ollama and pulls the configured model
 
 ### Verify the installation
@@ -160,11 +160,11 @@ Expected output shows `ok` for node, pnpm, dsh, engine, both profiles, and the u
 Opens the headless REPL. Type a task directly or use `/command` shortcuts.
 
 ```
-verness> /help
-verness> What is the capital of France?
-verness> /persona data-analyst
-verness> /model reset
-verness> /off
+finess> /help
+finess> What is the capital of France?
+finess> /persona data-analyst
+finess> /model reset
+finess> /off
 ```
 
 ### Web UI (browser)
@@ -173,7 +173,7 @@ verness> /off
 ./turn_on.sh web
 ```
 
-Opens the `verness-web` profile: the substrate's browser interface (`@deepseek-ai/dsh-web-app`), with:
+Opens the `finess-web` profile: the substrate's browser interface (`@deepseek-ai/dsh-web-app`), with:
 - chat and sessions, with tool calls, approvals and plans
 - side panels for files, a terminal, a browser and document previews
 - settings (models, shell, web search, agent loop), a plugin manager and the plugin inventory
@@ -189,7 +189,7 @@ Your quick-tools work there too: type `/cost`, `/usage`, `/persona`, `/agents`, 
 persona command in the message bar. `/model` and `/help` are the web UI's own; `/persona` and `/api`
 changes apply after restarting the UI.
 
-It still shows the DeepSeek Harness name and logo; replacing them with VerNess's is planned (T-398).
+It still shows the DeepSeek Harness name and logo; replacing them with FiNess's is planned (T-398).
 
 `./turn_on.sh ui` is an alias. The persona, route/model and access mode are read when the server starts, so after changing any of them restart the UI: `./turn_on.sh off`, then `./turn_on.sh web`.
 
@@ -210,16 +210,16 @@ It still shows the DeepSeek Harness name and logo; replacing them with VerNess's
 ./turn_on.sh off     # turn everything off: web UI, decision sidecar and model
 ```
 
-`off` (alias `stop`, `/off` in the REPL) stops all three in one go. Add `--force` to also stop servers VerNess did not start.
+`off` (alias `stop`, `/off` in the REPL) stops all three in one go. Add `--force` to also stop servers FiNess did not start.
 
 ### Task dashboard
 
 ```sh
-verness> /dashboard           # alias /dash, inside the REPL
+finess> /dashboard           # alias /dash, inside the REPL
 node scripts/dashboard.mjs    # same, from a plain shell
 ```
 
-Builds a static HTML page at `.verness/dashboard.html` (no server, no network) and opens it:
+Builds a static HTML page at `.finess/dashboard.html` (no server, no network) and opens it:
 - **Backlog** — every open task in `docs/03-BACKLOG.md`, with a P0–P3 priority picker (kept in your browser), filters, sort, and *copy as markdown*; the backlog file itself is rendered below.
 - **Sessions** — turns, tool calls, tokens and wall time; click a row for its full timeline.
 - **Decisions and teams** — shadow decisions (model vs. rules agreement, latency) and per-task team outcomes.
@@ -228,7 +228,7 @@ Add `--no-open` to only write the file, `--limit N` to cap the session list.
 
 ### Configuration
 
-All configuration lives in `verness.config.json`. Edit it and run `./turn_on.sh sync` to push changes to both profiles without a full re-setup.
+All configuration lives in `finess.config.json`. Edit it and run `./turn_on.sh sync` to push changes to both profiles without a full re-setup.
 
 ```jsonc
 {
@@ -266,7 +266,7 @@ computations). Global commands always win on a name clash. How to write one:
 ```
 
 Laya runs in **shadow mode**. It answers three routing questions for each task (`level`, `tier`,
-`pipeline`) and the answer is logged to `.verness/decisions/` next to what the rules decided. The
+`pipeline`) and the answer is logged to `.finess/decisions/` next to what the rules decided. The
 rules still make every real decision.
 
 > **Reminder: Laya only evolves as much as you validate it.** Out of the box it scores close to
@@ -282,14 +282,14 @@ rules still make every real decision.
 | Feature | Status | Notes |
 |---------|--------|-------|
 | CLI / headless REPL | ✅ | `./turn_on.sh` |
-| Browser UI (`dsh-web-app`) | ✅ | `./turn_on.sh web`; VerNess branding planned (T-398), skin (T-430) |
+| Browser UI (`dsh-web-app`) | ✅ | `./turn_on.sh web`; FiNess branding planned (T-398), skin (T-430) |
 | Quick-tools in the web UI | ✅ | type `/cost`, `/persona`, `/dd`… in the message bar ([ADR-0011](docs/adr/0011-web-commands-bridge.md)) |
 | Local model (Ollama) | ✅ | auto-installs engine + weights |
 | Remote/cloud models | ✅ | any OpenAI-compatible endpoint |
 | Slash commands | ✅ | one file per command in `scripts/commands/`; `/help` lists them |
 | Task dashboard + backlog | ✅ | `/dashboard`: prioritise open tasks, inspect sessions and costs |
 | Teams / `/loop-task` | ✅ | several tasks under different personas; `teams/*.json` |
-| Contracts (`@verness/contracts`) | ✅ M2 | types only, zero dependencies |
+| Contracts (`@finess/contracts`) | ✅ M2 | types only, zero dependencies |
 | Persona files + `/persona check` | ✅ M2 | `personas/*.json`, validated at load; persona-scoped commands ([guide](docs/12-PERSONAS.md)) |
 | Persona catalog | ✅ | 17 personas in four families, 11 persona-only zero-token commands ([catalog](docs/12-PERSONAS.md#5-the-catalog-and-choosing-between-personas)) |
 | Decisions (shadow mode) | ✅ shadow · 🔄 gate | Laya logs model-vs-rules; `/decisions-data` labels, reports and refits; nothing is applied until the gate (T-223) |
@@ -311,7 +311,7 @@ rules still make every real decision.
 
 ```mermaid
 graph TD
-    subgraph VerNess["VerNess capability layer (our plugins)"]
+    subgraph FiNess["FiNess capability layer (our plugins)"]
         P[Personas]
         SK[Skills]
         D[Decisions]
@@ -341,7 +341,7 @@ graph TD
         HMR["Hot-module reload / fibers"]
     end
 
-    VerNess --> DSH --> Cordis
+    FiNess --> DSH --> Cordis
 ```
 
 ### Adaptive pipeline
@@ -369,16 +369,16 @@ model runs in shadow mode only, and no deterministic engine is wired yet.
 ```mermaid
 sequenceDiagram
     participant TOS as turn_on.sh
-    participant VJS as verness.mjs
+    participant VJS as finess.mjs
     participant DSH as dsh runtime
     participant CRD as Cordis
 
     TOS->>VJS: dispatch(command, cfg)
     VJS->>VJS: writePatch(cfg) → cordis.patch.yml
-    VJS->>DSH: dsh --profile verness[-web]
+    VJS->>DSH: dsh --profile finess[-web]
     DSH->>CRD: load base bundle (headless | web)
     DSH->>CRD: apply cordis.patch.yml inserts
-    CRD->>CRD: mount @verness/spike
+    CRD->>CRD: mount @finess/spike
     CRD->>CRD: mount the web bundle (dsh-web-app, web profile only)
     CRD->>CRD: mount @deepseek-ai/dsh-llm-pi-ai
     CRD-->>DSH: all fibers ACTIVE
@@ -387,11 +387,11 @@ sequenceDiagram
 
 ### Contract seam map
 
-Every VerNess subsystem attaches through a documented `dsh` seam — no agent-loop edits.
+Every FiNess subsystem attaches through a documented `dsh` seam — no agent-loop edits.
 
 ```mermaid
 graph LR
-    subgraph VerNess subsystems
+    subgraph FiNess subsystems
         PERS[Personas]
         SKILL[Skills]
         DEC[Decisions]
@@ -437,7 +437,7 @@ graph LR
 | `@deepseek-ai/dsh-tools` | Tool scheduling (linked to runtime copy) |
 | `@deepseek-ai/dsh-web-app` | The browser UI bundle, part of `dsh` (web profile) |
 | `@linxin666/dsh-web-all` | Web bundle (`settings.webBundles`): task board, Git graph, usage, archive, skins, market; web profile only |
-| `@verness/spike` | M1 load-bearing spike plugin |
+| `@finess/spike` | M1 load-bearing spike plugin |
 
 ### Toolchain
 
@@ -464,15 +464,15 @@ Engram: install with `npm i -g @sentropic/engram`, then `engram install` to give
 | Milestone | Name | Status |
 |-----------|------|--------|
 | M0 | Foundation & plan | ✅ done |
-| M1 | Load-bearing spike (`@verness/spike`) | ✅ done |
-| M2 | Contracts (`@verness/contracts`) | ✅ done |
-| M3 | Decisions (`@verness/decisions`) | 🔜 next (the launcher-level shadow, labelling and calibration are built) |
-| M4 | Personas (`@verness/personas`) | 📋 todo |
-| M5 | Skills (`@verness/skills`) | 📋 todo |
-| M6 | Routing (`@verness/routing`) | 📋 todo |
+| M1 | Load-bearing spike (`@finess/spike`) | ✅ done |
+| M2 | Contracts (`@finess/contracts`) | ✅ done |
+| M3 | Decisions (`@finess/decisions`) | 🔜 next (the launcher-level shadow, labelling and calibration are built) |
+| M4 | Personas (`@finess/personas`) | 📋 todo |
+| M5 | Skills (`@finess/skills`) | 📋 todo |
+| M6 | Routing (`@finess/routing`) | 📋 todo |
 | M7 | Evaluation & goal loop | 📋 todo |
-| M8 | Data plane (`@verness/data`) | 📋 todo |
-| M9 | Governance (`@verness/governance`) | 📋 todo |
+| M8 | Data plane (`@finess/data`) | 📋 todo |
+| M9 | Governance (`@finess/governance`) | 📋 todo |
 
 Each milestone is independently runnable. See `docs/02-ROADMAP.md` for exit criteria.
 
@@ -482,9 +482,9 @@ Each milestone is independently runnable. See `docs/02-ROADMAP.md` for exit crit
 
 | Tag | Contents |
 |-----|----------|
-| `v0.4.0` | Your quick-tools in the web UI (`@verness/commands`, ADR-0011), `/exit`, short command names and `//`, `/config`, the calibration gate (`/dd gate`), `/routing`, the feature-delivery team, `dsh-web-all` in the web UI, repo tools. Notes: [CHANGELOG.md](CHANGELOG.md) |
+| `v0.4.0` | Your quick-tools in the web UI (`@finess/commands`, ADR-0011), `/exit`, short command names and `//`, `/config`, the calibration gate (`/dd gate`), `/routing`, the feature-delivery team, `dsh-web-all` in the web UI, repo tools. Notes: [CHANGELOG.md](CHANGELOG.md) |
 | `v0.3.0` | Decision layer measured: shadow records with probabilities, blind labelling (`/decisions-data label`, `--relabel`), calibration report and held-out temperature refit (`report`, `refit`). Ten new personas with their own zero-token commands, persona `family`, the catalog in `docs/12-PERSONAS.md`. Dashboard backlog with priorities. Windows: no terminal windows flashing at boot. Docs: persona guide, and the project explained simply |
-| `v0.2.0` | M2: `@verness/contracts`, persona files validated at load (`/persona check`), `data-analyst` and `reviewer` personas, persona-scoped commands |
+| `v0.2.0` | M2: `@finess/contracts`, persona files validated at load (`/persona check`), `data-analyst` and `reviewer` personas, persona-scoped commands |
 | `v0.1.0` | M0/M1: launcher, local model lifecycle, web UI, load-bearing spike plugin |
 
 Open work (not yet released) lives on `epic`; the prioritised list is in `docs/03-BACKLOG.md` and on the dashboard.
@@ -506,21 +506,21 @@ Adding a slash command means adding one file in `scripts/commands/` (see `docs/0
 ## Project Structure
 
 ```
-VerNess/
+FiNess/
 ├── turn_on.sh / turn_on.ps1 / turn_on.cmd  # cross-platform launcher
-├── verness.config.json                      # all day-to-day configuration
+├── finess.config.json                      # all day-to-day configuration
 ├── scripts/
-│   ├── verness.mjs                          # launcher entry point
+│   ├── finess.mjs                          # launcher entry point
 │   ├── model.mjs                            # model lifecycle (up/down/stats)
-│   ├── dashboard.mjs                        # builds .verness/dashboard.html
+│   ├── dashboard.mjs                        # builds .finess/dashboard.html
 │   ├── commands/                            # one file per slash command
 │   ├── lib/                                 # REPL, personas, decisions, backlog, pet…
 │   └── test/                                # node:test suites (pnpm test)
 ├── packages/
-│   ├── contracts/                           # @verness/contracts (M2, types only)
-│   └── spike/                               # @verness/spike (M1 proof-of-concept)
+│   ├── contracts/                           # @finess/contracts (M2, types only)
+│   └── spike/                               # @finess/spike (M1 proof-of-concept)
 ├── profiles/
-│   └── verness/cordis.patch.yml             # generated — do not edit by hand
+│   └── finess/cordis.patch.yml             # generated — do not edit by hand
 ├── personas/                                # persona JSON files (+ <id>/commands/*.mjs)
 ├── teams/                                   # multi-agent team configs
 ├── .claude/skills/terse/                     # agent skill: terse, low-token replies
@@ -534,7 +534,7 @@ VerNess/
     └── adr/                                 # architectural decision records
 ```
 
-> **The upstream submodule is read-only.** Never edit files inside `upstream/deepseek-harness/`. All VerNess code lives in `packages/` as Cordis plugins.
+> **The upstream submodule is read-only.** Never edit files inside `upstream/deepseek-harness/`. All FiNess code lives in `packages/` as Cordis plugins.
 
 ---
 

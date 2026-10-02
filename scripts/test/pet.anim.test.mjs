@@ -65,7 +65,7 @@ test('no argument at all is a safe no', () => {
 async function captureOnTTY(cfg) {
   const v = {
     name: 'Ness', persona: 'generalist', model: 'm', route: 'r', session: undefined,
-    versions: { verness: '0', commit: undefined, node: '24', dsh: { installed: '1', pinned: '1' }, engine: undefined },
+    versions: { finess: '0', commit: undefined, node: '24', dsh: { installed: '1', pinned: '1' }, engine: undefined },
     workers: { engine: { remote: true, baseURL: 'x' }, decision: { up: false, enabled: false } },
     roster: { personas: 1, teams: 0 }, recent: {}, now: 0,
   }
@@ -79,7 +79,7 @@ const CURSOR_UP = /\x1b\[\d+A/
 
 test('animatePet obeys the switch on a terminal: pet.animate false draws a still panel', async () => {
   const writes = await captureOnTTY({ pet: { animate: false } })
-  assert.ok(writes.some(w => w.includes('VerNess')), 'the panel is printed')
+  assert.ok(writes.some(w => w.includes('FiNess')), 'the panel is printed')
   assert.ok(!writes.some(w => CURSOR_UP.test(w)), 'no cursor-up: nothing animated')
 })
 

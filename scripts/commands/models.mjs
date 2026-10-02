@@ -11,7 +11,7 @@
  * files the repo actually publishes — a quant that does not exist there is the most common failed
  * pull (docs/06-SETUP-AND-LAUNCHER.md, "two traps") — and a sensible one is chosen when omitted.
  *
- * Registered models live in `.verness/state.json` (`localModels`), so the committed config is never
+ * Registered models live in `.finess/state.json` (`localModels`), so the committed config is never
  * rewritten. Zero tokens: everything here talks to the engine and to Hugging Face, never to a model.
  * @module scripts/commands/models
  */
@@ -182,7 +182,7 @@ export default {
       if (words.length === 0) { warn('usage: /models rm <ref> [--purge]'); return 1 }
       const target = words[0]
       const state = readState()
-      if (target === (ctx.cfg.model.source ?? ctx.cfg.model.id)) { warn('that is the configured model; change model.source in verness.config.json instead'); return 1 }
+      if (target === (ctx.cfg.model.source ?? ctx.cfg.model.id)) { warn('that is the configured model; change model.source in finess.config.json instead'); return 1 }
       writeState({ localModels: (state.localModels ?? []).filter(m => m !== target) })
       if (state.model === target) writeState({ model: undefined, modelRoute: undefined })
       ctx.sync()

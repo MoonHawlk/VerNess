@@ -1,21 +1,21 @@
-# 13 — VerNess, explained simply
+# 13 — FiNess, explained simply
 
 > For a curious 12-year-old, or anyone who has used a chatbot but never written code.
 > Every claim here matches what the code does today. When something is only planned, this page says so.
 
 ---
 
-## 1. What is VerNess, in one paragraph
+## 1. What is FiNess, in one paragraph
 
-VerNess is an AI helper that runs on your own computer. You type a job, like "list the biggest
+FiNess is an AI helper that runs on your own computer. You type a job, like "list the biggest
 files in this folder", and an AI does it. The big idea is to **save effort**. Most jobs do not
 need a giant, expensive AI brain. A simple rule, a small quick helper or a plain calculation is
-often enough. VerNess wants to try the cheapest way that works first, and only call a big AI when
-it has to. **That is the goal, not today's reality.** Today VerNess is a launcher (the place you
+often enough. FiNess wants to try the cheapest way that works first, and only call a big AI when
+it has to. **That is the goal, not today's reality.** Today FiNess is a launcher (the place you
 type), a set of AI "job hats", lots of free quick-commands, and a small helper called Laya that is
-still *practising* how to judge a job. VerNess is built on top of another program, the
+still *practising* how to judge a job. FiNess is built on top of another program, the
 **DeepSeek Harness** (people call it `dsh`). The Harness does the heavy lifting: talking to the
-AI, running tools, saving conversations. VerNess adds its own pieces on top without changing the
+AI, running tools, saving conversations. FiNess adds its own pieces on top without changing the
 Harness.
 
 ```
@@ -23,7 +23,7 @@ Harness.
         |
         v
    +-----------+    free quick-commands (/help, /cost, ...) never touch the AI
-   |  VerNess  | -------------------------------------------------------------> answer
+   |  FiNess  | -------------------------------------------------------------> answer
    | launcher  |
    +-----------+
         |  a real task
@@ -45,13 +45,13 @@ Harness.
 
 | Part | What it really is | Think of it as... |
 |---|---|---|
-| **Launcher / REPL** | The text prompt `verness>` where you type. *REPL* means "Read, Evaluate, Print, Loop": it reads what you type, does it, prints the result, and waits again. Started with `./turn_on.sh` (Mac/Linux) or `.\turn_on.cmd` (Windows). | The front desk of a school. You walk up, say what you need, and get sent to the right place. |
+| **Launcher / REPL** | The text prompt `finess>` where you type. *REPL* means "Read, Evaluate, Print, Loop": it reads what you type, does it, prints the result, and waits again. Started with `./turn_on.sh` (Mac/Linux) or `.\turn_on.cmd` (Windows). | The front desk of a school. You walk up, say what you need, and get sent to the right place. |
 | **The model** | The AI brain that writes answers. It can be **local** (it runs on your computer through a free program called *Ollama*; the default is a small one, Qwen3 0.6B) or **hosted** (a bigger AI on a company's servers, reached over the internet with a secret key). | The student who actually does the homework. A local one is a classmate at your desk; a hosted one is a tutor you phone, and each call costs money. |
 | **Personas** | A file in `personas/` that gives the AI a job: data scientist, QA engineer (a tester), HR specialist, and 14 more. Switching persona changes the instructions the AI reads before every task. | A job hat. Same student, but wearing the "tester" hat they think like a tester. |
 | **Persona-scoped commands** | Small commands that only appear while one persona is active, like `/testplan` for the QA engineer. They print a checklist or template and cost nothing. | A tool that hangs on one hat. Put on the tester hat and the test-plan checklist appears in your pocket; take it off and it is gone. (It is hidden, not locked: anyone can still open the file.) |
 | **Teams** | A file in `teams/` that lists several personas and a list of tasks. Each task runs under its own persona, one after another. The one team today is "analyse then review": one persona makes a table, a different persona checks it. | A group project where one person writes and a different person checks. The writer never grades their own work. |
 | **Laya, the decision helper** | A small, fast model that **never writes text**. It only answers multiple-choice questions. For every task you type, it guesses three things: how hard the job is (5 choices, from *trivial* to *research*), how strong a brain it needs (3 choices), and what way to work (4 choices). It runs in **shadow mode**: its guess is saved next to what simple hand-written rules would guess, and **nothing is changed**. Right now neither Laya nor the rules actually pick anything. | A trainee referee who watches the match from the stands and writes down calls in a notebook. Nobody listens to those calls yet. They are for practice. |
-| **Labelling and calibration** | You look at old tasks and pick the right answer for each question yourself. You do not see Laya's guess while you pick ("blind"). Then VerNess measures how often Laya was right and how honest its confidence was. *Calibration* means fixing its confidence, so "90% sure" really means right 9 times out of 10. | You are the teacher grading a quiz. Laya gets a report card. |
+| **Labelling and calibration** | You look at old tasks and pick the right answer for each question yourself. You do not see Laya's guess while you pick ("blind"). Then FiNess measures how often Laya was right and how honest its confidence was. *Calibration* means fixing its confidence, so "90% sure" really means right 9 times out of 10. | You are the teacher grading a quiz. Laya gets a report card. |
 | **The gate** | A rule: Laya may only start deciding a question once its measured score beats the simple rules. It needs at least 50 graded tasks per question (200 is better). So far 20 are graded. **The gate itself is not built yet.** | A driving test. No licence until you beat the instructor's score, and the test centre is still being built. |
 | **Dashboard** | `/dashboard` builds a web page on your computer (no internet needed) showing the to-do list, past sessions, Laya's shadow guesses and team results. | The school noticeboard with the timetable, the homework list and everybody's scores. |
 | **The pet (Ness)** | A small text-art face that greets you when you start. It shows versions and which helpers are running. Its mood tells you the health: *happy* (all good), *sleepy* (engine on, no model warmed up), *worried* (something is wrong). | A school mascot that frowns when the lights are off in the gym. |
@@ -81,9 +81,9 @@ brackets.
 | `/resume` (`/continue`) | Picks up an older conversation by the start of its id. Use it to finish yesterday's work. |
 | `/loop-task` (`/loop`) | Works on one goal over several rounds until it is done, stuck, repeating itself, or out of rounds. A fresh check confirms "done". Use it for a bigger job that needs several tries. |
 | `/pet` (`/ness`, `/status`) | Redraws Ness with fresh checks: versions, running helpers, what needs attention. |
-| `/sync` | Rewrites the settings file the Harness reads, from `verness.config.json`. Use it after you edit the config. |
+| `/sync` | Rewrites the settings file the Harness reads, from `finess.config.json`. Use it after you edit the config. |
 | `/web` (`/ui`) | Opens the browser chat window. It also ends the terminal prompt, because they share the window. |
-| `/off` | Turns everything off: web UI, Laya and the local model. Add `--force` to also stop servers VerNess did not start. Use it when you are done for the day. |
+| `/off` | Turns everything off: web UI, Laya and the local model. Add `--force` to also stop servers FiNess did not start. Use it when you are done for the day. |
 
 ### model: the AI brain
 
@@ -135,7 +135,7 @@ researcher and reviewer. The "generalist" (the plain, no-hat mode) has none eith
 
 | Command | What it does, and when you would use it |
 |---|---|
-| `/team` (`/teams`) | Lists teams, shows one, or runs one: `/team run analysis-review`. `--dry-run` shows the plan without running it. The results are saved in `.verness/runs/`. |
+| `/team` (`/teams`) | Lists teams, shows one, or runs one: `/team run analysis-review`. `--dry-run` shows the plan without running it. The results are saved in `.finess/runs/`. |
 
 ### telemetry: looking at what happened
 
@@ -153,7 +153,7 @@ researcher and reviewer. The "generalist" (the plain, no-hat mode) has none eith
 
 | Word | What it does |
 |---|---|
-| *(nothing)* | Starts VerNess and opens the `verness>` prompt. |
+| *(nothing)* | Starts FiNess and opens the `finess>` prompt. |
 | `"a task in quotes"` | Runs one task and exits. Add `--continue` to carry on from the last one. |
 | `setup` | Installs or repairs everything. Safe to run twice. |
 | `doctor` | Same as `/doctor`. |
@@ -167,12 +167,12 @@ researcher and reviewer. The "generalist" (the plain, no-hat mode) has none eith
 
 ---
 
-## 4. A day with VerNess
+## 4. A day with FiNess
 
 Mia wants to test a new login page.
 
 1. **Start.** She types `.\turn_on.cmd`. Ness pops up looking *happy*: the model is warm and Laya is
-   running. The `verness>` prompt appears with the list of commands.
+   running. The `finess>` prompt appears with the list of commands.
 2. **Put on a hat.** `/persona qa-engineer`. The command bar changes: `/testplan` appears, and
    `/hypotheses` (the data scientist's) disappears.
 3. **Free checklist first.** `/testplan login page` prints a checklist. No AI, no cost.
@@ -203,7 +203,7 @@ From `docs/02-ROADMAP.md` and `docs/03-BACKLOG.md`. Milestones M0 to M2 are done
   "may not edit" today only because its instructions say so.
 - **Skills** (step-by-step know-how the AI loads when needed) are M5. **An independent checker**
   that grades every answer is M7. **Budgets and an audit log** are M9.
-- **Web UI:** the VerNess logo and name are planned (T-398); today it shows the DeepSeek Harness
+- **Web UI:** the FiNess logo and name are planned (T-398); today it shows the DeepSeek Harness
   branding. The quick-commands do not appear in the web UI's `/` menu yet (T-374..T-378). After
   switching persona, model or access, you must restart it (`off`, then `web`).
 - **Commands that are planned, not built:** `/btw` (side notes for the next task), `/exit`,
@@ -228,7 +228,7 @@ From `docs/02-ROADMAP.md` and `docs/03-BACKLOG.md`. Milestones M0 to M2 are done
 | **Persona** | A job hat: instructions (and later, rules) that make the AI act as a certain kind of worker. |
 | **Command** | A word starting with `/` that the launcher handles itself, usually for free. |
 | **Plugin** | An add-on that plugs into the DeepSeek Harness without changing it, like a new app on a phone. |
-| **Harness** | The program underneath VerNess that runs the AI, its tools and its conversations. |
+| **Harness** | The program underneath FiNess that runs the AI, its tools and its conversations. |
 | **Session** | One saved conversation with the AI. |
 | **Shadow mode** | Watching and writing down guesses without being allowed to act on them. |
 | **Label** | The right answer a human picks for a past task, used to grade Laya. |

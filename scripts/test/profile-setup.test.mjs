@@ -43,7 +43,7 @@ test('no allowBuilds block yet: one is appended; CRLF files stay CRLF', () => {
 })
 
 test('apply writes once, reports undecided builds, and reads bundles', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-profile-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-profile-'))
   try {
     writeFileSync(join(dir, 'pnpm-workspace.yaml'), PNPM_WROTE)
     assert.deepEqual(undecidedBuilds(dir), ['@google/genai', 'cloudflared'])
@@ -58,7 +58,7 @@ test('apply writes once, reports undecided builds, and reads bundles', () => {
 })
 
 test('enableBundle appends an installed bundle once, and never enables one that is not installed', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-profile-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-profile-'))
   try {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: { web: '^1.0.0' }, dsh: { profile: { bundles: ['base'] }, other: 1 } }))
     assert.equal(enableBundle(dir, 'missing'), false)

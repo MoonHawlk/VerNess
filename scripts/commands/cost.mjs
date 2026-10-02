@@ -1,5 +1,5 @@
 /**
- * `/cost` — what the work cost, priced from `pricing` in `verness.config.json`.
+ * `/cost` — what the work cost, priced from `pricing` in `finess.config.json`.
  *
  * Cost is derived, never guessed: tokens come from the session logs, rates come from the config. A
  * local route has no rate and no reported tokens, so it prices at zero *by construction* — which is
@@ -16,7 +16,7 @@ export default {
   summary: 'priced usage per route (rates come from config `pricing`)',
   usage: '/cost [--all] [--limit N]',
   details: [
-    'add rates in verness.config.json: "pricing": { "<route>": { "inputPer1M": 0.27, "outputPer1M": 1.1 } }',
+    'add rates in finess.config.json: "pricing": { "<route>": { "inputPer1M": 0.27, "outputPer1M": 1.1 } }',
     'a route with tokens but no rate is reported as unpriced rather than assumed free',
   ],
   /**
@@ -51,7 +51,7 @@ export default {
     }
     if (unpriced.length > 0) {
       warn(`no rate configured for: ${unpriced.join(', ')}`)
-      info('add it under "pricing" in verness.config.json to price those tokens')
+      info('add it under "pricing" in finess.config.json to price those tokens')
     }
     return 0
   },

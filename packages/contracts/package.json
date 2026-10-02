@@ -1,8 +1,8 @@
 {
-  "name": "@verness/contracts",
+  "name": "@finess/contracts",
   "version": "0.0.1",
   "private": true,
-  "description": "VerNess vocabulary: types and dependency-free validators. No runtime behaviour.",
+  "description": "FiNess vocabulary: types and dependency-free validators. No runtime behaviour.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

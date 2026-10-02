@@ -1,18 +1,18 @@
 /**
  * Web commands bridge (ADR-0011). Registers the launcher's quick-tools (`/cost`, `/usage`,
  * `/persona`, persona commands, ...) as slash commands of the web UI's message bar. It implements no
- * command itself: each handler runs `node scripts/verness.mjs /<name> <args>` in the checkout, so a
+ * command itself: each handler runs `node scripts/finess.mjs /<name> <args>` in the checkout, so a
  * command keeps its one implementation and the launcher-built context it expects.
  *
  * Plain ESM with only `node:` imports on purpose: no build step, no substrate package to link, and
- * the tests run without dsh. The web profile only (`surfaces: ["web"]` in `verness.config.json`).
- * @module @verness/commands
+ * the tests run without dsh. The web profile only (`surfaces: ["web"]` in `finess.config.json`).
+ * @module @finess/commands
  */
 
 import { spawn, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 
-export const name = 'verness-commands'
+export const name = 'finess-commands'
 export const inject = ['commands']
 
 /** Names the substrate owns on the web and a host registration cannot detect (ADR-0011, spike b). */
@@ -33,7 +33,7 @@ export const RESTART_LINE = 'restart the web UI to apply (./turn_on.sh off, then
 const COMMAND_NAME = /^[a-z][a-z0-9_-]*$/
 
 /** Environment for every launcher child: no colour codes, no pet banner. */
-const childEnv = () => ({ ...process.env, NO_COLOR: '1', VERNESS_NO_PET: '1' })
+const childEnv = () => ({ ...process.env, NO_COLOR: '1', FINESS_NO_PET: '1' })
 
 /**
  * Remove ANSI escape sequences (colour, cursor movement) from launcher output.
@@ -58,13 +58,13 @@ export const words = rawInput => rawInput.trim().split(/\s+/).filter(w => w !== 
 export const hintOf = usage => usage.trim().replace(/^\/?\S+\s*/, '').trim()
 
 /**
- * Run `verness.mjs --list-commands` once, synchronously (5 s cap).
- * @param {string} repo - absolute path of the VerNess checkout.
+ * Run `finess.mjs --list-commands` once, synchronously (5 s cap).
+ * @param {string} repo - absolute path of the FiNess checkout.
  * @param {{run?: typeof spawnSync}} [opts] - injectable spawner, for tests.
  * @returns {{list: object[]} | {error: string}} the command list, or why it could not be read.
  */
 export function listCommands(repo, { run = spawnSync } = {}) {
-  const r = run(process.execPath, [join(repo, 'scripts', 'verness.mjs'), '--list-commands'], {
+  const r = run(process.execPath, [join(repo, 'scripts', 'finess.mjs'), '--list-commands'], {
     cwd: repo, encoding: 'utf8', timeout: 5000, windowsHide: true, env: childEnv(),
   })
   if (r.error !== undefined) return { error: r.error.message }
@@ -82,19 +82,19 @@ export function listCommands(repo, { run = spawnSync } = {}) {
  * (indentation kept). The UI's abort
  * signal kills the child; there is no fixed timeout (`/team` and `/loop-task` are long by design).
  * @param {object} opts - options.
- * @param {string} opts.repo - absolute path of the VerNess checkout.
+ * @param {string} opts.repo - absolute path of the FiNess checkout.
  * @param {string} opts.command - the canonical command name (an alias is resolved by the caller).
  * @param {string} opts.rawInput - the text after the command name.
  * @param {AbortSignal} [opts.signal] - cancellation owned by the UI request.
  * @param {typeof spawn} [opts.spawnImpl] - injectable spawner, for tests.
- * @param {string} [opts.script] - the launcher entry; defaults to `<repo>/scripts/verness.mjs`.
+ * @param {string} [opts.script] - the launcher entry; defaults to `<repo>/scripts/finess.mjs`.
  * @returns {Promise<{kind: 'success', text?: string} | {kind: 'error', text: string}>} the result.
  */
 export function runCommand({ repo, command, rawInput, signal, spawnImpl = spawn, script }) {
   if (signal?.aborted === true) return Promise.resolve({ kind: 'error', text: `/${command} cancelled` })
   const args = words(rawInput)
   return new Promise(resolve => {
-    const child = spawnImpl(process.execPath, [script ?? join(repo, 'scripts', 'verness.mjs'), `/${command}`, ...args], {
+    const child = spawnImpl(process.execPath, [script ?? join(repo, 'scripts', 'finess.mjs'), `/${command}`, ...args], {
       cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: childEnv(),
     })
     let out = ''
@@ -133,7 +133,7 @@ export function runCommand({ repo, command, rawInput, signal, spawnImpl = spawn,
  * @param {{register: (definition: object) => () => void}} commands - `ctx.commands`.
  * @param {object[]} list - the `--list-commands` entries.
  * @param {object} opts - options.
- * @param {string} opts.repo - absolute path of the VerNess checkout.
+ * @param {string} opts.repo - absolute path of the FiNess checkout.
  * @param {(message: string) => void} opts.log - one-line logger.
  * @param {typeof runCommand} [opts.run] - the handler body, injectable for tests.
  * @returns {(() => void)[]} the disposers of every registration made.
@@ -145,11 +145,11 @@ export function registerCommands(commands, list, { repo, log, run = runCommand }
     for (const n of [cmd.name, ...(cmd.aliases ?? [])]) {
       if (!COMMAND_NAME.test(n)) continue
       if (RESERVED.has(n)) { log(`/${n} left to the substrate`); continue }
-      const summary = typeof cmd.summary === 'string' && cmd.summary.trim() !== '' ? cmd.summary : `VerNess quick-tool /${cmd.name}`
+      const summary = typeof cmd.summary === 'string' && cmd.summary.trim() !== '' ? cmd.summary : `FiNess quick-tool /${cmd.name}`
       const hint = hintOf(cmd.usage ?? '')
       try {
         disposers.push(commands.register({
-          definitionId: `@verness/commands:${n}`,
+          definitionId: `@finess/commands:${n}`,
           name: n,
           description: n === cmd.name ? summary : `${summary} (alias of /${cmd.name})`,
           ...(hint === '' ? {} : { input: { hint } }),
@@ -174,7 +174,7 @@ export function registerCommands(commands, list, { repo, log, run = runCommand }
  *   injectable pieces, for tests.
  */
 export function apply(ctx, config, deps = {}) {
-  const log = deps.log ?? (m => console.error(`verness-commands: ${m}`))
+  const log = deps.log ?? (m => console.error(`finess-commands: ${m}`))
   const repo = config?.repo
   if (typeof repo !== 'string' || repo === '') { log('no config.repo; run ./turn_on.sh sync'); return }
   const got = (deps.list ?? listCommands)(repo)

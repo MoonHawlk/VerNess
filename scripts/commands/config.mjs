@@ -1,6 +1,6 @@
 /**
  * `/config` — the resolved configuration, and for each value the layer that owns it: built-in
- * default, `verness.config.json`, `.verness/state.json`, a persona file, or the environment.
+ * default, `finess.config.json`, `.finess/state.json`, a persona file, or the environment.
  * Read-only and zero tokens; credentials are masked, never printed.
  * @module scripts/commands/config
  */
@@ -25,10 +25,10 @@ export default {
    */
   run(ctx, args) {
     const cfg = ctx.cfg
-    const file = join(REPO, 'verness.config.json')
+    const file = join(REPO, 'finess.config.json')
     let raw
     if (existsSync(file)) {
-      try { raw = parseJsonc(readFileSync(file, 'utf8')) } catch (e) { warn(`verness.config.json is not valid JSON (${e.message}); attributing everything to defaults`) }
+      try { raw = parseJsonc(readFileSync(file, 'utf8')) } catch (e) { warn(`finess.config.json is not valid JSON (${e.message}); attributing everything to defaults`) }
     }
     const state = readState()
     const persona = loadPersonas(cfg).get(activePersonaId(cfg))
@@ -42,9 +42,9 @@ export default {
     })
     for (const l of render(resolved)) line(`  ${l}`)
     line('')
-    head('settings - built-in defaults merged with verness.config.json')
+    head('settings - built-in defaults merged with finess.config.json')
     for (const l of render(settingRows(cfg, raw))) line(`  ${l}`)
-    info('credentials are masked; edit verness.config.json, then /sync (state changes through /persona, /model, /api, /access)')
+    info('credentials are masked; edit finess.config.json, then /sync (state changes through /persona, /model, /api, /access)')
     return 0
   },
 }

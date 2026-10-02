@@ -54,7 +54,7 @@ test('a registration carries definitionId, description, input hint and recordInp
   const reg = fakeRegistry()
   registerCommands(reg, LIST, { repo: REPO, log: () => {} })
   const cost = reg.defs.get('cost')
-  assert.equal(cost.definitionId, '@verness/commands:cost')
+  assert.equal(cost.definitionId, '@finess/commands:cost')
   assert.equal(cost.description, 'priced usage')
   assert.deepEqual(cost.input, { hint: '[--all] [--limit N]' })
   assert.equal(cost.recordInput, true)
@@ -167,7 +167,7 @@ test('small helpers: words, hints, ANSI', () => {
 
 // ------------------------------------------------------------------------- handler, real child
 
-const dir = mkdtempSync(join(tmpdir(), 'verness-bridge-'))
+const dir = mkdtempSync(join(tmpdir(), 'finess-bridge-'))
 const script = join(dir, 'fake-launcher.mjs')
 writeFileSync(script, `
 const [cmd, ...args] = process.argv.slice(2)

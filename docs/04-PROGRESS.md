@@ -38,10 +38,10 @@
   `dsh plugin` shells out to it. `@deepseek-ai/dsh@0.1.7-rc.2` installed globally.
   `DSH_HOME = C:/Users/totov/.dsh`. (T-010)
 - Baseline composition captured (376 rows): `docs/research/dump-config.headless.txt`. (T-011)
-- Spike: `packages/spike/` (plain ESM, no build step) registers `verness_ping` and appends
-  `mounted`/`disposed` lines to `verness-spike.log`. Mounted through
-  `profiles/verness/cordis.patch.yml` -> `insert: [{ id: verness-spike, name: '@verness/spike' }]`,
-  installed with `dsh plugin --profile verness add "file:<repo>/packages/spike"`. (T-012..T-014)
+- Spike: `packages/spike/` (plain ESM, no build step) registers `finess_ping` and appends
+  `mounted`/`disposed` lines to `finess-spike.log`. Mounted through
+  `profiles/finess/cordis.patch.yml` -> `insert: [{ id: finess-spike, name: '@finess/spike' }]`,
+  installed with `dsh plugin --profile finess add "file:<repo>/packages/spike"`. (T-012..T-014)
 - Findings worth remembering:
   - `--dump-config` proves *composition*, not *mount*. Only a real boot mounts; a failure prints
     `dsh: warning: N entry did not activate` followed by the error.
@@ -60,11 +60,11 @@
   pulled `qwen3:0.6b` (522 MB). (T-017)
 - No adapter of ours was needed: `@deepseek-ai/dsh-llm-pi-ai` already serves OpenAI-compatible
   self-hosted gateways, so Ollama is a hand-declared route in
-  `profiles/verness/cordis.patch.yml` (`api: openai-completions`, `baseURL: http://localhost:11434/v1`,
+  `profiles/finess/cordis.patch.yml` (`api: openai-completions`, `baseURL: http://localhost:11434/v1`,
   explicit `models` list) plus an `agent-default-model` override. A keyless route is refused
   (`PI_AI_ERROR: No API key`), so it declares `apiKeyEnv: OLLAMA_API_KEY` with any non-empty value.
-- **End-to-end verified** (T-018): `dsh --profile verness "Call verness_ping with note=hello..."`
-  returns `VerNess layer verness-spike is mounted: hello`. Local model -> agent loop -> our
+- **End-to-end verified** (T-018): `dsh --profile finess "Call finess_ping with note=hello..."`
+  returns `FiNess layer finess-spike is mounted: hello`. Local model -> agent loop -> our
   out-of-tree tool -> rendered result, at zero API cost.
 - **Bug found and fixed (T-019) — worth remembering, it would have cost days later.** Installing
   `@deepseek-ai/dsh-tools` into the profile (needed for `defineTool`) made every tool call fail with
@@ -94,14 +94,14 @@
 - `.engram/` is gitignored for now (T-103 revisits committing `graph.json` once we have real code).
 
 ## 2026-09-25 — one setup file, one cross-platform launcher (ADR-0006)
-- `verness.config.json` is now the only file to edit for day-to-day work: substrate pins, profile,
+- `finess.config.json` is now the only file to edit for day-to-day work: substrate pins, profile,
   model routes, active route, personas, tips, plugins, tools mode. JSON with `//` comments.
-- `scripts/verness.mjs` (plain Node, no dependencies) does setup/start/run/sync/doctor/graph;
+- `scripts/finess.mjs` (plain Node, no dependencies) does setup/start/run/sync/doctor/graph;
   `turn_on.sh`, `turn_on.ps1` and `turn_on.cmd` are thin wrappers, so Windows/macOS/Linux share one
   implementation. `profiles/<name>/cordis.patch.yml` is now GENERATED from the config and still
   committed for reviewability. `scripts/profile-sync.mjs` removed. (T-110..T-113)
 - Verified on this machine: `doctor` (all green), `sync` (block-scalar persona text), `setup` (clean
-  and idempotent on re-run), and a one-shot task that called `verness_ping` through the launcher.
+  and idempotent on re-run), and a one-shot task that called `finess_ping` through the launcher.
 - Two platform lessons now encoded in the launcher:
   - **Windows `.cmd` shims**: Node refuses to spawn `pnpm`/`dsh`/`engram` without a shell (EINVAL
     since 20.12). The launcher opts into the shell on Windows and quotes every argument itself,
@@ -115,7 +115,7 @@
 ## 2026-09-25 — model lifecycle: up / stats / down, weights from Hugging Face (ADR-0007)
 - `scripts/model.mjs` owns the local model on all platforms; the launcher exposes it as
   `./turn_on.sh up | stats | down` (also `npm run model:up|model:stats|model:down`). The duplicated
-  Ollama helper inside `verness.mjs` was removed — one engine code path. (T-120, T-122)
+  Ollama helper inside `finess.mjs` was removed — one engine code path. (T-120, T-122)
 - Weights now come **from Hugging Face**: `model.source = "hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0"`. Ollama
   is used purely as the cross-platform runner (native builds for Windows/macOS/Linux, OpenAI-compatible
   endpoint, pulls GGUF straight from a HF repo), which avoids a Python/PyTorch toolchain. (T-121)
@@ -123,9 +123,9 @@
   - `up`: engine detected, server adopted, weights present, **warm in 7.5 s**, resident 10 min.
   - `stats`: resident 5.2 GiB on GPU, 596M params, family qwen3; catalogue of 2; probe **60.2 tok/s**,
     prompt eval 5732 ms, load 210 ms.
-  - `down`: **5.2 GiB released, 0 models resident**; server left running because VerNess had only
+  - `down`: **5.2 GiB released, 0 models resident**; server left running because FiNess had only
     adopted it (`--force` overrides, untested here on purpose — it would kill the owner's process).
-  - A harness task through the launcher then called `verness_ping` successfully on the HF model.
+  - A harness task through the launcher then called `finess_ping` successfully on the HF model.
 - Traps recorded in ADR-0007: only quants actually published in the HF repo are valid tags
   (`Q4_K_M` on that repo fails with `400 ... tag is not available`, while `Q8_0` works), and
   `ollama pull` can print `Error:` while **exiting 0** — so `up` verifies through `/api/tags`.
@@ -204,7 +204,7 @@
   beats the rule baseline it would replace.
 
 ## 2026-09-26 (overnight) — the decision layer is running, and it is not trustworthy yet
-- **Sidecar is live.** `laya[serve]` 0.3.20 installed into `.verness/py` (torch 2.14, transformers
+- **Sidecar is live.** `laya[serve]` 0.3.20 installed into `.finess/py` (torch 2.14, transformers
   5.17, fastapi 0.141), started on `127.0.0.1:8000` with a generated `LAYA_API_KEY`, all three
   checkpoints loaded (english, multilingual, typed-decisions). `/decision up|stats|down` manages it
   exactly like the model engine. (T-210..T-214)
@@ -288,7 +288,7 @@
 
 ## 2026-09-26 — the pet: versions and workers at a glance (T-330..T-333)
 - The REPL now boots with a small ASCII companion (default name **Ness**) beside a status panel:
-  VerNess version and commit, node, **dsh installed vs the pinned substrate** (the most useful single
+  FiNess version and commit, node, **dsh installed vs the pinned substrate** (the most useful single
   versions signal, since ADR-0002 pins it), the engine version, whether the model engine is up and
   which model is warm with its memory, the decision sidecar, the last `/loop-task` and `/team` run,
   the roster and the conversation. `/pet` redraws it with fresh probes.
@@ -302,7 +302,7 @@
 - Found while testing from a worktree: booting any second checkout syncs ITS persona into the shared
   `~/.dsh/profiles/<name>/cordis.patch.yml`, silently switching the live profile (T-336).
 - It draws only on a real terminal, so piped output is unchanged; `pet.enabled: false` or
-  `VERNESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
+  `FINESS_NO_PET=1` restores the one-line banner. That banner also printed a literal `undefined`
   before persona and model on a TTY (the launcher's colour table had no `bold`), fixed in passing.
 - Redesigned on request, twice. The triangle with a detailed face read as scary; Ness is now a
   **cube - a little TV** with a deliberately small face on its screen (`o   o` over `u`; `-   -`
@@ -351,7 +351,7 @@
   time: persona overlays were one shared file per persona, rewritten per task; each task now writes
   its own beside its transcript. Proof lives in `scripts/test/teams.parallel.mjs` (no tokens spent).
 - `decisions.enabled` is now `true`: every REPL task is shadow-routed and logged to
-  `.verness/decisions/` beside what the rules chose. Nothing is applied. Calibration (T-223) needs a
+  `.finess/decisions/` beside what the rules chose. Nothing is applied. Calibration (T-223) needs a
   labelled set more than it needs code, so the set accumulates from normal use first. Each REPL turn
   now waits on one decision call (~1 s at the measured CPU p50) when the sidecar is up, and prints a
   one-line "unavailable" note and carries on when it is not.
@@ -362,10 +362,10 @@
 - **What**: `./turn_on.sh off` (alias `stop`, `/off` in the REPL) stops the web UI — whatever
   listens on port 6173, plus any process matching `pgrep -f "profile <web profile>"`, so a UI
   started with `--port` is found too — then the decision sidecar, then the local model. `--force`
-  also stops servers VerNess did not start. Commit 6bc91a6, follow-ups in merge 74cb2de.
+  also stops servers FiNess did not start. Commit 6bc91a6, follow-ups in merge 74cb2de.
 - **Verified**: `off` released 5.3 GiB (Qwen3-0.6B) and exited 0, leaving Ollama running because
-  VerNess had not started it. A decoy process `--profile verness-web --port 7000` was killed while
-  `--profile verness-website` was left alone.
+  FiNess had not started it. A decoy process `--profile finess-web --port 7000` was killed while
+  `--profile finess-website` was left alone.
 - **Not verified**: stopping a real running web UI server; the Windows PowerShell path (T-372).
 - **Found on the way**: on `main`, `/off` was not reachable in the REPL — the handler existed in
   `ctx.builtins` but no quick-tool exposed it. Fixed in 74cb2de.
@@ -403,16 +403,16 @@
   succeeded regardless.
 - **Not done**: the optional description batches and `engram claude install` (CLAUDE.md section +
   PreToolUse hook) — T-379.
-- **Planned, not built**: a "web commands bridge" — a `@verness/commands` dsh plugin that registers
+- **Planned, not built**: a "web commands bridge" — a `@finess/commands` dsh plugin that registers
   the launcher's quick-tools in the web UI's `/` menu (via dsh-commands) and runs them through
-  `node scripts/verness.mjs <name>`. The design spec lives on the separate branch `web-commands`
+  `node scripts/finess.mjs <name>`. The design spec lives on the separate branch `web-commands`
   (`docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`), not yet in `epic`, and
   awaits an implementation plan. Tasks T-374..T-378. Per-persona `tools.allow`/`deny` remain
   unenforced (M4) and are out of that scope.
 
 ## 2026-09-26 — M2 done: contracts as types, zero dependencies (T-020..T-027, T-162..T-165)
 - **Exit criteria verified**: `pnpm typecheck` (`tsc -p packages/contracts`) clean; `pnpm test`
-  125/125 pass; `packages/contracts/package.json` has no `dependencies`. `@verness/contracts` is
+  125/125 pass; `packages/contracts/package.json` has no `dependencies`. `@finess/contracts` is
   erasable-only TypeScript run directly by Node's type stripping; `exports` points at `./src/index.ts`.
 - **Tooling**: root dev tooling via pnpm (the declared `packageManager`), `pnpm-lock.yaml` committed.
   Node floor is `^22.19.0 || >=24`; `nodeOk()` rejects 23.x. Only Node 26 was used for the run —
@@ -426,7 +426,7 @@
   win and the collision warning names the owner. Example: `/hypotheses` (data-scientist), zero tokens.
 - **Personas**: `data-analyst`, `data-engineer`, `data-scientist`, `researcher`, `reviewer`,
   `software-engineer` as files, plus the inline `generalist` — 7 in all, all valid. The inline
-  `data-analyst` block in `verness.config.json` is now shadowed by the file; the owner may delete it
+  `data-analyst` block in `finess.config.json` is now shadowed by the file; the owner may delete it
   (T-388). Inline config definitions are not validated.
 - **Final-review fixes** (`fd09901`): a persona file whose JSON is `null` no longer crashes
   `loadPersonas`; `loadCommands` guards persona command names against path escape; `nodeOk` rejects
@@ -444,7 +444,7 @@
   from it for further work.
 - **Dashboard backlog** (T-389): `/dashboard` now opens on a Backlog section built from
   `docs/03-BACKLOG.md` — each open task gets a P0–P3 picker (kept in the browser's localStorage under
-  `verness.backlog.priority`), with filters by workstream/priority, sort, and copy-as-markdown; the
+  `finess.backlog.priority`), with filters by workstream/priority, sort, and copy-as-markdown; the
   file itself is rendered below. Parser and renderer: `scripts/lib/backlog.mjs`, no dependency.
 - **Wall-time fix** (T-390): session wall time starts at the first timed event, not at an untimed
   header, so it is no longer inflated.
@@ -570,7 +570,7 @@
   real registry. `/persona check`: 17 ok.
 - **T-395** `family` in the contracts (validated, round-trips), set in all 16 files; `/persona` and
   `/agents` group by it. The inline `generalist` lists under `other`, because it is defined in
-  `verness.config.json` and was not edited.
+  `finess.config.json` and was not edited.
 - **T-394** `docs/12-PERSONAS.md` section 5: the catalog table, generated from the files, and "which
   persona do I pick?" for every overlapping pair.
 - `npm test` and `pnpm typecheck` clean. **Left in WS-I**: T-396 (two-stage routing, needed before
@@ -580,10 +580,10 @@
 - `epic` merged into `main` (`--no-ff`) with `package.json` 0.2.0 → 0.3.0 in the merge commit, tagged
   `v0.3.0`; `epic` fast-forwarded to the release. Minor bump: new commands (`/decisions-data`, ten
   persona commands) and a new persona field (`family`).
-- Clean-clone check on `epic` before the merge: `node scripts/verness.mjs help` runs, `npm test`
+- Clean-clone check on `epic` before the merge: `node scripts/finess.mjs help` runs, `npm test`
   198/198, all 11 persona commands tracked.
 
-## 2026-09-27 — dsh-web-all as a web bundle (T-399); repo tools and the verness-tools skill
+## 2026-09-27 — dsh-web-all as a web bundle (T-399); repo tools and the finess-tools skill
 - **dsh-web-all installed**, the way its README asks: as a bundle in the web profile only. Root cause
   of the old silent failure: pnpm 11 exits 1 (`ERR_PNPM_IGNORED_BUILDS`) while any dependency's
   install script is undecided, so setup's `pnpm add` counted as failed. The fix lives in the launcher,
@@ -598,7 +598,7 @@
 - **Repo tools** (`scripts/tools/`, Node only): `where` (code via the Engram graph, plus docs),
   `backlog`, `repo`, `tests`, `docs`, `commands`, `graph`, `profiles`, with `scripts/test/tools.test.mjs`.
   They already found the headless undecided builds and the unmounted bundle. The skill
-  `.claude/skills/verness-tools/` lists them. Policy: locate through the graph and these tools, and
+  `.claude/skills/finess-tools/` lists them. Policy: locate through the graph and these tools, and
   do not run Engram's semantic doc extraction.
 
 ## 2026-09-27 — round of four parallel branches, v0.4.0
@@ -608,7 +608,7 @@
   T-388, T-397). The worktrees started from `v0.3.0` instead of `epic`; each agent noticed and
   fast-forwarded itself before working.
 - Conflicts resolved by hand: `scripts/lib/commands.mjs` (prefix resolution and `commandList` side
-  by side), the import line in `scripts/verness.mjs`, and `docs/07-COMMAND-LAYER.md` (both sections).
+  by side), the import line in `scripts/finess.mjs`, and `docs/07-COMMAND-LAYER.md` (both sections).
   Follow-up: `/mo` resolves to `/model` (a prefix every candidate extends picks the shortest), and
   the REPL's shadowing `task` variable was renamed.
 - Deviations accepted: the gate uses raw accuracy, because a temperature never changes the answer;
@@ -616,10 +616,10 @@
   client menu entry, and a clash would break the `/` menu) and `surfaces: ["web"]` (headless mounts
   `commands` too).
 - **Incident:** one bridge-agent command ran without the throwaway `DSH_HOME` and re-rendered the
-  owner's real profile patches from its worktree (a missing `verness-commands` row, persona reset to
+  owner's real profile patches from its worktree (a missing `finess-commands` row, persona reset to
   `generalist`). Repaired by `setup` from the main checkout: both patches have `data-scientist` again,
   and the web profile has the plugin, pointing at the main checkout. Verified with a real `web` boot:
-  `verness-commands: /model left to the substrate`, no activation warning, the dsh-web-all degraded
+  `finess-commands: /model left to the substrate`, no activation warning, the dsh-web-all degraded
   list empty. The agent's one stray local session under `~/.dsh/sessions/` was left in place.
 - Release notes are now required for every release (`CHANGELOG.md`, rule in `05-CONVENTIONS.md`);
   T-431 plans a tool to draft them. New follow-ups: T-430 (web skin), T-432 (setup and edited local
@@ -630,14 +630,14 @@
 - Ten subagents in separate git worktrees from `epic`, each on quick tasks with disjoint files,
   merged into `epic` with `--no-ff` one at a time, the suite run after each merge.
 - **REPL:** `/btw <note>` side notes, sent once with the next task as context, not tasks (T-130).
-  `#<note>` adds to the durable project brief `.verness/brief.md`: the whole brief goes on each new
+  `#<note>` adds to the durable project brief `.finess/brief.md`: the whole brief goes on each new
   session's first task, only new lines on a continuing one; `#` shows it, `##` escapes it (T-147).
-  Plain input suggests recent tasks from the persisted input history `.verness/history.jsonl`, not
+  Plain input suggests recent tasks from the persisted input history `.finess/history.jsonl`, not
   the session logs (too slow per keystroke, and they hold composed briefs) (T-303).
 - **Commands:** `/usage --by day`, with local dates and each call dated by its own event, so a
   session crossing midnight splits (T-137). `/team status [<id>]`, plus a `summary.json` beside every
   run's `summary.md`; the newest run is chosen by folder name, not mtime (T-170).
-- **Launcher:** one `verness` command through the new entry `scripts/cli.mjs` (package.json `bin`;
+- **Launcher:** one `finess` command through the new entry `scripts/cli.mjs` (package.json `bin`;
   `turn_on.*` and npm scripts use it too). It checks Node before any `.ts` import, so old Node gets
   a plain error (T-380, T-383). A startup warning names any `scripts/lib` module the launcher imports
   that git does not track (T-312). Node 22.19.0 verified: smoke 37/37, no type-stripping warning (T-382).
@@ -647,7 +647,7 @@
   single 17-persona question needs T-396's two stages. `scripts/tools/release-notes.mjs` drafts the
   next CHANGELOG entry (T-431). The pet render test is a mood-agnostic `node:test` suite (T-338), and
   `pet.animate` plus `animationAllowed` form the animation off switch (T-335g).
-- Conflicts resolved by hand: `scripts/verness.mjs` (DEFAULTS `pet` + `notes`; the input history
+- Conflicts resolved by hand: `scripts/finess.mjs` (DEFAULTS `pet` + `notes`; the input history
   now loaded at start instead of `const history = []`; the notes and node-version imports) and the
   `package.json` scripts (`cli.mjs` entries plus `check:clean-clone`).
 - Worktrees have no upstream submodule checkout, so two smoke tests skip there and their suites

@@ -9,8 +9,8 @@ dashboard that shows loops, per-tool health and filters, first as a static page 
 optional loopback service.
 
 **Architecture:** Every dashboard number comes from a **pure aggregation function** over data the
-launcher already reads (session events, `.verness/loops/*.jsonl`, `.verness/decisions/*.jsonl`,
-`.verness/runs/**/summary.json`). `scripts/dashboard.mjs` only renders. The standalone service
+launcher already reads (session events, `.finess/loops/*.jsonl`, `.finess/decisions/*.jsonl`,
+`.finess/runs/**/summary.json`). `scripts/dashboard.mjs` only renders. The standalone service
 (`scripts/dashboard-server.mjs`) reuses the same aggregation and render functions; it adds file
 watching and HTTP. It must never be required for anything else to work.
 
@@ -22,7 +22,7 @@ substrate's guard packages); `docs/04-PROGRESS.md` entries "/loop-task" and "sta
 ## Global Constraints
 Inherit the master plan. Also:
 - The dashboard is as sensitive as the session logs it renders. The service binds `127.0.0.1` by
-  default and **refuses** any other host unless `dashboard.token` (or `VERNESS_DASHBOARD_TOKEN`) is
+  default and **refuses** any other host unless `dashboard.token` (or `FINESS_DASHBOARD_TOKEN`) is
   set; with a token, every request needs `Authorization: Bearer <token>` or `?token=`.
 - Static export stays one self-contained HTML file with no external assets, and it must keep working
   after the service exists (T-278).
@@ -44,7 +44,7 @@ Inherit the master plan. Also:
 
 | File | Change | Responsibility |
 |---|---|---|
-| `scripts/verness.mjs` | modify | `dsh()` accepts `timeoutMs` |
+| `scripts/finess.mjs` | modify | `dsh()` accepts `timeoutMs` |
 | `scripts/loop-task.mjs` | modify | `--round-timeout`; `timeout` outcome |
 | `scripts/lib/obs.mjs` | create | pure aggregators: `toolStats`, `latencyHistogram`, `loopRuns`, `filterSessions` |
 | `scripts/dashboard.mjs` | modify | panels for tools, loops; filters; `--watch`; atomic write |
@@ -57,7 +57,7 @@ Inherit the master plan. Also:
 ### Task 1: Per-round wall-clock budget (T-327)
 
 **Files:**
-- Modify: `scripts/verness.mjs` (`dsh(args, opts)`: add `opts.timeoutMs` → `spawnSync` `timeout` + `killSignal: 'SIGTERM'`; return `signal: r.signal ?? undefined` and `timedOut: r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM'`)
+- Modify: `scripts/finess.mjs` (`dsh(args, opts)`: add `opts.timeoutMs` → `spawnSync` `timeout` + `killSignal: 'SIGTERM'`; return `signal: r.signal ?? undefined` and `timedOut: r.error?.code === 'ETIMEDOUT' || r.signal === 'SIGTERM'`)
 - Modify: `scripts/loop-task.mjs` (`opts.roundTimeoutSec`, default 600; CLI flag `--round-timeout <s>`)
 - Modify: `scripts/commands/loop-task.mjs` (usage and argument parsing)
 - Test: `scripts/test/loop.timeout.test.mjs`
@@ -81,7 +81,7 @@ import { runLoopTask } from '../loop-task.mjs'
 test('a timed-out round stops the loop with outcome timeout', async () => {
   const calls = []
   const ctx = {
-    cfg: { profile: { name: 'verness' } },
+    cfg: { profile: { name: 'finess' } },
     routeEnv: {},
     dsh: (args, opts) => { calls.push(opts); return { code: 1, out: '', timedOut: true } },
   }
@@ -135,10 +135,10 @@ turns it on for our profile and keeps our identical-call check only as the hard 
 schema). Write down: its package name, its config keys (threshold, window, message), whether it
 blocks or only reminds, and which event it listens on. Put these in a new section of
 `docs/research/task-loop-machinery.md` titled `repeat-tool-reminder (read 2026-09-26)`.
-- [ ] **Step 2: Is it already composed?** `dsh --profile verness --dump-config | grep -i repeat`.
+- [ ] **Step 2: Is it already composed?** `dsh --profile finess --dump-config | grep -i repeat`.
 If a row exists, note its `id`. If it does not, it must be `insert:`ed like our own plugins.
 - [ ] **Step 3: Configure it from our config.** Add `guards: { repeatToolReminder: { enabled: true, ...keys from Step 1 } }`
-to `DEFAULTS` in `scripts/verness.mjs`, and in `writePatch` emit either a config override for the
+to `DEFAULTS` in `scripts/finess.mjs`, and in `writePatch` emit either a config override for the
 existing row id or an `insert:` row. Follow the existing `L.push(...)` style and remember that a
 patch **replaces the whole row config**, so restate every field.
 - [ ] **Step 4: Escalate to a hard block.** If the upstream guard only reminds, keep
@@ -146,7 +146,7 @@ patch **replaces the whole row config**, so restate every field.
 `blocked: the same call was repeated after the substrate's reminder`. If upstream already blocks,
 delete our identical-call check (keep the churn and no-tool rules, which upstream does not have)
 and update the comment in `scripts/lib/loop.mjs`.
-- [ ] **Step 5: Verify by boot.** `node scripts/verness.mjs sync`, then a loop that invites
+- [ ] **Step 5: Verify by boot.** `node scripts/finess.mjs sync`, then a loop that invites
 repetition: `/loop-task --rounds 4 read package.json three times and report its name each time`.
 Record in `docs/04-PROGRESS.md` whether the reminder appeared in the session (`/tools`, or the
 dashboard timeline) and which rule stopped the loop.
@@ -280,7 +280,7 @@ export function latencyHistogram(ms, edges = [100, 300, 1000, 3000, 10000, 30000
   return labels.map((label, i) => ({ label, count: counts[i] }))
 }
 
-/** @param {string[]} lines - JSONL lines from `.verness/loops/*.jsonl`. @returns {object[]} runs, newest first. */
+/** @param {string[]} lines - JSONL lines from `.finess/loops/*.jsonl`. @returns {object[]} runs, newest first. */
 export function loopRuns(lines) {
   const out = []
   for (const l of lines) { try { out.push(JSON.parse(l)) } catch { /* partial line */ } }
@@ -317,7 +317,7 @@ is 1. Check.
 - `buildDashboard(cfg, {limit?, persona?, route?})` renders:
   - `<h2 id="tools">Tools</h2>`: table of tool, calls, failures, failure %, p50, p95, and a CSS bar
     histogram of all tool latencies (`latencyHistogram` over every `ms`).
-  - `<h2 id="loops">Loops</h2>`: from `.verness/loops/*.jsonl` via `loopRuns`: when, objective (esc),
+  - `<h2 id="loops">Loops</h2>`: from `.finess/loops/*.jsonl` via `loopRuns`: when, objective (esc),
     outcome, rounds, tokens.
   - A filter bar showing the active `--persona`/`--route` and the counts before/after filtering.
     Static HTML cannot re-filter server-side, so the static page also embeds the persona and route per
@@ -329,7 +329,7 @@ with a hand-built `data` object containing one session with `tools`, one loop ru
 Assert that the HTML contains `id="tools"`, `id="loops"`, the tool name, a `<select` for persona and
 route, and that a tool named `<img src=x>` appears escaped as `&lt;img`.
 - [ ] **Step 2: Implement** following the file's existing section style (read `render()` fully first; it is lines 159–300).
-- [ ] **Step 3: Manual check.** `node scripts/verness.mjs dashboard --no-open`, open the file, confirm
+- [ ] **Step 3: Manual check.** `node scripts/finess.mjs dashboard --no-open`, open the file, confirm
 the three panels and that the selects hide rows.
 - [ ] **Step 4: Commit** — `feat(dashboard): tools, latency histogram, loops, persona/route filters (T-271, T-272, T-328)`
 
@@ -341,8 +341,8 @@ the three panels and that the selects hide rows.
 
 - [ ] **Step 1:** Make `buildDashboard` write to `<file>.tmp` and `renameSync` onto the target.
 - [ ] **Step 2:** `--watch`: build once, open once, then watch `sessionsRoot()` (and each workspace
-subdirectory, since Linux `fs.watch` does not recurse), `.verness/decisions`, `.verness/loops` and
-`.verness/runs`. Debounce 250 ms and rebuild. Print `rebuilt <time>` per rebuild; stop on ctrl+c.
+subdirectory, since Linux `fs.watch` does not recurse), `.finess/decisions`, `.finess/loops` and
+`.finess/runs`. Debounce 250 ms and rebuild. Print `rebuilt <time>` per rebuild; stop on ctrl+c.
 Add `<meta http-equiv="refresh" content="5">` **only** in watch mode, so a browser tab follows along.
 - [ ] **Step 3: Test** the debounce as a pure function, `debounce(fn, ms, {setTimeout, clearTimeout})`
 in `scripts/lib/obs.mjs`, with the fake clock pattern from the WS-C plan (Task 3, Step 1).
@@ -356,15 +356,15 @@ Do this only after Tasks 3–5. Build it in this order; each step is independent
 
 **Files:**
 - Create: `scripts/dashboard-server.mjs` (CLI: `node scripts/dashboard-server.mjs [--port 4180] [--host 127.0.0.1]`)
-- Modify: `scripts/verness.mjs` (`DEFAULTS.dashboard = { port: 4180, host: '127.0.0.1', token: undefined, environments: [] }`)
-- Modify: `scripts/commands/dashboard.mjs` (`--serve` starts it detached and records its pid in `.verness/run/dashboard.json`, the same run-state pattern as `scripts/decision.mjs`)
+- Modify: `scripts/finess.mjs` (`DEFAULTS.dashboard = { port: 4180, host: '127.0.0.1', token: undefined, environments: [] }`)
+- Modify: `scripts/commands/dashboard.mjs` (`--serve` starts it detached and records its pid in `.finess/run/dashboard.json`, the same run-state pattern as `scripts/decision.mjs`)
 - Test: `scripts/test/dashboard.server.test.mjs`
 
 **Interfaces:**
 - `createDashboardServer({host, port, token?, build: () => string, watchDirs: string[]}): {server: http.Server, close(): Promise<void>}`
   - `GET /` → the HTML from `build()` (the static page plus a tiny SSE client that reloads on `update`).
   - `GET /events` → `text/event-stream`, sends `event: update` after each debounced change.
-  - `GET /export` → the same HTML as a download (`content-disposition: attachment; filename=verness-dashboard.html`). That is the static export (T-278).
+  - `GET /export` → the same HTML as a download (`content-disposition: attachment; filename=finess-dashboard.html`). That is the static export (T-278).
   - Auth: when `token` is set, missing or wrong token → `401`. When `host` is not a loopback address
     (`127.0.0.1`, `::1`, `localhost`) and no token is set → **throw before listening** with
     `refusing to bind <host> without dashboard.token`.
@@ -411,7 +411,7 @@ The watcher reuses `debounce` from Task 5. `close()` ends every SSE response, cl
 and awaits `server.close`.
 - [ ] **Step 4: Lifecycle.** `/dashboard --serve` spawns `process.execPath scripts/dashboard-server.mjs`
 detached (`child.unref()`), waits for `GET /` to answer (≤ 3 s), records the pid, and prints the URL
-(with `?token=` when a token is configured). `/dashboard --stop` stops only a server VerNess started.
+(with `?token=` when a token is configured). `/dashboard --stop` stops only a server FiNess started.
 Extend `off` (the launcher verb added in commit 6bc91a6) to stop it too. The harness must run
 with the server down: nothing else may import the server.
 - [ ] **Step 5: Environments (T-276)** as specified. Test `aggregate across two DSH_HOMEs` with two

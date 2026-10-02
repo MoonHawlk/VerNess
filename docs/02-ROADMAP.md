@@ -32,27 +32,27 @@ nothing inside `upstream/` is modified (`git -C upstream/deepseek-harness status
 T-006 resolves which tag we pin.
 
 ## M1 — Load-bearing spike (most important milestone)
-Prove the whole strategy with the least code: one out-of-tree package `@verness/spike` exporting
+Prove the whole strategy with the least code: one out-of-tree package `@finess/spike` exporting
 `name`/`apply`, registering one trivial tool, inserted into a profile patch.
-**Deliverables:** `packages/spike/`, `profiles/verness/cordis.patch.yml`, `docs/RUNBOOK.md`
+**Deliverables:** `packages/spike/`, `profiles/finess/cordis.patch.yml`, `docs/RUNBOOK.md`
 (exact Windows commands: install `dsh`, `DSH_HOME`, profile creation, `--dump-config`, run).
-**Exit:** `dsh --profile verness --dump-config` prints our plugin row; the tool is callable in a
+**Exit:** `dsh --profile finess --dump-config` prints our plugin row; the tool is callable in a
 session; peer-version gate passes without a `compatibility.json` exemption.
 **Risk (highest in the project):** peer-version gate, Windows/pnpm/corepack friction, profile
 install path. If this milestone fails, re-evaluate ADR-0002 before writing any subsystem.
 
-## M2 — Contracts (`@verness/contracts`)
+## M2 — Contracts (`@finess/contracts`)
 Types + schemastery schemas only, zero runtime behavior: `Persona`, `Skill`, `DecisionModel`,
 `DecisionRequest/Result`, `ModelCapabilities`, `Task`, `TaskState`, `Evaluator`, `Artifact`,
 `Evidence`, `Budget`, `Policy`.
 **Exit:** `tsc` clean; schema round-trip unit tests; no dependency on any vendor package.
-**Done 2026-09-26** (`@verness/contracts@0.0.1`): the schemas are hand-written validators returning
+**Done 2026-09-26** (`@finess/contracts@0.0.1`): the schemas are hand-written validators returning
 `Result<T>` with every `Issue` (not schemastery), plus `locate()` for line:column in JSONC. Exit
 verified with `pnpm typecheck` (clean) and `pnpm test` (125/125); `package.json` has no
 `dependencies`. Persona files (`personas/<id>.json`) are validated by the launcher today — see
 `07-COMMAND-LAYER.md`.
 
-## M3 — Decisions (`@verness/decisions`)
+## M3 — Decisions (`@finess/decisions`)
 `ctx.decisions` service + `RuleDecisionProvider` (first) + `LlmDecisionProvider` (wraps `ctx.llm`)
 + `CompositeDecisionModel` (rules → decision model → LLM escalation) + `JevProvider` stub +
 tool `decision.evaluate`.
@@ -60,42 +60,42 @@ tool `decision.evaluate`.
 HMR-safety test (dispose fiber → registry clean); every result carries
 `{decision, confidence, reason_code, provider}`.
 
-## M4 — Personas (`@verness/personas`)
+## M4 — Personas (`@finess/personas`)
 JSON/JSONC loader (the M2 validator and `/persona check` already exist) + registry + `system-prompt/assemble` contribution + tool allow/deny/approval
 enforcement on `tools/pre-execute`. First personas: `data-analyst`, `data-scientist` (the catalog
 already has 16 persona files; M4 makes their tool policy real).
 **Exit:** a denied tool is refused with a persona-attributed reason; `approval: human` triggers
 one `ctx.approval` prompt; switching persona changes the assembled prompt and the tool set.
 
-## M5 — Skills (`@verness/skills`)
+## M5 — Skills (`@finess/skills`)
 `SKILL.md` + `metadata.yaml` format (3-tier progressive disclosure, per `docs/research/capability-sources-digest.md`),
 loader, `ctx.skills.registerProvider` bridge, trigger-based activation, `requires: tools`.
 First skills: `statistics`, `sql`, `evidence`.
 **Exit:** a matching trigger injects only the skill summary (not the body) until viewed; a skill
 whose required tool is denied by the persona is not offered.
 
-## M6 — Routing (`@verness/routing`)
+## M6 — Routing (`@finess/routing`)
 Capability declarations for models, requirement declarations on personas, `ctx.modelRouter`
 resolving `requirements → capabilities → eligible → cost/latency/policy → model`, hooked on
 `agent/request`.
 **Exit:** zero hardcoded `if task == 'coding'`; routing decision is logged with its inputs;
 policy can pin a model and the router obeys.
 
-## M7 — Evaluation & goal loop (`@verness/evaluation`, `@verness/supervisor`)
+## M7 — Evaluation & goal loop (`@finess/evaluation`, `@finess/supervisor`)
 Independent evaluator (fresh-context subagent via `ctx.subagents`, `PASS`/`NEEDS_WORK` contract),
 evidence gate, continuation policy plugin on top of existing `ctx.goals`, then the four modes
 `standard | agent | decision | adaptive`.
 **Exit:** evaluator never shares the generator's context; `max_iterations` and `escalation.after`
 respected; a failed evaluation produces retry with a reason_code, not a silent success.
 
-## M8 — Data plane (`@verness/data`)
+## M8 — Data plane (`@finess/data`)
 `ctx.dataEngines` + adapters (DuckDB first, then Postgres/Polars; Spark/warehouses later) +
 tools `data.inspect|profile|sample|schema|aggregate`, `sql.query|explain|validate`, long scans via
 `ctx.jobs`.
 **Exit:** a 10M-row local dataset is profiled and aggregated with no raw rows entering the prompt;
 engine choice is made by the planner from size/location/cost, not by the agent.
 
-## M9 — Governance (`@verness/governance`)
+## M9 — Governance (`@finess/governance`)
 RBAC/ABAC hooks, token/cost/time budgets, audit trail as session events, PII policy,
 model/tool policy, `ctx.invariants` registrations.
 **Exit:** exceeding a budget stops the task with `escalated`, not a crash; the audit log alone

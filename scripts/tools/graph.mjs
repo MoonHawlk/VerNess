@@ -16,10 +16,10 @@ const args = parseArgs(process.argv.slice(2))
 helpIf(args, `
 graph [--rebuild]
   nodes/edges/communities, the commit the graph was built from, code files changed since, top hubs.
-  --rebuild runs node scripts/verness.mjs graph (engram update ., code only, no LLM)`)
+  --rebuild runs node scripts/finess.mjs graph (engram update ., code only, no LLM)`)
 
 if (args.rebuild === true) {
-  const r = spawnSync(process.execPath, ['scripts/verness.mjs', 'graph'], { cwd: REPO, encoding: 'utf8', windowsHide: true })
+  const r = spawnSync(process.execPath, ['scripts/finess.mjs', 'graph'], { cwd: REPO, encoding: 'utf8', windowsHide: true })
   const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.split('\n').filter(l => /Rebuilt|updated|error/i.test(l))
   console.log(tail.join('\n') || `rebuild exited ${r.status}`)
 }

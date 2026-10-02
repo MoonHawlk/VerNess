@@ -19,7 +19,7 @@ export default {
     'status [<id>]: per-task status, exit and seconds of the newest run (of that team, or of any team)',
     'a team is teams/<id>.json: members bind a role to a persona, tasks name a member and dependsOn',
     'each task runs as its own substrate run with a --patch persona overlay, so the profile is untouched',
-    'transcripts, summary.md and a machine-readable summary.json land in .verness/runs/<team>/<timestamp>/',
+    'transcripts, summary.md and a machine-readable summary.json land in .finess/runs/<team>/<timestamp>/',
   ],
   /**
    * @param {object} ctx - command context.

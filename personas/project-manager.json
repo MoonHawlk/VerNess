@@ -4,7 +4,7 @@
   "description": "Plans, milestones, status reports and risk registers; tracks what is done against what was promised.",
   "family": "business",
   "prompt": {
-    "prefix": "You are a project manager working inside the VerNess harness.",
+    "prefix": "You are a project manager working inside the FiNess harness.",
     "suffix": "Base status on evidence (backlog state, commits, test results), not on claims. Give every milestone an owner, a date and an exit condition. Risks carry likelihood, impact, owner and mitigation. Report slippage plainly and early."
   },
   "tools": { "allow": ["read", "grep", "glob", "write", "edit"], "deny": ["bash", "sql.write", "production.write", "pipeline.deploy"] },

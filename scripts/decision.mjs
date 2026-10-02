@@ -30,7 +30,7 @@ const KEY_FILE = join(RUN_DIR, 'laya.key')
  * @returns {{py: string, serve: string}} paths to the venv interpreter and the server entry point.
  */
 function venvPaths(dc) {
-  const base = resolve(REPO, dc.venv ?? '.verness/py')
+  const base = resolve(REPO, dc.venv ?? '.finess/py')
   return WIN
     ? { py: join(base, 'Scripts', 'python.exe'), serve: join(base, 'Scripts', 'laya-serve.exe'), pip: join(base, 'Scripts', 'pip.exe') }
     : { py: join(base, 'bin', 'python'), serve: join(base, 'bin', 'laya-serve'), pip: join(base, 'bin', 'pip') }
@@ -57,9 +57,9 @@ function ensureKey() {
 function install(dc) {
   const { py, serve, pip } = venvPaths(dc)
   if (existsSync(serve)) return true
-  const base = resolve(REPO, dc.venv ?? '.verness/py')
+  const base = resolve(REPO, dc.venv ?? '.finess/py')
   if (!existsSync(py)) {
-    step(`creating the virtual environment at ${dc.venv ?? '.verness/py'}`)
+    step(`creating the virtual environment at ${dc.venv ?? '.finess/py'}`)
     const r = spawnSync(WIN ? 'python' : 'python3', ['-m', 'venv', base], { stdio: 'inherit', shell: WIN })
     if (r.status !== 0) { warn('could not create the virtual environment (is Python 3.10+ installed?)'); return false }
   }
@@ -71,7 +71,7 @@ function install(dc) {
 
 /**
  * Bring the decision sidecar up: install if missing, start on loopback with a key, wait for health.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {Promise<boolean>} whether the service is ready.
  */
 export async function decisionUp(cfg) {
@@ -110,7 +110,7 @@ export async function decisionUp(cfg) {
 
 /**
  * Report what the decision service is doing and how fast.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @returns {Promise<boolean>} whether the service answered.
  */
 export async function decisionStats(cfg) {
@@ -127,7 +127,7 @@ export async function decisionStats(cfg) {
   info(`${dc.baseURL}  status ${health.status}  device ${health.device ?? 'unknown'}`)
   info(`checkpoints loaded: ${(health.loaded ?? []).join(', ') || 'none reported'}`)
   const run = readRun()
-  info(run === undefined ? 'run state: none recorded (not started by VerNess)' : `run state: pid ${run.pid}, started by ${run.startedByUs ? 'VerNess' : 'someone else'} at ${run.at}`)
+  info(run === undefined ? 'run state: none recorded (not started by FiNess)' : `run state: pid ${run.pid}, started by ${run.startedByUs ? 'FiNess' : 'someone else'} at ${run.at}`)
 
   head('latency (all three routing questions in one call)')
   const samples = []
@@ -153,9 +153,9 @@ export async function decisionStats(cfg) {
 }
 
 /**
- * Stop the sidecar we started and free its memory. A service VerNess merely adopted is left alone
+ * Stop the sidecar we started and free its memory. A service FiNess merely adopted is left alone
  * unless forced — the same rule the model engine follows.
- * @param {object} cfg - the VerNess configuration.
+ * @param {object} cfg - the FiNess configuration.
  * @param {{force?: boolean}} [opts] - `force` stops a service we did not start.
  * @returns {Promise<boolean>} whether the shutdown path completed.
  */
@@ -169,7 +169,7 @@ export async function decisionDown(cfg, opts = {}) {
   const run = readRun()
   const mine = run?.startedByUs === true && typeof run.pid === 'number'
   if (!mine && opts.force !== true) {
-    info('service left running: VerNess did not start it (use /decision down --force to stop it anyway)')
+    info('service left running: FiNess did not start it (use /decision down --force to stop it anyway)')
     return true
   }
   step(`stopping the sidecar${run?.pid === undefined ? '' : ` (pid ${run.pid})`}`)
@@ -188,7 +188,7 @@ export async function decisionDown(cfg, opts = {}) {
 
 // Standalone CLI: `node scripts/decision.mjs up|stats|down [--force]`.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const { loadConfigForCli } = await import('./verness.mjs')
+  const { loadConfigForCli } = await import('./finess.mjs')
   const cfg = loadConfigForCli()
   const cmd = process.argv[2]
   const force = process.argv.includes('--force')

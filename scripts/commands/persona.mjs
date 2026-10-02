@@ -1,5 +1,5 @@
 /**
- * `/persona` — inspect and switch the active persona. Switching writes `.verness/state.json` and
+ * `/persona` — inspect and switch the active persona. Switching writes `.finess/state.json` and
  * regenerates the profile patch, so the next task runs as that persona; the config file the user is
  * editing is never rewritten behind their back.
  * @module scripts/commands/persona

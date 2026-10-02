@@ -10,7 +10,7 @@ import { doneIndex, groupCommits, nextVersion, parseSubject, renderEntry, setupT
 const DONE = [
   '## Round',
   '- [x] T-148 `/exit` (alias `/quit`): ends the REPL like an empty line; `web: false`',
-  '- [x] T-374..T-378 Web commands bridge (ADR-0011): `@verness/commands` registers every quick-tool',
+  '- [x] T-374..T-378 Web commands bridge (ADR-0011): `@finess/commands` registers every quick-tool',
   '- [x] T-387 Validator edges: `__proto__` keys reported',
   '- [x] T-388 The inline persona removed from the config. Verified by tests',
   '- [x] T-135 Registry conformance test',
@@ -60,7 +60,7 @@ test('groupCommits: one bullet per done line, strongest type wins, the rest go t
 })
 
 test('setupTriggers ignores the root package.json; nextVersion follows the pre-1.0 rule', () => {
-  assert.deepEqual(setupTriggers(['package.json', 'packages/commands/package.json', 'verness.config.json', 'docs/x.md']), ['packages/commands/package.json', 'verness.config.json'])
+  assert.deepEqual(setupTriggers(['package.json', 'packages/commands/package.json', 'finess.config.json', 'docs/x.md']), ['packages/commands/package.json', 'finess.config.json'])
   assert.equal(nextVersion('v0.4.0', true), 'v0.5.0')
   assert.equal(nextVersion('v0.4.0', false), 'v0.4.1')
 })

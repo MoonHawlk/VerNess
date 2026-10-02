@@ -14,7 +14,7 @@ and retrieves nodes with tools, and the operator does the same with `/think`.
   `stateVersion`, which folds to empty on `task/start`;
 - `ctx.thoughts` service: `add`, `link`, `search`, `open`, `promote`, `forget`, `demote`;
 - tools `think_add`, `think_search`, `think_open`;
-- the persistent tier in `ctx.storage` under key `verness/thoughts/<project-hash>`, byte-capped;
+- the persistent tier in `ctx.storage` under key `finess/thoughts/<project-hash>`, byte-capped;
 - a `system-prompt/assemble` contribution that injects **only** persistent `constraint` nodes, frozen
   at session start;
 - a compaction contribution that renders the current task's `finding`/`decision` nodes.
@@ -22,7 +22,7 @@ and retrieves nodes with tools, and the operator does the same with `/think`.
 The launcher's `/think` command talks to the plugin through a one-shot tool call, or reads the
 projection from the session log for read-only subcommands, so no second store exists.
 
-**Tech stack:** TypeScript plugin (WS-G pipeline), `@verness/contracts` (add a `ThoughtNode`
+**Tech stack:** TypeScript plugin (WS-G pipeline), `@finess/contracts` (add a `ThoughtNode`
 contract and validator), `node:test`, the boot harness.
 
 **Spec:** `docs/10-THOUGHT-GRAPH.md` (node shape, scopes, three prompt tiers, the poisoning guard),
@@ -141,7 +141,7 @@ export function validateThoughtNode(v: unknown): Result<ThoughtNode>
 
 ### Task 5: What reaches the prompt (T-285, T-286)
 
-- [ ] `inject.ts`: a `system-prompt/assemble` section `verness-constraints` built **once per session**
+- [ ] `inject.ts`: a `system-prompt/assemble` section `finess-constraints` built **once per session**
   (cache it by session id at the first assemble, then return the cached text on every later call), from
   persistent `constraint` nodes, newest first, cut at 1.5 KiB with `(+N more; think_search to see them)`.
 - [ ] `compaction.ts`: a pure `renderDigest(nodes, {maxBytes: 2048})` for the current task's

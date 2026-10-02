@@ -1,9 +1,9 @@
 ---
-name: verness-tools
-description: Use in the VerNess repo before grepping, reading files one by one, or chaining git/test commands - to locate code or docs, check the backlog or a task ID, see branch state, run tests, audit docs, list quick-tools, check the Engram graph, or inspect the dsh profiles. Lists the repo's read-only tool scripts and when to use each.
+name: finess-tools
+description: Use in the FiNess repo before grepping, reading files one by one, or chaining git/test commands - to locate code or docs, check the backlog or a task ID, see branch state, run tests, audit docs, list quick-tools, check the Engram graph, or inspect the dsh profiles. Lists the repo's read-only tool scripts and when to use each.
 ---
 
-# VerNess tools
+# FiNess tools
 
 ## Overview
 
@@ -38,7 +38,7 @@ Run from the repo root: `node scripts/tools/<tool>.mjs [args]`. Every tool takes
 - **After changing code:** `graph.mjs --rebuild`, so the next `where.mjs` sees it.
 - **After changing docs:** `docs.mjs --problems`.
 - **A panel, plugin or bundle is missing, or setup warned:** `profiles.mjs`, then fix it in
-  `verness.config.json` and re-run setup. Never hand-edit `~/.dsh/profiles` (it must work the same on macOS and Windows).
+  `finess.config.json` and re-run setup. Never hand-edit `~/.dsh/profiles` (it must work the same on macOS and Windows).
 
 ## Adding a tool
 

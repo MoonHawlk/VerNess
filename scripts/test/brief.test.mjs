@@ -1,6 +1,6 @@
 /**
  * The `#` project brief (T-147): `classifyLine` routes `#<note>` to the brief without disturbing the
- * `/` and `//` prefixes, `##` escapes it, and `.verness/brief.md` appends lines under a cap.
+ * `/` and `//` prefixes, `##` escapes it, and `.finess/brief.md` appends lines under a cap.
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import { classifyLine } from '../lib/commands.mjs'
 import { appendBrief, briefFile, composeTask, readBrief } from '../lib/notes.mjs'
 
-const tmp = () => mkdtempSync(join(tmpdir(), 'verness-brief-'))
+const tmp = () => mkdtempSync(join(tmpdir(), 'finess-brief-'))
 
 test('classifyLine: # is the brief, ## escapes it, / and // are untouched', () => {
   assert.deepEqual(classifyLine('#amounts are in EUR'), { kind: 'brief', text: 'amounts are in EUR' })

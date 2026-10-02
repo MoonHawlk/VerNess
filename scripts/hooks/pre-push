@@ -1,5 +1,5 @@
 #!/bin/sh
-# VerNess pre-push hook (opt-in: git config core.hooksPath scripts/hooks).
+# FiNess pre-push hook (opt-in: git config core.hooksPath scripts/hooks).
 # All logic lives in Node (scripts/check-clean-clone.mjs); this shim only forwards the pushed refs
 # on stdin. Git runs hooks from the repo's top level, on macOS and in Git for Windows' sh alike.
 exec node scripts/check-clean-clone.mjs --hook

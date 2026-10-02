@@ -1,6 +1,6 @@
-# @verness/contracts
+# @finess/contracts
 
-VerNess's shared vocabulary: TypeScript types and dependency-free validators for the shapes
+FiNess's shared vocabulary: TypeScript types and dependency-free validators for the shapes
 that flow between packages (config, tool manifests, profile data, and so on).
 
 This package has **no runtime behaviour** of its own: no I/O, no side effects, no logic beyond

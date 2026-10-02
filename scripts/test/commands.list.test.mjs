@@ -1,5 +1,5 @@
 /**
- * `verness.mjs --list-commands` (web commands bridge, ADR-0011): valid JSON on stdout, every command
+ * `finess.mjs --list-commands` (web commands bridge, ADR-0011): valid JSON on stdout, every command
  * once with its aliases folded in, and the terminal-only commands marked `web: false`. Runs the real
  * launcher, which reads only the repo (no dsh, no tokens); `DSH_HOME` points at an empty temp dir.
  */
@@ -12,14 +12,14 @@ import { join } from 'node:path'
 
 import { commandList } from '../lib/commands.mjs'
 import { REPO } from '../lib/util.mjs'
-import { pluginOnSurface } from '../verness.mjs'
+import { pluginOnSurface } from '../finess.mjs'
 
 /** Run the launcher with an isolated `DSH_HOME`. @param {string[]} args - launcher arguments. */
 function launcher(args) {
-  const home = mkdtempSync(join(tmpdir(), 'verness-list-'))
+  const home = mkdtempSync(join(tmpdir(), 'finess-list-'))
   try {
-    return spawnSync(process.execPath, [join(REPO, 'scripts', 'verness.mjs'), ...args], {
-      cwd: REPO, encoding: 'utf8', windowsHide: true, env: { ...process.env, DSH_HOME: home, NO_COLOR: '1', VERNESS_NO_PET: '1' },
+    return spawnSync(process.execPath, [join(REPO, 'scripts', 'finess.mjs'), ...args], {
+      cwd: REPO, encoding: 'utf8', windowsHide: true, env: { ...process.env, DSH_HOME: home, NO_COLOR: '1', FINESS_NO_PET: '1' },
     })
   } finally { rmSync(home, { recursive: true, force: true }) }
 }

@@ -36,7 +36,7 @@ const reply = (time, usage) => ({ type: 'assistant/message', time, data: usage =
 
 before(() => {
   savedHome = process.env.DSH_HOME
-  home = mkdtempSync(join(tmpdir(), 'verness-usage-day-'))
+  home = mkdtempSync(join(tmpdir(), 'finess-usage-day-'))
   process.env.DSH_HOME = home
   // Session A spans local midnight: two calls on 30 Sep, one on 1 Oct, then a route switch.
   writeSession('a', [

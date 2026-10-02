@@ -30,7 +30,7 @@ TUI
 Launcher lifecycle
 - [ ] T-123 `stats --watch` for continuous telemetry, and record probe results over time for regression tracking
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (only Windows has been measured)
-- [ ] T-436 Live REPL check of `/btw` and `#` from the main checkout (only unit-tested so far): pipe the lines `/btw use metric units`, `/btw`, `# amounts in EUR`, `#` into `node scripts/verness.mjs`, then send one real task and confirm both blocks reach the model
+- [ ] T-436 Live REPL check of `/btw` and `#` from the main checkout (only unit-tested so far): pipe the lines `/btw use metric units`, `/btw`, `# amounts in EUR`, `#` into `node scripts/finess.mjs`, then send one real task and confirm both blocks reach the model
 - [ ] T-437 Exercise the `pre-push` hook through a real `git push` with `core.hooksPath scripts/hooks`, on Windows (Git for Windows `sh`) and macOS
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
@@ -62,7 +62,7 @@ Launcher lifecycle
 Autonomous task loop
 - [ ] T-327 Per-round wall-clock budget (`--round-timeout <s>`, default 600); a timed-out round is classified `timeout` and stops the loop
 - [ ] T-325 Port `packages/guard/repeat-tool-reminder` behaviour from the substrate in place of our identical-call check, escalated to a hard block
-- [ ] T-328 Surface loop runs in `/dashboard` (already recorded in `.verness/loops/*.jsonl`)
+- [ ] T-328 Surface loop runs in `/dashboard` (already recorded in `.finess/loops/*.jsonl`)
 - [ ] T-326 Let the decision model give the round verdict (continue/retry/complete/escalate) once T-223 clears; shadow it until then
 
 Static dashboard
@@ -72,7 +72,7 @@ Static dashboard
 
 Standalone dashboard service (deferred by request; do after T-271..T-273)
 - [ ] T-279 Decide the read path (in-process `lib/sessions.mjs` vs `@deepseek-ai/dsh-session-query`). Measure first
-- [ ] T-274 Own process `verness-dashboard`, independent of any REPL; the harness works with it down
+- [ ] T-274 Own process `finess-dashboard`, independent of any REPL; the harness works with it down
 - [ ] T-275 HTTP on loopback by default; a generated token is required before any non-loopback bind
 - [ ] T-276 Multi-environment: several `DSH_HOME`s / workspaces from config, environment as a column and filter
 - [ ] T-277 Live updates: watch the logs and push via SSE
@@ -212,21 +212,21 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 
 ## Launcher & branch integration
 - [ ] T-372 Boot the REPL and the web UI from the merged `epic` tree, then run `off` against a real running web UI; also exercise `off` through the Windows PowerShell wrapper. A second checkout must not be booted until T-336 is fixed
-- [ ] T-381 Model-less start: `verness --no-model` (alias `--no-start`) enters the REPL without booting a model/substrate — settings, /persona, /config, /help and other Tier L commands only; model-requiring commands and free-text tasks print a hint to restart without the flag. Default start unchanged (with model)
+- [ ] T-381 Model-less start: `finess --no-model` (alias `--no-start`) enters the REPL without booting a model/substrate — settings, /persona, /config, /help and other Tier L commands only; model-requiring commands and free-text tasks print a hint to restart without the flag. Default start unchanged (with model)
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
 Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
 Goal: the launcher's quick-tools appear in the web UI's `/` menu (via dsh-commands) and run through
-`node scripts/verness.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
+`node scripts/finess.mjs <name>`. Per-persona `tools.allow`/`deny` stay unenforced (M4, T-116) and are out of scope.
 
-## Web UI branding: VerNess logo and titles in the browser UI
+## Web UI branding: FiNess logo and titles in the browser UI
 Checked 2026-09-26 against `@deepseek-ai/dsh-*@0.1.7-rc.2`. The sidebar mark and name and the
 conversation-hero mark are **slots** that `dsh-client-ui-brand-official` occupies; its README says a
 deployment with another identity "leaves this package out and composes another package that
 occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
-- [ ] T-398 `@verness/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the VerNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `verness.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `verness-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the VerNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
-- [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a VerNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the VerNess skin on a fresh profile, on macOS and Windows; the owner approves the look
+- [ ] T-398 `@finess/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the FiNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `finess.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `finess-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the FiNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
+- [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a FiNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the FiNess skin on a fresh profile, on macOS and Windows; the owner approves the look
 
 ## Launcher follow-ups from the web bridge (ADR-0011)
 - [ ] T-432 `setup` does not pick up an edited local plugin file: pnpm reuses its copy of a same-version `file:` package, so a changed `packages/commands` or `packages/spike` stays stale until a fresh `DSH_HOME`. Reinstall `path` plugins when their files changed (content hash in the profile), and fix the "edits are live" line in `06-SETUP-AND-LAUNCHER.md`
@@ -235,5 +235,5 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
-- CLI `verness run --persona X --mode adaptive "..."` (today: `dsh` + profile) (see T-380)
+- CLI `finess run --persona X --mode adaptive "..."` (today: `dsh` + profile) (see T-380)
 - Real Jev API credentials; CI (GitHub Actions) now that M2 has landed (`pnpm test`, `pnpm typecheck`)

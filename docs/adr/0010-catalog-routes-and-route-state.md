@@ -11,11 +11,11 @@ and the variable each key is read from — and serves a catalog route from nothi
 
 ## Decision
 1. **Hosted models are catalog routes.** `/api use <provider> <model>` records the provider id and
-   its key variable; the generated patch declares only `apiKeyEnv` for it. VerNess names no vendor:
+   its key variable; the generated patch declares only `apiKeyEnv` for it. FiNess names no vendor:
    providers, models and key variables are read from the adapter installed in the profile
    (`providers/data/*.json`, `env-api-keys.js`), which also keeps ADR-0003 intact.
 2. **The route choice is state, not config.** Route, model and access mode live in
-   `.verness/state.json`, exactly like the persona (ADR-0008). The commented config stays
+   `.finess/state.json`, exactly like the persona (ADR-0008). The commented config stays
    operator-owned.
 3. **One resolver.** `scripts/lib/routes.mjs#effectiveRoute` is the only place that decides route and
    model; a model choice is bound to the route it was made for.

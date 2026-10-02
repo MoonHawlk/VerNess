@@ -9,7 +9,7 @@ The quick-tools you use in the CLI REPL (`/cost`, `/usage`, `/persona`, `/api`, 
 typed in the web UI's message bar, with the same behaviour and output, without a second
 implementation of any command.
 
-Success: in `./turn_on.sh web`, typing `/` lists the VerNess commands beside the substrate's own;
+Success: in `./turn_on.sh web`, typing `/` lists the FiNess commands beside the substrate's own;
 running `/cost` shows the same text as `/cost` in the REPL; `/model`, `/help` and the other
 substrate commands keep working exactly as before.
 
@@ -21,20 +21,20 @@ substrate commands keep working exactly as before.
 - Interactive commands (prompting for more input) and a rich UI (popups) for any command.
 
 ## Approach
-A new local plugin `@verness/commands` (plain ESM, like `packages/spike`) mounted in the web
+A new local plugin `@finess/commands` (plain ESM, like `packages/spike`) mounted in the web
 profile. It does not load command modules itself: it runs the launcher, so every command keeps its
 one implementation and the launcher-built context (`cfg`, `sync`, `builtins`, …) it expects.
 
 ```
 browser  "/cost --week"
-   │  dsh-commands (host)             @verness/commands                 launcher
-   └───────────────▶ handler(invocation) ──spawn──▶ node scripts/verness.mjs cost --week
+   │  dsh-commands (host)             @finess/commands                 launcher
+   └───────────────▶ handler(invocation) ──spawn──▶ node scripts/finess.mjs cost --week
                                    ◀── stdout+stderr, exit code ───┘
                      { kind: 'success' | 'error', text }
 ```
 
 ### 1. Launcher: machine-readable command list
-`node scripts/verness.mjs --list-commands` prints JSON, one entry per command (aliases folded in):
+`node scripts/finess.mjs --list-commands` prints JSON, one entry per command (aliases folded in):
 
 ```json
 [{ "name": "cost", "summary": "…", "usage": "/cost [--week]", "aliases": [], "web": true }]
@@ -59,13 +59,13 @@ terminal. It is set on:
 - Registration waits for cordis `ready`, so every substrate command plugin has registered first.
   Each `web: true` command (and each alias) is registered with `ctx.commands.register`; a name that
   throws "already registered" is skipped and logged once, e.g.
-  `verness-commands: /model left to the substrate`.
-- Each registration: `definitionId` `@verness/commands:<name>`, `description` = summary,
+  `finess-commands: /model left to the substrate`.
+- Each registration: `definitionId` `@finess/commands:<name>`, `description` = summary,
   `input.hint` = the usage line after the name, `recordInput: true`.
 
 ### 3. Handler
-- `spawn(process.execPath, [repo/scripts/verness.mjs, name, ...words(rawInput)], { cwd: repo,
-  stdin: 'ignore', env: { ...process.env, NO_COLOR: '1', VERNESS_NO_PET: '1' } })`.
+- `spawn(process.execPath, [repo/scripts/finess.mjs, name, ...words(rawInput)], { cwd: repo,
+  stdin: 'ignore', env: { ...process.env, NO_COLOR: '1', FINESS_NO_PET: '1' } })`.
   No shell; words split on whitespace with simple quote handling (same rule the REPL uses).
 - `invocation.signal` aborts the child (SIGTERM). No fixed timeout: `/team` and `/loop-task` are
   long by design and the UI owns cancellation.
@@ -75,8 +75,8 @@ terminal. It is set on:
   running web session.
 
 ### 4. Wiring
-- `verness.config.json` `settings.plugins` gains
-  `{ "id": "verness-commands", "package": "@verness/commands", "path": "packages/commands",
+- `finess.config.json` `settings.plugins` gains
+  `{ "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands",
   "enabled": true }`. `writePatch` adds `config.repo` to this row. `ensureProfile` already installs
   `path` plugins into both profiles; nothing else in the launcher changes.
 - The plugin declares `inject = ['commands']`. The headless profile mounts no command service

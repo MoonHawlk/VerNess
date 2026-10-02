@@ -25,15 +25,15 @@ distinct classes, and conflating them is how such a surface rots:
   so in its summary.
 - **Personas become files** under `personas/<id>.yaml` — identity, prompt, model requirements, tool
   policy, skills, evaluators, and commands the persona adds — superseding the inline block in
-  `verness.config.json`. Class 3 above is implemented once, as a persona, not as N commands.
+  `finess.config.json`. Class 3 above is implemented once, as a persona, not as N commands.
 - **Teams** are `teams/<id>.yaml`: member personas, an ordered task list, and a failure policy. v1 is
   a sequential launcher loop, explicitly labelled as such, to be re-based on `ctx.subagents` and
   `ctx.jobs` (T-172).
   *Amended 2026-09-26 (T-144):* the launcher loop now runs independent tasks concurrently when asked
   (`--parallel N` or a team's `concurrency`); the default is still 1, i.e. sequential. The re-base on
   `ctx.subagents`/`ctx.jobs` is unchanged.
-- **Mutable state leaves the config file**: commands write `verness.state.json`; the commented
-  `verness.config.json` stays operator-owned so hand-written comments are never destroyed (T-131).
+- **Mutable state leaves the config file**: commands write `finess.state.json`; the commented
+  `finess.config.json` stays operator-owned so hand-written comments are never destroyed (T-131).
 
 ## Why not implement commands as a dsh plugin
 The substrate's own slash commands live in the web surface (`dsh-session-log-export` ships `/export`).
@@ -56,7 +56,7 @@ needed, not by convenience.
 
 ## Amendment (2026-09-26, M2)
 - Personas shipped as **JSON/JSONC** files, `personas/<id>.json`, not YAML. The shape is `PersonaFile`
-  in `@verness/contracts`; every file is validated at load by `validatePersonaFile`, and
+  in `@finess/contracts`; every file is validated at load by `validatePersonaFile`, and
   `/persona check` reports issues as `personas/x.json:L:C path: message`.
 - A persona's `commands` load `personas/<id>/commands/<name>.mjs` after the global commands; globals
   win and a collision warns, naming the owner.

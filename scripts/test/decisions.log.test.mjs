@@ -55,14 +55,14 @@ test('askDecision refuses a question with more than 8 options before any request
   const questions = { level: ROUTING_QUESTIONS.level, persona: { type: 'choice', instructions: 'Who owns this?', criteria } }
   assert.match(questionErrors(questions), /^persona\.criteria: 9 options exceeds the limit of 8/)
   // Port 9 (discard) on loopback: if validation did not short-circuit, this would be a fetch error instead.
-  const r = await askDecision({ baseURL: 'http://127.0.0.1:9', timeoutMs: 1000, apiKeyEnv: 'VERNESS_TEST_NO_KEY' }, 'x', questions, { retries: 0 })
+  const r = await askDecision({ baseURL: 'http://127.0.0.1:9', timeoutMs: 1000, apiKeyEnv: 'FINESS_TEST_NO_KEY' }, 'x', questions, { retries: 0 })
   assert.equal(r.ok, false)
   assert.equal(r.ms, 0)
   assert.match(r.error, /^invalid question: persona\.criteria: 9 options exceeds the limit of 8/)
 })
 
 test('logShadowDecision writes a v2 record with a 12-hex id', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verness-decisions-'))
+  const dir = mkdtempSync(join(tmpdir(), 'finess-decisions-'))
   try {
     const id = logShadowDecision({ source: 'test', task: 't' }, dir)
     assert.match(id, /^[0-9a-f]{12}$/)

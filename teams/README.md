@@ -29,7 +29,7 @@ tasks can wear different personas without interfering.
   active persona.
 - `dependsOn` both orders the work and feeds the upstream task's output into the dependent task's
   prompt, under a delimited "context from upstream tasks" block (last 4000 characters).
-- Transcripts and a summary table land in `.verness/runs/<team>/<timestamp>/` — gitignored.
+- Transcripts and a summary table land in `.finess/runs/<team>/<timestamp>/` — gitignored.
 
 ## Before you trust a fan-out
 
