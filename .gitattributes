@@ -1,0 +1,2 @@
+# Hooks run under sh: a CRLF checkout would break the shebang on Windows.
+scripts/hooks/* text eol=lf
