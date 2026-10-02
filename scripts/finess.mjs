@@ -25,6 +25,7 @@ import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, 
 import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
+import { notifyDone } from './lib/notify.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
@@ -52,6 +53,7 @@ const DEFAULTS = {
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness', animate: true },
   notes: { maxChars: 2000, briefMaxChars: 4000 },
+  notify: { afterSeconds: 30, desktop: false },
 }
 
 const C = {
@@ -1126,7 +1128,9 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The brief opens every new session in full; a continuing one gets only the lines added since.
     const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)) })
+    const t0 = Date.now()
     const run = dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
+    notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0 }
     if (before !== undefined) {

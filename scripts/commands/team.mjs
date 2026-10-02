@@ -6,6 +6,7 @@
  */
 
 import { loadPersonas } from '../lib/personas.mjs'
+import { withNotify } from '../lib/notify.mjs'
 import { latestRun, loadTeams, readRun, runTeam, statusRows, validateTeam } from '../lib/teams.mjs'
 import { head, info, table, warn } from '../lib/util.mjs'
 
@@ -82,11 +83,11 @@ export default {
     if (sub === 'run') {
       const pAt = args.indexOf('--parallel')
       const oAt = args.indexOf('--only')
-      const { results, skipped } = await runTeam(team, ctx, {
+      const { results, skipped } = await withNotify(ctx.cfg, `team ${team.id ?? ''}`, () => runTeam(team, ctx, {
         concurrency: pAt >= 0 ? Number(args[pAt + 1]) : undefined,
         only: oAt >= 0 ? String(args[oAt + 1] ?? '').split(',').filter(s => s !== '') : undefined,
         dryRun: args.includes('--dry-run'),
-      })
+      }), r => r.results.every(x => x.code === 0) && r.skipped.length === 0)
       return results.some(r => r.code !== 0) || skipped.length > 0 ? 1 : 0
     }
 

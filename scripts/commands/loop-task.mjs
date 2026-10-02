@@ -4,6 +4,7 @@
  */
 
 import { runLoopTask } from '../loop-task.mjs'
+import { withNotify } from '../lib/notify.mjs'
 import { info, warn } from '../lib/util.mjs'
 
 export default {
@@ -38,12 +39,12 @@ export default {
     if (at >= 0 && (!Number.isFinite(rounds) || rounds < 1)) { warn('--rounds needs a positive number'); return 1 }
     if (tt >= 0 && (!Number.isFinite(roundTimeout) || roundTimeout < 1)) { warn('--round-timeout needs a positive number of seconds'); return 1 }
 
-    const res = await runLoopTask(ctx, objective, {
+    const res = await withNotify(ctx.cfg, objective, () => runLoopTask(ctx, objective, {
       maxRounds: rounds,
       roundTimeout,
       verify: !args.includes('--no-verify'),
       fresh: !args.includes('--here'),
-    })
+    }), r => r.outcome === 'done')
     info(`recorded in .finess/loops/ — ${res.rounds} round(s), outcome ${res.outcome}`)
     return res.outcome === 'done' ? 0 : 1
   },

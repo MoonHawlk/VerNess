@@ -135,6 +135,15 @@
     "name": "Ness",
   },
 
+  // ------------------------------------------------------------------- notify
+  // When a REPL task, /loop-task or /team run takes longer than afterSeconds, ring the
+  // terminal bell and retitle the window "done/failed: ...". desktop: true also raises a
+  // native notification (Windows toast, macOS osascript, Linux notify-send). TTY only, never in CI.
+  "notify": {
+    "afterSeconds": 30,
+    "desktop": false,
+  },
+
   // ----------------------------------------------------------------- settings
   "settings": {
     // Tool presentation: native (default) | ptc | both.
