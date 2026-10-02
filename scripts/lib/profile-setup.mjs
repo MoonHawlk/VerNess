@@ -96,6 +96,17 @@ export function enableBundle(dir, name) {
 }
 
 /**
+ * The package name of a bundle spec: `@scope/pkg@0.4.3` → `@scope/pkg`. A spec may pin a version
+ * (passed as-is to `dsh plugin add`), but the profile manifest lists bundles by bare name.
+ * @param {string} spec - `name` or `name@version`.
+ * @returns {string} the package name.
+ */
+export function bundleName(spec) {
+  const at = spec.indexOf('@', 1)
+  return at === -1 ? spec : spec.slice(0, at)
+}
+
+/**
  * The bundles a profile composes (`package.json` → `dsh.profile.bundles`).
  * @param {string} dir - the profile directory.
  * @returns {string[]} the bundle package names.

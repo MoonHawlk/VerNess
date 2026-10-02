@@ -145,7 +145,9 @@
     // applies (a plain plugin row would skip it and also land in the headless profile).
     // dsh-web-all: task board, Git graph, pet, usage, session archive, skins, plugin manager, ...
     // It also brings remote-web-ui, ssh (off by default), update and a community-plugin market.
-    "webBundles": ["@linxin666/dsh-web-all"],
+    // Pinned to 0.4.3: 0.4.4 needs dsh >=0.2.0-rc.1 and the pinned substrate is 0.1.7-rc.2, so dsh
+    // refuses it. Lift the pin when the submodule moves to dsh 0.2.
+    "webBundles": ["@linxin666/dsh-web-all@0.4.3"],
     // pnpm 11 stops an install while any dependency's install script is undecided. Decide each one
     // here; false = never run it. These five come with dsh-web-all: cloudflared would download a
     // tunnel binary (remote access), ssh2/cpu-features compile native extras. Not needed locally.

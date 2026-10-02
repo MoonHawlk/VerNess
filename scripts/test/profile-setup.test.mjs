@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { applyAllowBuilds, enableBundle, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
+import { applyAllowBuilds, bundleName, enableBundle, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
 
 const PNPM_WROTE = `packages:
   - .
@@ -68,4 +68,11 @@ test('enableBundle appends an installed bundle once, and never enables one that 
     assert.deepEqual(m.dsh.profile.bundles, ['base', 'web'])
     assert.equal(m.dsh.other, 1, 'other dsh keys are kept')
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('bundleName strips a pinned version and keeps the scope', () => {
+  assert.equal(bundleName('@linxin666/dsh-web-all@0.4.3'), '@linxin666/dsh-web-all')
+  assert.equal(bundleName('@linxin666/dsh-web-all'), '@linxin666/dsh-web-all')
+  assert.equal(bundleName('plain@1.2.3'), 'plain')
+  assert.equal(bundleName('plain'), 'plain')
 })

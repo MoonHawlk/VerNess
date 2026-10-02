@@ -25,7 +25,7 @@ import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, 
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
-import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
+import { applyAllowBuilds, bundleName, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
@@ -768,8 +768,9 @@ function ensureProfile(cfg, name, template) {
   // Browser-UI bundles carry their own patch, so they are added as bundles (the way their authors
   // ask), and only to the web profile: the headless REPL has no browser to render them.
   if (template === 'web') {
-    for (const pkg of cfg.settings.webBundles ?? []) {
-      if (!profileBundles(dir).includes(pkg)) dsh(['plugin', '--profile', name, 'add', pkg], { capture: true })
+    for (const spec of cfg.settings.webBundles ?? []) {
+      const pkg = bundleName(spec)
+      if (!profileBundles(dir).includes(pkg)) dsh(['plugin', '--profile', name, 'add', spec], { capture: true })
       // `plugin add` only enables a bundle it newly installs; one already present stays off.
       enableBundle(dir, pkg)
       if (profileBundles(dir).includes(pkg)) ok(`web bundle ${pkg}`)
