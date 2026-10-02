@@ -33,6 +33,7 @@ import { loadRecipes } from './lib/recipes.mjs'
 import { CAPS, MAX_TASK_CHARS, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
+import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -151,7 +152,7 @@ async function printCommandList(cfg) {
  */
 export async function makeCliContext(cfg) {
   const commands = await loadActiveCommands(cfg)
-  const convo = conversation(REPO.replace(/[\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+  const convo = conversation()
   return makeCtx(cfg, commands, convo)
 }
 
@@ -217,7 +218,7 @@ let dshEntry
  * characters, and `%` is expanded. Resolving the shim to its JS file and spawning `process.execPath`
  * with it sidesteps all three, on every platform.
  * @param {string[]} args - arguments for dsh.
- * @param {{env?: Record<string,string>, capture?: boolean, timeoutMs?: number}} [opts] - options; `timeoutMs` kills the run and sets `timedOut`.
+ * @param {{env?: Record<string,string>, capture?: boolean, timeoutMs?: number, cwd?: string}} [opts] - options; `timeoutMs` kills the run and sets `timedOut`; `cwd` (default: this repo) is the agent's working directory.
  * @returns {{code: number, out: string, timedOut?: boolean}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
@@ -225,7 +226,7 @@ function dsh(args, opts = {}) {
   // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
   if (dshEntry === null) return sh('dsh', args, opts)
   const r = spawnSync(process.execPath, [dshEntry, ...args], {
-    cwd: REPO,
+    cwd: opts.cwd ?? REPO,
     env: { ...process.env, ...opts.env },
     stdio: opts.capture === true ? 'pipe' : 'inherit',
     encoding: 'utf8',
@@ -241,7 +242,7 @@ function dsh(args, opts = {}) {
  * `dsh` without blocking the event loop: what lets the team runner's `--parallel` actually overlap
  * runs (T-144). Same entry resolution and the same shim fallback, just awaited.
  * @param {string[]} args - arguments for dsh.
- * @param {{env?: Record<string,string>, capture?: boolean}} [opts] - options.
+ * @param {{env?: Record<string,string>, capture?: boolean, cwd?: string}} [opts] - options.
  * @returns {Promise<{code: number, out: string}>} exit status and captured output.
  */
 function dshAsync(args, opts = {}) {
@@ -533,6 +534,7 @@ function makeArgsSupplier(cfg) {
       models: ['list', 'search', 'add', 'rm', '--use', '--purge', ...models],
       api: ['use', 'models', 'key', 'local', ...catalogProviders(cfg).keys()],
       access: ['read-only', 'workspace', 'full', 'reset'],
+      workspace: ['reset'],
       decision: ['up', 'stats', 'down', '--force'],
       dashboard: ['--no-open', '--limit'],
       usage: ['--all', '--limit'],
@@ -603,18 +605,19 @@ const shortSession = identity => String(identity).replace(/^session-/, '').slice
  * session ("does not exist; omit --session-id to start a new Session"), so the first turn runs
  * without it and we then identify the session it created by diffing the session list. The durable
  * session log stays the single source of truth for context; we only hold its id.
- * @param {string} workspaceKey - the workspace filter for session discovery.
+ * Sessions are looked up under the active workspace's key, read per call: `/workspace` moves it.
  * @returns {{id: () => string|undefined, adopt: (id: string) => void, reset: () => void, capture: (before: Set<string>) => void, snapshot: () => Set<string>}} the handle.
  */
-function conversation(workspaceKey) {
+function conversation() {
   let id = readState().session
+  const key = () => workspaceKey(activeWorkspace().dir)
   return {
     id: () => id,
     adopt: next => { id = next; writeState({ session: next }) },
     reset: () => { id = undefined; writeState({ session: undefined }) },
-    snapshot: () => new Set(listSessions({ workspace: workspaceKey, limit: 60 }).map(x => x.identity)),
+    snapshot: () => new Set(listSessions({ workspace: key(), limit: 60 }).map(x => x.identity)),
     capture: before => {
-      const fresh = listSessions({ workspace: workspaceKey, limit: 60 }).find(x => !before.has(x.identity))
+      const fresh = listSessions({ workspace: key(), limit: 60 }).find(x => !before.has(x.identity))
       if (fresh !== undefined) { id = fresh.identity; writeState({ session: fresh.identity }) }
     },
   }
@@ -636,13 +639,14 @@ function makeCtx(cfg, commands, convo) {
     sh,
     // The team runner sends multi-line prompts, so it gets the shell-free runner; the async one is
     // what lets its --parallel overlap tasks.
-    dsh,
-    dshAsync,
+    // Agent runs (teams, loop-task) start in the active workspace unless a caller picks a cwd.
+    dsh: (a, o = {}) => dsh(a, { cwd: activeWorkspace().dir, ...o }),
+    dshAsync: (a, o = {}) => dshAsync(a, { cwd: activeWorkspace().dir, ...o }),
     sync: () => syncPatch(cfg),
     routeEnv: env,
     activePersonaId: activePersonaId(cfg),
     // Sessions live under a directory named after the workspace path.
-    workspaceKey: REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''),
+    workspaceKey: workspaceKey(activeWorkspace().dir),
     builtins: {
       // `/up` warms the model the next task would use, when that is a local one.
       up: async () => {
@@ -883,6 +887,7 @@ function routeRows(cfg) {
     ['model', e.model ?? '-', smallModelNote(e.model) ?? (e.route?.kind === 'local' ? `${localModels(cfg).length} registered locally` : 'served by the provider')],
     ['api key', key ?? '-', missingKey !== undefined ? 'missing - add it to .env' : (key === undefined || e.route.apiKeyValue !== undefined ? 'not needed' : 'set')],
     ['access', accessMode(), 'sandbox for shell and file tools (/access)'],
+    ['workspace', activeWorkspace().dir, activeWorkspace().isRepo ? 'this repo (/workspace)' : 'another project (/workspace reset goes back)'],
   ]
 }
 
@@ -998,7 +1003,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
   let env = first?.env ?? {}
 
   const args = ['--profile', cfg.profile.name]
-  const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+  const convo = conversation()
 
   if (task.length > 0) {
     // `--continue` (or `-c`) carries the previous conversation into a one-shot run.
@@ -1007,11 +1012,11 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const prior = wants ? convo.id() : undefined
     if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env })
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir })
     if (before !== undefined) convo.capture(before)
     return
   }
-  if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env }); return }
+  if (cfg.profile.template !== 'headless') { step(`booting the ${cfg.profile.template} surface`); dsh(args, { env, cwd: activeWorkspace().dir }); return }
 
   const commands = await loadActiveCommands(cfg)
   const count = new Set([...commands.values()]).size
@@ -1025,6 +1030,9 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
   } else {
     step(`FiNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, boot.model ?? '-')} via ${boot.name} (tools: ${accessMode()})`)
   }
+  const bootWs = activeWorkspace()
+  if (bootWs.missing !== undefined) warn(`the saved workspace ${bootWs.missing} is gone - the agent works in this repo`)
+  if (!bootWs.isRepo) console.log(paint(C.yellow, `  workspace ${bootWs.dir} - tasks run there, not in FiNess (/workspace reset goes back)`))
   console.log(paint(C.dim, `  ${count} quick-tools (tab completes, /help <name> explains):`))
   for (const l of commandBar(commands)) console.log(l)
   info(convo.id() === undefined
@@ -1058,7 +1066,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The prompt carries the live state, so persona, model and conversation are never a guess.
     const id = convo.id()
     const live = effectiveRoute(loadConfig())
-    const status = [activePersonaId(loadConfig()), `${live.model ?? '-'} @ ${live.name}`, id === undefined ? 'new' : shortSession(id)].join(' · ')
+    const ws = activeWorkspace()
+    const status = [activePersonaId(loadConfig()), `${live.model ?? '-'} @ ${live.name}`, ...(ws.isRepo ? [] : [`in ${workspaceLabel(ws)}`]), id === undefined ? 'new' : shortSession(id)].join(' · ')
     const answer = interactive
       ? await readLineWithSuggestions({ prompt: paint(C.cyan, 'finess> '), status: `  ${status}`, suggest, history })
       : await (async () => {
@@ -1106,7 +1115,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
         warn('access is read-only - ! commands are refused (change it: /access workspace)')
         continue
       }
-      const res = runShell(parsed.text, { cwd: REPO, spawnSync })
+      const res = runShell(parsed.text, { cwd: activeWorkspace().dir, spawnSync })
       if (res.out !== '') console.log(res.out)
       if (res.error !== undefined) warn(`could not run the shell: ${res.error}`)
       else if (res.timedOut) warn('stopped after 120 s')
@@ -1175,7 +1184,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The brief opens every new session in full; a continuing one gets only the lines added since.
     const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
     // `@path` and `@https://...` attach a file, a directory listing or a page as text (T-181, T-447).
-    const refs = await expandRefs(taskText, { cwd: REPO, fs: nodeFs, fetch: globalThis.fetch, caps: { total: CAPS.total - attachedChars(shellAttached) } })
+    const refs = await expandRefs(taskText, { cwd: activeWorkspace().dir, fs: nodeFs, fetch: globalThis.fetch, caps: { total: CAPS.total - attachedChars(shellAttached) } })
     for (const n of refs.notes) info(n)
     for (const w of refs.warnings) warn(w)
     for (const m of refs.missing) info(`${m} is not a file here - left as text`)
@@ -1189,7 +1198,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
       continue
     }
     const t0 = Date.now()
-    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
+    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir })
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0; shellAttached.length = 0 }
@@ -1249,6 +1258,8 @@ commands
   --no-model    open the prompt without booting a model (alias --no-start): settings,
                   /persona, /config, /help and other quick-tools; tasks print a hint
   "<task>"      run one task and exit
+  --workspace <dir>   (before anything else) the agent works in <dir> instead of this repo;
+                  kept for later runs, like /workspace <dir>; --workspace reset goes back
   web           open the browser UI: a chat window with a message bar instead of the
                   terminal prompt (same model, persona and plugins; alias: ui)
                   pass-through flags: --port <n>  --no-open  --host <host>
@@ -1278,8 +1289,21 @@ everything is configured in finess.config.json (personas, tips, model, plugins)`
  * @param {string[]} argv - the words after the script name.
  */
 export async function main(argv) {
-  const [first, ...rest] = argv
+  const { argv: words, workspace } = takeWorkspaceFlag(argv)
+  if (workspace !== undefined) applyWorkspaceFlag(workspace)
+  const [first, ...rest] = words
   await dispatch(first, rest, loadConfig())
+}
+
+/**
+ * `--workspace <dir>`: the same as typing `/workspace <dir>` first, so it persists. Exits on a bad dir.
+ * @param {string} input - the directory as given, or `reset`.
+ */
+function applyWorkspaceFlag(input) {
+  const r = input === 'reset' ? { dir: undefined } : resolveWorkspace(input)
+  if ('error' in r) die(`--workspace: ${r.error}`, 'give an existing directory, or --workspace reset')
+  const { changed, ws } = switchWorkspace(r.dir)
+  if (changed) info(ws.isRepo ? 'workspace: back to this repo (new conversation)' : `workspace: ${ws.dir} (new conversation)`)
 }
 
 /** @returns {boolean} whether this file is the process entry, even when reached through a symlink. */
@@ -1307,7 +1331,7 @@ async function dispatch(first, rest, cfg) {
   // `turn_on.cmd "help me fix this"` stays a task while `turn_on.cmd help` is the command.
   const commands = await loadActiveCommands(cfg)
   if (first !== undefined && (first.startsWith('/') || (!first.includes(' ') && commands.has(first.toLowerCase())))) {
-    const convo = conversation(REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, ''))
+    const convo = conversation()
     const { handled, code } = await runCommand([first, ...rest].join(' '), makeCtx(cfg, commands, convo))
     if (handled) { process.exitCode = code; return }
     // A slash word is always meant as a command (the web bridge sends `/name`): an unknown one is

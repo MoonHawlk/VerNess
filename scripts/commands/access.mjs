@@ -18,6 +18,7 @@
 
 import { ACCESS_MODES, accessMode } from '../lib/routes.mjs'
 import { writeState } from '../lib/personas.mjs'
+import { activeWorkspace } from '../lib/workspace.mjs'
 import { head, info, ok, warn } from '../lib/util.mjs'
 
 const MEANING = {
@@ -41,6 +42,7 @@ export default {
     if (want === undefined) {
       const mode = accessMode()
       head(`tools run ${mode}: ${MEANING[mode] ?? 'custom mode'}`)
+      info(`working directory: ${activeWorkspace().dir} (/workspace)`)
       if (process.env.DSH_PERMISSION_MODE !== undefined) info('set by DSH_PERMISSION_MODE in your shell, which wins over /access')
       info('an action beyond the mode is refused (headless has no approval prompt)')
       info('change it: /access read-only | workspace | full --yes')
