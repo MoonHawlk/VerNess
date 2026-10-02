@@ -155,10 +155,10 @@ export function groupByFamily(personas) {
 /**
  * The persona that is currently active: the local state override, else the config's choice.
  * @param {object} cfg - the VerNess configuration.
+ * @param {object} [state] - the launcher state; `.verness/state.json` unless a test passes one.
  * @returns {string} the active persona id.
  */
-export function activePersonaId(cfg) {
-  const state = readState()
+export function activePersonaId(cfg, state = readState()) {
   return state.persona ?? cfg.personas?.active ?? 'generalist'
 }
 
