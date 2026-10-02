@@ -217,3 +217,29 @@ export function classifyRound(text) {
   if (blocked !== null) return { kind: 'blocked', detail: blocked[1].trim() }
   return { kind: 'working', detail: t.slice(0, 200) }
 }
+
+/**
+ * Parse `.finess/loops/*.jsonl` text into run rows for the dashboard. Bad lines are skipped, and
+ * duration is the sum of the per-round seconds the driver recorded.
+ * @param {string} text - JSONL text (any number of day files concatenated).
+ * @returns {{at: string, objective: string, rounds: number, outcome: string, seconds: number, detail: string}[]} runs, newest first.
+ */
+export function parseLoopRuns(text) {
+  const runs = []
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    if (line.trim() === '') continue
+    let r
+    try { r = JSON.parse(line) } catch { continue }
+    if (r === null || typeof r !== 'object' || typeof r.objective !== 'string') continue
+    const log = Array.isArray(r.log) ? r.log : []
+    runs.push({
+      at: String(r.at ?? ''),
+      objective: r.objective,
+      rounds: Number.isFinite(r.rounds) ? r.rounds : log.length,
+      outcome: String(r.outcome ?? '?'),
+      seconds: log.reduce((a, x) => a + (Number.isFinite(x?.seconds) ? x.seconds : 0), 0),
+      detail: String(r.detail ?? ''),
+    })
+  }
+  return runs.sort((a, b) => b.at.localeCompare(a.at))
+}
