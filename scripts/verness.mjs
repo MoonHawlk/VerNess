@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { classifyLine, commandList, loadCommands, runCommand } from './lib/commands.mjs'
 import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
+import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
@@ -998,11 +999,14 @@ async function cmdRun(cfg, task) {
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
   const interactive = process.stdin.isTTY === true
-  const suggest = makeSuggester(commands, makeArgsSupplier(cfg))
+  // Input history persists across runs (read once here, appended per line): Up/Down reach earlier
+  // sessions and plain text suggests recent tasks that start with it (T-303).
+  const histFile = join(REPO, '.verness', 'history.jsonl')
+  const history = loadHistory(histFile)
+  const suggest = makeSuggester(commands, makeArgsSupplier(cfg), () => history)
   const rl = interactive
     ? undefined
     : createInterface({ input: process.stdin, output: process.stdout, completer: makeCompleter(cfg, commands) })
-  const history = []
   for (;;) {
     // The prompt carries the live state, so persona, model and conversation are never a guess.
     const id = convo.id()
@@ -1015,6 +1019,7 @@ async function cmdRun(cfg, task) {
     const line = answer.trim()
     if (line === '') break
     history.push(line)
+    appendHistory(histFile, line)
     // A leading slash is the only command marker in the REPL, so no phrasing of a real request can
     // be swallowed by the registry; `//` escapes it, sending the rest (one slash kept) to the model.
     const parsed = classifyLine(line)

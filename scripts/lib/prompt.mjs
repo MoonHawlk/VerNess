@@ -14,6 +14,8 @@
 
 import { emitKeypressEvents } from 'node:readline'
 
+import { recentTasks } from './history.mjs'
+
 const ESC = '\u001b'
 const DIM = `${ESC}[2m`
 const OFF = `${ESC}[0m`
@@ -247,14 +249,15 @@ export function readLineWithSuggestions(opts) {
 
 /**
  * Build the suggestion function the REPL uses: command names while the first word is being typed,
- * then that command's own arguments.
+ * then that command's own arguments; for plain text (a task), recent tasks that start with it.
  * @param {Map<string, object>} commands - the loaded registry.
  * @param {() => Record<string, string[]>} argsFor - lazily supplies argument candidates per command.
+ * @param {() => string[]} [recent] - supplies the input history, oldest first (T-303).
  * @returns {(buffer: string) => {value: string, hint?: string}[]} the suggester.
  */
-export function makeSuggester(commands, argsFor) {
+export function makeSuggester(commands, argsFor, recent) {
   return buffer => {
-    if (!buffer.startsWith('/')) return []
+    if (!buffer.startsWith('/')) return recent === undefined ? [] : recentTasks(recent(), buffer)
     const parts = buffer.split(/\s+/)
     const unique = [...new Set(commands.values())]
 
