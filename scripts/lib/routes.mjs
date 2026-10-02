@@ -68,9 +68,10 @@ export function applyDotEnv(text, env) {
   for (const raw of text.split(/\r?\n/)) {
     const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(raw)
     if (m === null) continue
-    let value = m[2]
-    if (/^(['"]).*\1$/.test(value)) value = value.slice(1, -1)
-    else value = value.replace(/\s+#.*$/, '')
+    // `(.*)` is greedy, so trailing blanks land in the capture: a key pasted as `KEY=sk-...  ` must
+    // not carry them, and a quoted value may be followed by blanks or a comment.
+    const quoted = /^(['"])(.*?)\1(?:\s+#.*)?$/.exec(m[2].trim())
+    const value = quoted !== null ? quoted[2] : m[2].replace(/\s+#.*$/, '').trim()
     if (env[m[1]] !== undefined || value === '') continue
     env[m[1]] = value
     loaded.push(m[1])
