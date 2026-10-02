@@ -62,6 +62,9 @@ const MAX_VISIBLE = 6
  *   returns candidates for the current buffer. `replace` is how many characters at the end of the
  *   buffer the value replaces; it defaults to the length of the final word.
  * @param {string[]} [opts.history] - previous lines, newest last; navigated with Up/Down.
+ * @param {(state: {row: number, dropdown: boolean}) => void} [opts.onRender] - called after every
+ *   redraw with the row the cursor is on (counted from the editor's first row) and whether the
+ *   dropdown is showing; the pet's animator uses it to find its art, and holds still meanwhile.
  * @returns {Promise<string|null>} the submitted line, or null on ctrl+c / ctrl+d.
  */
 export function readLineWithSuggestions(opts) {
@@ -160,6 +163,7 @@ export function readLineWithSuggestions(opts) {
       out.write('\r')
       if (at % w > 0) out.write(`${ESC}[${at % w}C`) // CSI 0 C still moves one column
       cursorRow = target
+      opts.onRender?.({ row: cursorRow, dropdown: lines.length > 0 })
     }
 
     /** Accept the highlighted candidate into the buffer. */

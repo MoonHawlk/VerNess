@@ -24,6 +24,7 @@ import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } f
 import { accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
+import { petAnimation, rowsOf } from './lib/pet-anim.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { applyAllowBuilds, bundleName, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
@@ -974,24 +975,36 @@ async function cmdRun(cfg, task) {
   const commands = await loadActiveCommands(cfg)
   const count = new Set([...commands.values()]).size
   const boot = effectiveRoute(cfg)
+  // The pet just drawn, waiting for the line editor to animate her: set at boot and by `/pet`,
+  // consumed by the next prompt. Her animation ends as soon as a line is submitted.
+  let petArm
+  let vitals
   if (petEnabled(cfg)) {
     // The pet is the boot banner: versions and workers at a glance. `/pet` redraws it later.
-    const vitals = await gatherVitals(cfg, { dsh: dshVersion, commands: count, session: convo.id() })
+    vitals = await gatherVitals(cfg, { dsh: dshVersion, commands: count, session: convo.id() })
     console.log()
     for (const l of renderPet(vitals, { columns: process.stdout.columns })) console.log(l)
-    console.log()
   } else {
     step(`FiNess ready - persona ${paint(C.bold, activePersonaId(cfg))}, model ${paint(C.bold, boot.model ?? '-')} via ${boot.name} (tools: ${accessMode()})`)
   }
-  console.log(paint(C.dim, `  ${count} quick-tools (tab completes, /help <name> explains):`))
-  for (const l of commandBar(commands)) console.log(l)
-  info(convo.id() === undefined
-    ? 'a new conversation starts with your first task; it is kept for every later turn'
-    : `continuing ${shortSession(convo.id())} - /new starts a fresh one`)
-  info('type / to see commands as you type - arrows choose, tab or right accepts, enter runs')
-  info('anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits')
-  info('/btw <note> adds a side note to your next task; #<note> adds a line to the project brief (## escapes)')
-  info('prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)')
+  // Collected before printing so the animator knows exactly how many rows sit below the pet.
+  const tail = [
+    ...(vitals === undefined ? [] : ['']),
+    paint(C.dim, `  ${count} quick-tools (tab completes, /help <name> explains):`),
+    ...commandBar(commands),
+    ...[
+      convo.id() === undefined
+        ? 'a new conversation starts with your first task; it is kept for every later turn'
+        : `continuing ${shortSession(convo.id())} - /new starts a fresh one`,
+      'type / to see commands as you type - arrows choose, tab or right accepts, enter runs',
+      'anything without a leading slash is a task for the model; /exit, an empty line or ctrl+c exits',
+      '/btw <note> adds a side note to your next task; #<note> adds a line to the project brief (## escapes)',
+      'prefer a chat window with a message bar? /web opens the browser UI (ctrl+c there ends this prompt too)',
+    ].map(s => paint(C.dim, `     ${s}`)),
+  ]
+  for (const l of tail) console.log(l)
+  const after = rowsOf(tail, process.stdout.columns ?? 80)
+  if (vitals !== undefined && after !== undefined) petArm = { vitals, cfg, after }
   // A TTY gets the inline editor (ghost completion + live dropdown); a pipe gets plain readline,
   // because an editor that redraws itself is meaningless without a terminal.
   const interactive = process.stdin.isTTY === true
@@ -1010,9 +1023,14 @@ async function cmdRun(cfg, task) {
     const id = convo.id()
     const live = effectiveRoute(loadConfig())
     const status = [activePersonaId(loadConfig()), `${live.model ?? '-'} @ ${live.name}`, id === undefined ? 'new' : shortSession(id)].join(' · ')
+    // Only the editor reports where its cursor is, so only it can host the animation.
+    const anim = interactive && petArm !== undefined ? petAnimation(petArm) : undefined
+    petArm = undefined
     const answer = interactive
-      ? await readLineWithSuggestions({ prompt: paint(C.cyan, 'finess> '), status: `  ${status}`, suggest, history })
+      ? await readLineWithSuggestions({ prompt: paint(C.cyan, 'finess> '), status: `  ${status}`, suggest, history, onRender: anim?.onRender })
       : await rl.question(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'finess> ')}`)
+    // Before anything else prints: a command's output or a model turn moves the art out of reach.
+    anim?.stop()
     if (answer === null) break
     const line = answer.trim()
     if (line === '') break
@@ -1046,7 +1064,9 @@ async function cmdRun(cfg, task) {
       const cfgNow = loadConfig()
       // `/exit` asks through `ctx.quit`; the loop then ends the same way an empty line does.
       let quit = false
-      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true } })
+      // `/pet` calls `petDrawn` when its panel is the last thing printed, so the next prompt animates her.
+      const petDrawn = v => { petArm = { vitals: v, cfg: cfgNow, after: 0 } }
+      const { handled, name } = await runCommand(line, { ...makeCtx(cfgNow, commands, convo), quit: () => { quit = true }, petDrawn })
       if (quit) break
       // `name` is the resolved one, so `/p` and a prefix like `/pers` reload too.
       if (handled && name === 'persona') {
