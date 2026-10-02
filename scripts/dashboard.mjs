@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
 import { readShadow } from './lib/labels.mjs'
+import { parseLoopRuns } from './lib/loop.mjs'
 import { listSessions, readSessionEvents } from './lib/sessions.mjs'
 import { summarizeTools, toolRuns } from './lib/toolstats.mjs'
 import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
@@ -162,6 +163,13 @@ function readTeamRuns() {
   return runs.sort((a, b) => b.at - a.at)
 }
 
+/** @returns {object[]} recorded `/loop-task` runs, newest first. */
+function readLoopRuns() {
+  const root = join(REPO, '.finess', 'loops')
+  if (!existsSync(root)) return []
+  return parseLoopRuns(readdirSync(root).filter(f => f.endsWith('.jsonl')).map(f => readFileSync(join(root, f), 'utf8')).join('\n'))
+}
+
 /** @returns {{tasks: object[], html: string}} open backlog tasks and the rendered backlog file. */
 export function readBacklog() {
   const file = join(REPO, 'docs', '03-BACKLOG.md')
@@ -176,7 +184,7 @@ export function readBacklog() {
  * @returns {string} the HTML document.
  */
 function render(data) {
-  const { sessions, decisions, teamRuns, totals, generated, backlog = { tasks: [], html: '' }, toolSummary = summarizeTools([]) } = data
+  const { sessions, decisions, teamRuns, loopRuns = [], totals, generated, backlog = { tasks: [], html: '' }, toolSummary = summarizeTools([]) } = data
   const maxBucket = Math.max(1, ...toolSummary.histogram.map(h => h.count))
   const pct = r => `${(r * 100).toFixed(r > 0 && r < 0.1 ? 1 : 0)}%`
   const toolRows = toolSummary.tools.map(t => `
@@ -232,6 +240,15 @@ function render(data) {
       <td class="n">${esc(r.tasks.length)}</td>
       <td>${r.tasks.map(t => `<span class="pill ${t.exit === '0' ? 'good' : 'bad'}">${esc(t.id)} · ${esc(t.persona)} · ${esc(t.seconds)}s</span>`).join(' ')}</td>
       <td class="mono dim">${esc(r.dir.replace(REPO, '.'))}</td>
+    </tr>`).join('')
+
+  const loopRows = loopRuns.slice(0, 20).map(r => `
+    <tr>
+      <td>${esc(r.at.slice(5, 16).replace('T', ' '))}</td>
+      <td class="title" title="${esc(r.detail)}">${esc(r.objective.slice(0, 120))}</td>
+      <td class="n">${esc(r.rounds)}</td>
+      <td class="mono ${r.outcome === 'done' ? 'good' : r.outcome === 'blocked' ? '' : 'bad'}">${esc(r.outcome)}</td>
+      <td class="n">${esc(dur(r.seconds * 1000))}</td>
     </tr>`).join('')
 
   return `<!doctype html>
@@ -328,7 +345,11 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <table><thead><tr><th>team</th><th>when</th><th class="n">tasks</th><th>outcome</th><th>transcripts</th></tr></thead>
 <tbody>${teamRows || '<tr><td colspan="5" class="dim">no team runs yet — /team run &lt;id&gt;</td></tr>'}</tbody></table>
 
-<footer>Backlog from <span class="mono">docs/03-BACKLOG.md</span>. Read from the substrate's durable session logs, <span class="mono">.finess/decisions/*.jsonl</span> and <span class="mono">.finess/runs/</span>. Static file, no server, no network.</footer>
+<h2>Loop runs <span class="dim">(/loop-task)</span></h2>
+<table><thead><tr><th>when</th><th>objective</th><th class="n">rounds</th><th>outcome</th><th class="n">duration</th></tr></thead>
+<tbody>${loopRows || '<tr><td colspan="5" class="dim">no loop runs yet — /loop-task &lt;objective&gt;</td></tr>'}</tbody></table>
+
+<footer>Backlog from <span class="mono">docs/03-BACKLOG.md</span>. Read from the substrate's durable session logs, <span class="mono">.finess/decisions/*.jsonl</span> and <span class="mono">.finess/runs/</span> and <span class="mono">.finess/loops/*.jsonl</span>. Static file, no server, no network.</footer>
 
 <script>
 const BACKLOG = ${JSON.stringify(backlog.tasks).replaceAll('<', '\\u003c')};
@@ -413,6 +434,7 @@ export function buildDashboard(cfg, opts = {}) {
   const sessions = listSessions({ workspace, limit }).map(detail)
   const decisions = readDecisions()
   const teamRuns = readTeamRuns()
+  const loopRuns = readLoopRuns()
   const totals = {
     sessions: sessions.length,
     turns: sessions.reduce((a, s) => a + s.turns, 0),
@@ -423,7 +445,7 @@ export function buildDashboard(cfg, opts = {}) {
   }
   const backlog = readBacklog()
   const toolSummary = summarizeTools(sessions.flatMap(s => s.runs))
-  const html = render({ sessions, decisions, teamRuns, totals, backlog, toolSummary, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
+  const html = render({ sessions, decisions, teamRuns, loopRuns, totals, backlog, toolSummary, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
   const out = join(REPO, '.finess', 'dashboard.html')
   mkdirSync(join(REPO, '.finess'), { recursive: true })
   writeFileSync(out, html, 'utf8')
