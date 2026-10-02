@@ -27,6 +27,7 @@ Run from the repo root: `node scripts/tools/<tool>.mjs [args]`. Every tool takes
 | `docs.mjs` | docs audit: each doc's status line, outdated status versions, broken relative links, "not built" statuses to confirm | `docs.mjs` · `docs.mjs --problems` |
 | `commands.mjs` | every quick-tool, global and persona-scoped, with owner and group; persona/global clashes | `commands.mjs` · `commands.mjs dd` |
 | `graph.mjs` | Engram code-graph size, the commit it was built from, whether code changed since, top hubs; rebuild | `graph.mjs` · `graph.mjs --rebuild` |
+| `release-notes.mjs` | draft the next `CHANGELOG.md` entry: done tasks since the last tag grouped Added / Changed / Fixed, Upgrade when setup inputs changed, a review list of what it could not place | `release-notes.mjs` · `release-notes.mjs --since v0.3.0 --to v0.4.0` |
 | `profiles.mjs` | the dsh profiles on this machine: bundles, plugins and web bundles vs installed, undecided pnpm build scripts, patch rows | `profiles.mjs` |
 
 ## When to use which
