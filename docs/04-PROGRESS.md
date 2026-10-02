@@ -657,3 +657,31 @@
   words a refused question as "unavailable"), T-436 (live REPL check of `/btw` and `#`), T-437 (a
   real push through the hook).
 - `npm test` 382/382 and typecheck clean on `epic`; `node scripts/check-clean-clone.mjs` ok on HEAD.
+
+## 2026-10-02 — renamed to FiNess; twelve branches merged into epic
+- **Rename:** every reference to the old project name became `FiNess`/`finess`/`FINESS`
+  (127 files, 764 lines, five path moves) in one commit. `.finess/` replaced the old state directory locally;
+  the decision sidecar's Python venv was not moved (absolute paths, held by the editor), so
+  `finess decision up` rebuilds it under `.finess/py`. Setup made new `~/.dsh/profiles/finess` and
+  `finess-web`; the profiles under the old name are left in place.
+- **Setup:** `@linxin666/dsh-web-all` 0.4.4 appeared with a peer of dsh >=0.2.0-rc.1, which the
+  pinned 0.1.7-rc.2 refuses, so a fresh web profile came up without the bundle. `webBundles` now
+  accepts `name@version`, pinned to 0.4.3.
+- **Model performance:** the dashboard's tool errors were all "[object Object]"; read properly,
+  20 of 33 tool calls in the newest 25 sessions failed, every one from Qwen3 0.6B (T-438). The
+  arguments are frozen by the substrate, so `@finess/tool-hints` adds a corrected, copyable call to
+  the failed result instead, and `doctor`/`/model` warn below 4B. Live effect not measured yet (T-440).
+  Also: `stats --watch` with a probe history and a tok/s regression warning (T-123), per-tool
+  failure rate and latency histogram plus a route filter in the dashboard (T-271, T-272), a GGUF
+  fit check on `/models add` (T-360), `/loop-task` round timeout and repeat guard (T-327, T-325),
+  `/api test` and a `/cost` price table (T-358, T-362).
+- **Ness:** state-driven animation in ASCII (T-335a..h without d, T-434); simulated-terminal tests
+  only, not yet watched in a real terminal (T-442); at 80x24 she rarely moves at boot (T-441).
+- **Launcher:** `--no-model` (T-381), checkout-stamped profile patch and worktree `sync` warning
+  (T-336, half of T-433), piped stdin keeps every line (T-439), `setup` reinstalls a changed local
+  plugin (T-432), team failure policy (T-167).
+- Agents fixed by hand at merge: the loop-task tests wrote fake "x" runs into the real
+  `.finess/loops` (now a temp dir; 12 fake records removed); the piped-stdin test cleared the
+  checkout's real `/btw` notes (now read-only commands). Two agent branches started from v0.4.0,
+  before the rename; their old-name paths were renamed while resolving the merge.
+- `npm test` 481/481 and typecheck clean on `epic`; clean-clone check ok.

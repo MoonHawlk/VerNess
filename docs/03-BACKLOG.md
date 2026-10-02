@@ -28,14 +28,12 @@ TUI
 - [ ] T-302 Wrap long input lines in the editor; today the dropdown is suppressed when input exceeds the terminal width
 
 Launcher lifecycle
-- [ ] T-123 `stats --watch` for continuous telemetry, and record probe results over time for regression tracking
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (only Windows has been measured)
 - [ ] T-436 Live REPL check of `/btw` and `#` from the main checkout (only unit-tested so far): pipe the lines `/btw use metric units`, `/btw`, `# amounts in EUR`, `#` into `node scripts/finess.mjs`, then send one real task and confirm both blocks reach the model
 - [ ] T-437 Exercise the `pre-push` hook through a real `git push` with `core.hooksPath scripts/hooks`, on Windows (Git for Windows `sh`) and macOS
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
 - [ ] T-171 Measure before promising parallelism: time the same team at concurrency 1 and 2 on the local model and record the numbers in `04-PROGRESS.md`
-- [ ] T-167 *(remaining part)* Failure policy per team and per task: `onFailure: stop | skip | retry-once`, default `stop`; dependents of a failed task are marked `skipped`, never run
 - [ ] T-169 `/task add|list|cancel` and `/delegate <persona> <task>`: a one-task ad-hoc team run
 - [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
@@ -46,28 +44,16 @@ Launcher lifecycle
 > (`scripts/lib/pet.mjs`). `scripts/test/pet.render.test.mjs` is a mood-agnostic `node:test` suite over
 > `PET_MOODS` (T-338); the off switch `animationAllowed` + `pet.animate` exists (T-335g), but nothing
 > animates after boot yet. The tasks below are written against frame lists, not a drawing.
-- [ ] T-335 Animations. Frames stay ASCII and minimal
-  - [ ] T-335a Frame model *(remaining part)*: `petAnimFrames(mood)` exists; add a per-frame timing (`{lines, ms}`) and a `loop` vs `once` flag per mood
-  - [ ] T-335b Blink: happy eyes → closed for ~150 ms every few seconds, at a randomised interval
-  - [ ] T-335c Idle loop for `sleepy`: a `z` drifts up, then restarts
+- [ ] T-335 Animations. Frames stay ASCII and minimal *(remaining: T-335d; the rest done 2026-10-02)*
   - [ ] T-335d Talking *(blocked)*: `dsh` streams straight to stdout during a turn, so nothing may draw then. Re-scoped: a one-line status spinner once the REPL reads the `--json` event stream, as `/loop-task` already does
-  - [ ] T-335e `worried`: the `!` pulses until the problem it names is fixed
-  - [ ] T-335f Safe redraw: repaint only the art's rows in place (cursor save/restore), never while the line editor is drawing its dropdown; one timer, cleared on exit and on ctrl+c
-  - [ ] T-335h Simulated-terminal test: fake clock, frames advance, timers stop, nothing written off a TTY
-- [ ] T-434 The resting sheep (`petArt`) is drawn in block characters, which breaks the plan's "ASCII only" rule on legacy Windows consoles; T-338 enforces ASCII only on animation frames. Owner decides: redraw in ASCII, or relax the rule for the resting art
 - [ ] T-334 Show running `/loop-task` and `/team` runs as live workers (pid + heartbeat file per run)
-- [ ] T-336 A boot from a second checkout overwrites the shared `~/.dsh` profile patch; stamp the patch with the checkout path and warn (or refuse) when another checkout wrote it
 
 ## WS-D — Loop, dashboard, observability (plan `04-loop-dashboard-observability.md`)
 Autonomous task loop
-- [ ] T-327 Per-round wall-clock budget (`--round-timeout <s>`, default 600); a timed-out round is classified `timeout` and stops the loop
-- [ ] T-325 Port `packages/guard/repeat-tool-reminder` behaviour from the substrate in place of our identical-call check, escalated to a hard block
-- [ ] T-328 Surface loop runs in `/dashboard` (already recorded in `.finess/loops/*.jsonl`)
 - [ ] T-326 Let the decision model give the round verdict (continue/retry/complete/escalate) once T-223 clears; shadow it until then
 
 Static dashboard
-- [ ] T-271 Per-tool call counts and failure rate; latency histogram rather than p50 alone
-- [ ] T-272 Filter by persona and by route
+- [ ] T-272 *(remaining part)* Filter by persona: the session logs do not record the persona, so record it first (the route filter is done)
 - [ ] T-273 `--watch`: rebuild on change
 
 Standalone dashboard service (deferred by request; do after T-271..T-273)
@@ -98,7 +84,6 @@ Composition and routing
 First real uses
 - [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice
 - [ ] T-232 Decision accounting in `/cost`: decision calls counted separately; LLM calls avoided reported
-- [ ] T-435 `shadowRoute` reports a question `askDecision` refused (T-385) as "decision service unavailable (invalid question: …)"; say "invalid question" instead, since it is a caller bug, not an outage
 
 Deferred / investigate
 - [ ] T-240 MCP path (`laya[mcp]`, stdio only): register as a loader row; complements, never replaces, harness-side control
@@ -201,18 +186,14 @@ Tier S commands: surface existing substrate capabilities, never rebuild them
 Goal: installing a new model, or moving the agent onto a hosted API model that can act on the
 environment, is one command — no config edit, no guessing quants, no frozen route.
 - [ ] T-357 **First run with a real key**: one API turn that forces a tool call (e.g. list `docs/` and write a file under the workspace), recorded in `04-PROGRESS.md`. Nothing above proves a successful hosted turn yet
-- [ ] T-358 `/api test [provider]` — a one-token probe that confirms key + model before a long task; must say it costs tokens and ask first (command-layer cost rule)
 - [ ] T-359 Setup wizard: `./turn_on.sh setup --api` asks for a provider, writes the key to `.env` with hidden input, and runs `/api use` — first-run to working hosted agent in one step
-- [ ] T-360 `/models add` on hardware: warn when the chosen GGUF will not fit free RAM/VRAM (sizes are already read from the repo), and suggest a smaller quant
 - [ ] T-361 Model presets per persona: `persona.model = { route, id }` for hosted routes, surfaced in `/agents`, so a reviewer persona can run on a stronger model than the worker
-- [ ] T-362 Per-route price table for `/cost` (operator-written, never guessed — challenge #3 in `07-COMMAND-LAYER.md`)
 - [ ] T-363 `/workspace <dir>` — point the agent's working directory (and so the `workspace` sandbox root) at another project instead of this repo
 - [ ] T-364 Stop reading the adapter's `env-api-keys.js` by file path once the substrate exposes provider key names through a public seam (ADR-0010 consequence)
 - [ ] T-366 Windows: sandboxed PowerShell runs in ConstrainedLanguage (restricted token), so .NET type creation fails — including the substrate's own UTF-8 preamble. Measure what an API model can still do under `workspace`, and report upstream if the preamble should degrade gracefully
 
 ## Launcher & branch integration
 - [ ] T-372 Boot the REPL and the web UI from the merged `epic` tree, then run `off` against a real running web UI; also exercise `off` through the Windows PowerShell wrapper. A second checkout must not be booted until T-336 is fixed
-- [ ] T-381 Model-less start: `finess --no-model` (alias `--no-start`) enters the REPL without booting a model/substrate — settings, /persona, /config, /help and other Tier L commands only; model-requiring commands and free-text tasks print a hint to restart without the flag. Default start unchanged (with model)
 
 ## Web commands bridge — design in `docs/superpowers/specs/2026-09-26-web-commands-bridge-design.md`
 Feasibility checked 2026-09-27: `@deepseek-ai/dsh-commands` (`ctx.commands.register`) ships in dsh 0.1.7-rc.2, so the design holds; `/model` and `/help` stay the substrate's own.
@@ -229,8 +210,13 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a FiNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the FiNess skin on a fresh profile, on macOS and Windows; the owner approves the look
 
 ## Launcher follow-ups from the web bridge (ADR-0011)
-- [ ] T-432 `setup` does not pick up an edited local plugin file: pnpm reuses its copy of a same-version `file:` package, so a changed `packages/commands` or `packages/spike` stays stale until a fresh `DSH_HOME`. Reinstall `path` plugins when their files changed (content hash in the profile), and fix the "edits are live" line in `06-SETUP-AND-LAUNCHER.md`
-- [ ] T-433 The web bridge's `config.repo` is whichever checkout last ran `sync`, so a worktree's `sync` makes the web UI run that worktree's launcher. Pin it to the main checkout (or warn when `sync` runs from a worktree); and on Windows, cancelling a command can leave a grandchild process (`/team` dsh run) behind: kill the process tree
+- [ ] T-433 *(remaining part)* On Windows, cancelling a command can leave a grandchild process (`/team` dsh run) behind: kill the process tree (the worktree `sync` warning is done)
+
+## Follow-ups from the 2026-10-02 round
+- [ ] T-440 Live check of `@finess/tool-hints` (T-438): run a session on the local 0.6B model and on a 4B+ model, then compare `/dashboard` tool failures before and after; the hints are unit-tested only
+- [ ] T-441 Shorten the boot text so Ness animates at boot in an 80x24 terminal (the wrapped command bar pushes her eye out of reach; she animates after `/pet` or in taller terminals)
+- [ ] T-442 Watch Ness in a real terminal (Windows Terminal, conhost, Terminal.app): ESC 7/8 cursor restore, resize stop, freeze on `/`, stop on Enter (simulated-terminal tests only so far)
+- [ ] T-443 `/stats` in the REPL has no `--watch` (CLI only); decide whether a watching quick-tool fits the prompt
 
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5

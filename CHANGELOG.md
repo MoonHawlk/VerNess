@@ -6,9 +6,30 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 
 ## Unreleased
 
-**Side notes and a project brief in the prompt, one `finess` command, and `/team status`.**
+**The project is now FiNess; side notes and a project brief in the prompt, one `finess` command,
+tool-failure hints for small models, and an animated Ness.**
 
 ### Added
+- **Tool-failure hints** (`@finess/tool-hints`): when a tool call fails on bad arguments, a missing
+  read or a wrong path, the result gains one line with a corrected call the model can copy. No prompt
+  tokens on calls that succeed (T-438).
+- **Small-model warning**: `doctor` and `/model` flag models under 4B parameters as too small for
+  reliable tool calls (T-438).
+- **`stats --watch [--interval <s>]`**: live model telemetry, one line per tick; every probe is kept
+  in `.finess/probes.jsonl` and a tok/s drop of 30% below the recent median is flagged (T-123).
+- **Dashboard**: per-tool calls, failure rate, p50/p95 and a latency histogram (T-271); a route
+  filter (T-272); `/loop-task` runs (T-328).
+- **`/models add`** warns when a GGUF will not fit free RAM/VRAM and suggests a smaller quant (T-360).
+- **`/api test [provider] --yes`**: a one-token probe of key and model; without `--yes` it only says
+  what it would cost (T-358).
+- **`pricing`** in `finess.config.json`: per-route prices for `/cost`; unpriced routes show tokens
+  only, never a guessed price (T-362).
+- **`/loop-task --round-timeout <s>`** (default 600) (T-327).
+- **`onFailure: stop | skip | retry-once`** for teams and tasks (T-167).
+- **`finess --no-model`** (`--no-start`): the prompt and quick-tools without booting a model (T-381).
+- **Ness animates by state**: blinks when all is well, a drifting `z` when no model is loaded, a
+  pulsing `!` when something needs attention, a one-shot cheer or `?` after a `/loop-task`; never
+  while a command or a model turn runs (T-335a..h, T-434).
 - **`/btw <note>`** (`/btw`, `/btw clear`, `/btw drop <n>`): side notes sent once with your next
   task as context, not tasks; capped at `notes.maxChars` (2000), warning at 80%; terminal only (T-130).
 - **`#<note>`** adds a line to a project brief (`.finess/brief.md`) that every new session receives;
@@ -31,6 +52,15 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
   the last tag, for you to edit (T-431).
 
 ### Changed
+- **Renamed to FiNess** everywhere: the `finess` command, `@finess/*` packages,
+  `scripts/finess.mjs`, `finess.config.json`, `.finess/`, `profiles/finess`, `FINESS_*` variables.
+- `/loop-task` repeat guard follows the substrate's repeat-tool-reminder: reminders at 3 and 5
+  identical calls in a row, a stop at 8 (it used to stop on any call seen more than twice) (T-325).
+- `/team run`: a task whose dependency failed is `skipped`, never run; the run exits 1 (T-167).
+- The Ness drawing is ASCII and fits beside the panel from 77 columns (T-434).
+- `setup` reinstalls a local plugin whose files changed (T-432); `sync` stamps the profile patch with
+  its checkout and warns when another checkout or a worktree takes it over (T-336, T-433).
+- `webBundles` entries may pin a version; `dsh-web-all` is pinned to 0.4.3 (0.4.4 needs dsh 0.2).
 - Decision questions are validated before they are sent: a `choice` with more than 8 options (or
   fewer than 2, or a malformed shape) is refused with an error naming the limit (T-385).
 - `turn_on.sh/.ps1/.cmd` and the npm scripts start through `scripts/cli.mjs`; `scripts/finess.mjs`
@@ -39,12 +69,20 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
   rendering and `.env` parsing are covered (T-365).
 
 ### Fixed
+- Piped input to the prompt no longer loses lines that arrive while a command runs, and EOF exits
+  cleanly (T-439).
+- Dashboard tool errors show their name and code instead of "[object Object]".
+- A refused decision question reads "invalid question", not "decision service unavailable" (T-435).
 - `.env` values no longer keep trailing whitespace (`KEY=sk-... ` used to send the space), and a
   quoted value may be followed by spaces or a `# comment` (T-365).
 - Old Node gets "FiNess needs Node 22.19.0+ … or 24+" instead of a module-link error from the `.ts`
   contracts (T-383).
 
 ### Upgrade
+- **Rename:** run `setup` once (creates `~/.dsh/profiles/finess` and `finess-web`), then `npm link`
+  again for the `finess` command. Move the old state directory to `.finess/` and carry config edits over to
+  `finess.config.json`; rename environment variables to the `FINESS_*` prefix. The profiles under
+  the old name can be deleted. `finess decision up` rebuilds the decision venv under `.finess/py`.
 - In the REPL, a line that starts with a single `#` is no longer a task: it goes to the project brief.
   Type `##` to send it as a task.
 - New settings `pet.animate`, `notes.maxChars` and `notes.briefMaxChars` have defaults; nothing to set.
