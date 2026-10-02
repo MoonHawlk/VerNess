@@ -8,7 +8,8 @@
  */
 
 import { listSessions } from '../lib/sessions.mjs'
-import { head, info, ok, table, warn } from '../lib/util.mjs'
+import { NEW_KEY, markUnsent, moveNotes } from '../lib/notes.mjs'
+import { head, info, ok, RUN_DIR, table, warn } from '../lib/util.mjs'
 
 export default {
   name: 'new',
@@ -25,6 +26,8 @@ export default {
   run(ctx) {
     const had = ctx.conversation?.id()
     if (ctx.conversation === undefined) { warn('no conversation in this context'); return 1 }
+    // Kept `/btw` notes follow into the fresh session, unsent, so its first task gets them again.
+    if (had !== undefined) { moveNotes(RUN_DIR, had, NEW_KEY); markUnsent(RUN_DIR, NEW_KEY) }
     ctx.conversation.reset()
     ok(had === undefined ? 'starting fresh (there was no active session)' : `left session ${String(had).replace(/^session-/, '').slice(0, 8)}; the next task starts a new one`)
     info('the old session is not deleted — /sessions still lists it, /resume <id> returns to it')

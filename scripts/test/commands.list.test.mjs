@@ -24,7 +24,7 @@ function launcher(args) {
   } finally { rmSync(home, { recursive: true, force: true }) }
 }
 
-const TERMINAL_ONLY = ['help', 'new', 'off', 'resume', 'web']
+const TERMINAL_ONLY = ['btw', 'help', 'new', 'off', 'resume', 'web']
 
 test('--list-commands prints one JSON array and nothing else on stdout', () => {
   const r = launcher(['--list-commands'])

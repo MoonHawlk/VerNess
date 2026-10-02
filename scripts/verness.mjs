@@ -26,6 +26,7 @@ import { gatherVitals, petEnabled, renderPet } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { applyAllowBuilds, enableBundle, profileBundles, undecidedBuilds } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
+import { NEW_KEY, composeTask, markSent, moveNotes, pendingNotes, readNotes } from './lib/notes.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -49,6 +50,7 @@ const DEFAULTS = {
   tips: [],
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness' },
+  notes: { maxChars: 2000 },
 }
 
 const C = {
@@ -1055,10 +1057,20 @@ async function cmdRun(cfg, task) {
     // own history instead of meeting each question cold.
     const prior = convo.id()
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), taskText], { env })
+    // `/btw` notes ride once, on this task, as a delimited context block (scripts/lib/notes.mjs).
+    // Notes filed before a session existed (or before a /resume) join the current one first.
+    const noteKey = prior ?? NEW_KEY
+    if (prior !== undefined) moveNotes(RUN_DIR_LOCAL, NEW_KEY, prior)
+    const outgoing = composeTask(taskText, { notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)) })
+    const run = dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env })
+    // A failed run may never have reached the model, so its notes stay pending for the next task.
+    if (run.code === 0) markSent(RUN_DIR_LOCAL, noteKey)
     if (before !== undefined) {
       convo.capture(before)
-      if (convo.id() !== undefined) info(`session ${shortSession(convo.id())} - following turns continue it`)
+      if (convo.id() !== undefined) {
+        moveNotes(RUN_DIR_LOCAL, NEW_KEY, convo.id())
+        info(`session ${shortSession(convo.id())} - following turns continue it`)
+      }
     }
   }
   rl?.close()
