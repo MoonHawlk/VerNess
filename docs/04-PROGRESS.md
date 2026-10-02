@@ -650,8 +650,9 @@
 - Conflicts resolved by hand: `scripts/verness.mjs` (DEFAULTS `pet` + `notes`; the input history
   now loaded at start instead of `const history = []`; the notes and node-version imports) and the
   `package.json` scripts (`cli.mjs` entries plus `check:clean-clone`).
-- Worktrees have no `node_modules`, so their suites counted 269, not 271 (two smoke tests need the
-  upstream submodule). Typecheck was run on `epic` after the merges: clean.
+- Worktrees have no upstream submodule checkout, so two smoke tests skip there and their suites
+  counted 269, not 271; they also lack `node_modules`, so the typecheck was run on `epic` after the
+  merges: clean.
 - Follow-ups opened: T-434 (resting sheep is block characters, not ASCII), T-435 (`shadowRoute`
   words a refused question as "unavailable"), T-436 (live REPL check of `/btw` and `#`), T-437 (a
   real push through the hook).
