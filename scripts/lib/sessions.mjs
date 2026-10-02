@@ -131,6 +131,8 @@ export function summarizeSession(dir) {
           r.cacheReadTokens += Number(u.cacheReadTokens ?? 0)
           r.reasoningTokens += Number(u.reasoningTokens ?? 0)
         }
+        // The latest request's input is the conversation's current size (`/context`).
+        if (u !== undefined) s.lastInputTokens = Number(u.inputTokens ?? 0)
         break
       }
       default: break
