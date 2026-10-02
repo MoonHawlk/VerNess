@@ -30,8 +30,8 @@ dsh plugin --profile finess add "file:C:\Users\totov\Desktop\FiNess\FiNess\packa
 ```
 - The `dsh: warning: ... declares no dsh.bundle` line is expected: these are plain dependencies
   mounted by our patch layer, not bundle layers.
-- pnpm installs a local directory dependency as **hardlinked files**, not a symlink: edits to an
-  existing file are live, but **adding or renaming a file requires re-running the add command**.
+- pnpm installs a local directory dependency as **hardlinked files**, not a symlink: a changed
+  plugin is **not** live: re-run `setup`, which hashes each local plugin and reinstalls only the ones whose files changed.
 
 ## 3. Sync our patch layer and verify composition
 ```powershell

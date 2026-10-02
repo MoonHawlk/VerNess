@@ -9,7 +9,8 @@
  * @module scripts/lib/profile-setup
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** @param {string} key - a package name. @returns {string} it as a YAML mapping key. */
@@ -152,4 +153,54 @@ export function isWorktree(repo) {
  */
 export function profileBundles(dir) {
   try { return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dsh?.profile?.bundles ?? [] } catch { return [] }
+}
+
+/** The file in a profile directory that remembers each local plugin's content hash (T-432). */
+export const PLUGIN_HASH_FILE = '.finess-plugin-hashes.json'
+
+/**
+ * Content hash of a local plugin directory: every file's relative path (always `/`-separated) and
+ * bytes, in sorted order, skipping `node_modules` and dotfiles, so it is identical on Windows and
+ * macOS and changes only when the plugin's files do.
+ * @param {string} dir - the package directory.
+ * @returns {string} a hex sha256.
+ */
+export function hashPluginDir(dir) {
+  const h = createHash('sha256')
+  const walk = rel => {
+    const names = readdirSync(join(dir, rel)).filter(n => n !== 'node_modules' && !n.startsWith('.')).sort()
+    for (const n of names) {
+      const r = rel === '' ? n : `${rel}/${n}`
+      if (statSync(join(dir, r)).isDirectory()) walk(r)
+      else h.update(`${r}\0`).update(readFileSync(join(dir, r))).update('\0')
+    }
+  }
+  walk('')
+  return h.digest('hex')
+}
+
+/**
+ * Whether setup must force-reinstall a local `file:` plugin: pnpm reuses its copy of a same-version
+ * `file:` package, so an edited plugin stays stale unless it is removed first (T-432).
+ * @param {{stored?: string, current: string, installed: boolean}} opts - the hash recorded at the
+ *   last install (undefined when none), the hash of the files now, and whether the profile has it.
+ * @returns {boolean} true when the plugin is installed but its files changed since the recorded install.
+ */
+export function pluginNeedsReinstall({ stored, current, installed }) {
+  return installed && stored !== current
+}
+
+/** @param {string} dir - the profile dir. @returns {Record<string, string>} recorded hashes, {} when none or unreadable. */
+export function readPluginHashes(dir) {
+  try { return JSON.parse(readFileSync(join(dir, PLUGIN_HASH_FILE), 'utf8')) } catch { return {} }
+}
+
+/**
+ * Record a plugin's hash.
+ * @param {string} dir - the profile dir.
+ * @param {string} pkg - the plugin's package name.
+ * @param {string} hash - its content hash.
+ */
+export function writePluginHash(dir, pkg, hash) {
+  writeFileSync(join(dir, PLUGIN_HASH_FILE), `${JSON.stringify({ ...readPluginHashes(dir), [pkg]: hash }, null, 2)}\n`)
 }

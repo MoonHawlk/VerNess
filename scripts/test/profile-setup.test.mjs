@@ -4,11 +4,11 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { applyAllowBuilds, bundleName, enableBundle, isWorktree, patchCheckout, syncWarnings, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
+import { applyAllowBuilds, bundleName, hashPluginDir, pluginNeedsReinstall, readPluginHashes, writePluginHash, enableBundle, isWorktree, patchCheckout, syncWarnings, mergeAllowBuilds, profileBundles, undecidedBuilds } from '../lib/profile-setup.mjs'
 
 const PNPM_WROTE = `packages:
   - .
@@ -100,3 +100,39 @@ test('isWorktree: a .git file is a linked worktree, a .git directory or none is 
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
+
+test('hashPluginDir changes only with the plugin files, ignoring node_modules and dotfiles', () => {
+  const d = mkdtempSync(join(tmpdir(), 'finess-hash-'))
+  try {
+    writeFileSync(join(d, 'index.js'), 'a')
+    const h1 = hashPluginDir(d)
+    assert.equal(hashPluginDir(d), h1)
+    mkdirSync(join(d, 'node_modules'))
+    writeFileSync(join(d, 'node_modules', 'x.js'), 'junk')
+    writeFileSync(join(d, '.DS_Store'), 'junk')
+    assert.equal(hashPluginDir(d), h1)
+    writeFileSync(join(d, 'index.js'), 'b')
+    const h2 = hashPluginDir(d)
+    assert.notEqual(h2, h1)
+    mkdirSync(join(d, 'sub'))
+    writeFileSync(join(d, 'sub', 'm.js'), 'c')
+    assert.notEqual(hashPluginDir(d), h2)
+  } finally { rmSync(d, { recursive: true, force: true }) }
+})
+
+test('pluginNeedsReinstall only when installed and the hash differs', () => {
+  assert.equal(pluginNeedsReinstall({ stored: 'a', current: 'b', installed: true }), true)
+  assert.equal(pluginNeedsReinstall({ stored: undefined, current: 'b', installed: true }), true)
+  assert.equal(pluginNeedsReinstall({ stored: 'a', current: 'a', installed: true }), false)
+  assert.equal(pluginNeedsReinstall({ stored: 'a', current: 'b', installed: false }), false)
+})
+
+test('plugin hashes round-trip through the profile dir', () => {
+  const d = mkdtempSync(join(tmpdir(), 'finess-hash-'))
+  try {
+    assert.deepEqual(readPluginHashes(d), {})
+    writePluginHash(d, '@finess/a', 'h1')
+    writePluginHash(d, '@finess/b', 'h2')
+    assert.deepEqual(readPluginHashes(d), { '@finess/a': 'h1', '@finess/b': 'h2' })
+  } finally { rmSync(d, { recursive: true, force: true }) }
+})
