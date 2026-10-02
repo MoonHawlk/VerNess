@@ -18,10 +18,63 @@ import { readSessionEvents } from './sessions.mjs'
  * @returns {string} a stable fingerprint for "the same call again".
  */
 export function callFingerprint(name, args) {
-  const text = typeof args === 'string' ? args : JSON.stringify(args ?? {})
-  let normalized = text
-  try { normalized = JSON.stringify(JSON.parse(text)) } catch { /* not JSON, use raw */ }
-  return `${name}:${createHash('sha1').update(normalized).digest('hex').slice(0, 12)}`
+  return `${name}:${createHash('sha1').update(canonicalArgs(args)).digest('hex').slice(0, 12)}`
+}
+
+/** Deep key-sort, so arguments differing only in property order canonicalize alike (as the upstream guard does). */
+function sortKeys(v) {
+  if (Array.isArray(v)) return v.map(sortKeys)
+  if (v !== null && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, sortKeys(v[k])]))
+  return v
+}
+
+/**
+ * @param {unknown} args - raw arguments (object, or a JSON string).
+ * @returns {string} the canonical string form; unparseable text is used raw.
+ */
+export function canonicalArgs(args) {
+  let v = args ?? {}
+  if (typeof v === 'string') { try { v = JSON.parse(v) } catch { return v } }
+  return JSON.stringify(sortKeys(v))
+}
+
+/** Consecutive identical calls that trigger a gentle reminder, a detailed one, and a hard stop. */
+export const REPEAT_THRESHOLDS = [3, 5, 8]
+
+/**
+ * Port of the substrate's `repeat-tool-reminder` (packages/guard): a chain of *consecutive*
+ * identical (tool, canonical arguments) calls, with the gentle -> detailed reminder tiers. The
+ * upstream guard is advisory only and goes silent past its last threshold; here the last tier is a
+ * hard block, because a small model that ignores two reminders will ignore a third.
+ * @param {{name: string, args: unknown}[]} calls - the calls in order.
+ * @param {number[]} [thresholds] - ascending run lengths for gentle, detailed and block.
+ * @returns {{level: 'none'|'gentle'|'detailed'|'block', name?: string, count?: number, args?: string}} the trailing chain.
+ */
+export function repeatChain(calls, thresholds = REPEAT_THRESHOLDS) {
+  const last = calls[calls.length - 1]
+  if (last === undefined) return { level: 'none' }
+  const key = `${last.name}:${canonicalArgs(last.args)}`
+  let count = 0
+  for (let i = calls.length - 1; i >= 0 && `${calls[i].name}:${canonicalArgs(calls[i].args)}` === key; i--) count++
+  const tier = thresholds.filter(t => count >= t).length
+  if (tier === 0) return { level: 'none', name: last.name, count }
+  const level = tier >= thresholds.length ? 'block' : tier === 1 ? 'gentle' : 'detailed'
+  return { level, name: last.name, count, args: canonicalArgs(last.args) }
+}
+
+/**
+ * @param {ReturnType<typeof repeatChain>} chain - a chain.
+ * @param {number} [cap] - characters of arguments to quote.
+ * @returns {string} the reminder text for the next round, or '' when there is nothing to say.
+ */
+export function repeatReminder(chain, cap = 500) {
+  if (chain.level === 'gentle') {
+    return 'You are repeating the exact same tool call with identical arguments. Carefully analyze the previous result before calling again: if the task is not complete, try a different approach or different arguments instead of repeating the call.'
+  }
+  if (chain.level !== 'detailed') return ''
+  const a = chain.args.length > cap ? `${chain.args.slice(0, cap)}... (+${chain.args.length - cap} more chars)` : chain.args
+  return `Repeated tool call detected:\n- tool: ${chain.name}\n- consecutive_calls: ${chain.count}\n- arguments: ${a}\n`
+    + 'The repeated calls are not making progress. Do not call this tool with these exact arguments again. Inspect the latest result and choose a different action, different arguments, or finish the task if enough evidence has been gathered.'
 }
 
 /**
@@ -66,14 +119,12 @@ export function observeSession(dir) {
  * new. Both are measured from the log, not from the model's opinion of its own progress.
  * @param {object} state - the result of {@link observeSession}.
  * @param {object} previous - the state observed after the previous round.
- * @param {{repeatLimit?: number}} [opts] - tuning.
- * @returns {{repeated: string[], churning: string[], stalled: boolean, newCalls: number, newText: number}} the verdict.
+ * @param {{thresholds?: number[], toolLimit?: number}} [opts] - tuning.
+ * @returns {{chain: ReturnType<typeof repeatChain>, repeated: string[], churning: string[], stalled: boolean, newCalls: number, newText: number}} the verdict; `repeated` is non-empty only at the block tier.
  */
 export function detectStall(state, previous, opts = {}) {
-  const limit = opts.repeatLimit ?? 2
-  const counts = new Map()
-  for (const c of state.calls) counts.set(c.fp, (counts.get(c.fp) ?? 0) + 1)
-  const repeated = [...counts.entries()].filter(([, n]) => n > limit).map(([fp]) => fp)
+  const chain = repeatChain(state.calls, opts.thresholds)
+  const repeated = chain.level === 'block' ? [`${chain.name} x${chain.count}`] : []
   // Exact fingerprints miss the failure we actually observed: the same tool called again and again
   // with slightly different arguments, hunting for a result it already had. Count by tool name too.
   const byTool = new Map()
@@ -81,7 +132,7 @@ export function detectStall(state, previous, opts = {}) {
   const churning = [...byTool.entries()].filter(([, n]) => n > (opts.toolLimit ?? 3)).map(([name, n]) => `${name} x${n}`)
   const newCalls = state.calls.length - (previous?.calls.length ?? 0)
   const newText = state.answers.length - (previous?.answers.length ?? 0)
-  return { repeated, churning, stalled: newCalls === 0 && newText === 0, newCalls, newText }
+  return { chain, repeated, churning, stalled: newCalls === 0 && newText === 0, newCalls, newText }
 }
 
 /**
