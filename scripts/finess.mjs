@@ -1021,6 +1021,9 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
   const rl = interactive
     ? undefined
     : createInterface({ input: process.stdin, output: process.stdout, completer: makeCompleter(cfg, commands) })
+  // A pipe delivers lines whether or not a question is pending, and `rl.question` drops the ones
+  // that arrive while a command runs (and never settles at EOF). One iterator buffers them all (T-439).
+  const pipeLines = rl?.[Symbol.asyncIterator]()
   // Brief lines added (`#<note>`) since the last task, for a session that already has the rest.
   const briefAdded = []
   for (;;) {
@@ -1030,7 +1033,11 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const status = [activePersonaId(loadConfig()), `${live.model ?? '-'} @ ${live.name}`, id === undefined ? 'new' : shortSession(id)].join(' · ')
     const answer = interactive
       ? await readLineWithSuggestions({ prompt: paint(C.cyan, 'finess> '), status: `  ${status}`, suggest, history })
-      : await rl.question(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'finess> ')}`)
+      : await (async () => {
+        process.stdout.write(`\n${paint(C.dim, status)}\n${paint(C.cyan, 'finess> ')}`)
+        const next = await pipeLines.next()
+        return next.done ? null : next.value
+      })()
     if (answer === null) break
     const line = answer.trim()
     if (line === '') break
