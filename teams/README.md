@@ -15,6 +15,7 @@ tasks can wear different personas without interfering.
   "id": "example",
   "name": "Human-readable name",
   "concurrency": 1,                 // default; --parallel overrides
+  "onFailure": "stop",              // stop (default) | skip | retry-once; a task may override
   "members": [
     { "role": "analyst", "persona": "data-scientist" }   // role -> persona in personas/
   ],
@@ -29,6 +30,10 @@ tasks can wear different personas without interfering.
   active persona.
 - `dependsOn` both orders the work and feeds the upstream task's output into the dependent task's
   prompt, under a delimited "context from upstream tasks" block (last 4000 characters).
+- `onFailure` is the failure policy, set on the team and overridable per task. `stop` (default): after
+  a failure nothing new starts. `skip`: only the failed task's dependents are skipped. `retry-once`:
+  the task runs one more time, then behaves like `skip`. Dependents of a failed task never run; they
+  are `skipped` in `summary.json`, `summary.md` and `/team status`.
 - Transcripts and a summary table land in `.finess/runs/<team>/<timestamp>/` — gitignored.
 
 ## Before you trust a fan-out
