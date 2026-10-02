@@ -17,6 +17,7 @@
  */
 
 import { modelUp } from '../model.mjs'
+import { fitCheck, probeHardware } from '../lib/hardware.mjs'
 import { effectiveRoute, localModels } from '../lib/routes.mjs'
 import { readState, writeState } from '../lib/personas.mjs'
 import { head, info, ok, paint, step, warn } from '../lib/util.mjs'
@@ -80,7 +81,7 @@ async function repoQuants(repo) {
 /**
  * Resolve a reference to the exact tag the engine will pull, validating it where we can.
  * @param {string} input - what the user typed.
- * @returns {Promise<{ref: string, note?: string}|{error: string, hint?: string}>} the pull tag.
+ * @returns {Promise<{ref: string, note?: string, quant?: string, quants?: Map<string, number|undefined>}|{error: string, hint?: string}>} the pull tag.
  */
 async function resolveRef(input) {
   const p = parseRef(input)
@@ -92,10 +93,10 @@ async function resolveRef(input) {
   if (p.quant !== undefined) {
     const hit = available.find(q => q === p.quant.toUpperCase())
     if (hit === undefined) return { error: `${p.repo} has no ${p.quant} quant`, hint: `available: ${available.join(', ')}` }
-    return { ref: `hf.co/${p.repo}:${hit}`, note: `${hit}, ${size(quants.get(hit))}` }
+    return { ref: `hf.co/${p.repo}:${hit}`, note: `${hit}, ${size(quants.get(hit))}`, quant: hit, quants }
   }
   const pick = PREFERRED_QUANTS.find(q => quants.has(q)) ?? available[0]
-  return { ref: `hf.co/${p.repo}:${pick}`, note: `${pick} chosen (${size(quants.get(pick))}); others: ${available.filter(q => q !== pick).join(', ') || 'none'}` }
+  return { ref: `hf.co/${p.repo}:${pick}`, note: `${pick} chosen (${size(quants.get(pick))}); others: ${available.filter(q => q !== pick).join(', ') || 'none'}`, quant: pick, quants }
 }
 
 /**
@@ -106,6 +107,19 @@ function engineList(ctx) {
   const r = ctx.sh('ollama', ['list'], { capture: true, allowFail: true })
   if (r.code !== 0) return []
   return r.out.split('\n').slice(1).map(l => l.split(/\s\s+/)).filter(c => c[0] !== undefined && c[0].trim() !== '').map(c => [c[0], c[2] ?? ''])
+}
+
+/**
+ * Warn (never block) when the chosen quant will not fit free RAM/VRAM, naming a smaller one that does.
+ * @param {{ref: string, quant?: string, quants?: Map<string, number|undefined>}} res - the resolved reference.
+ */
+function warnIfTooBig(res) {
+  if (res.quant === undefined || res.quants === undefined) return
+  const fit = fitCheck({ quant: res.quant, quants: res.quants, ...probeHardware() })
+  if (!fit.known || fit.fits) return
+  warn(`${res.quant} needs about ${size(fit.need)} with context but only ${size(fit.budget)} is free - it may swap or crawl`)
+  if (fit.suggest !== undefined) info(`a smaller quant that fits: /models add ${res.ref.replace(/:[^:]*$/, '')}:${fit.suggest} (${size(res.quants.get(fit.suggest))})`)
+  else info('no smaller quant in this repo fits either; try a smaller model')
 }
 
 export default {
@@ -161,6 +175,7 @@ export default {
       const res = await resolveRef(words[0])
       if ('error' in res) { warn(res.error); if (res.hint !== undefined) info(res.hint); return 1 }
       ok(`${res.ref}${res.note === undefined ? '' : ` - ${res.note}`}`)
+      warnIfTooBig(res)
       // modelUp starts the engine if needed, pulls the weights, and warms them - one code path for
       // the configured model and every added one.
       if (!(await modelUp(ctx.cfg, res.ref))) { warn(`could not bring up ${res.ref}`); return 1 }
