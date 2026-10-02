@@ -119,6 +119,9 @@
   // decision sidecar, last loop/team run). `/pet` redraws it with fresh probes.
   // Set enabled to false to boot with the one-line banner; VERNESS_NO_PET=1 does
   // the same for a single run. It only draws on a real terminal, never in a pipe.
+  // animate (default true) lets her move; set it to false for a still drawing. It
+  // is off anyway when NO_COLOR or CI is set or the terminal is too narrow for the
+  // side-by-side layout.
   "pet": {
     "enabled": true,
     "name": "Ness",

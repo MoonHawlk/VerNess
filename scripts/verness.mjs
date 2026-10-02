@@ -49,7 +49,7 @@ const DEFAULTS = {
   personas: { active: 'generalist', definitions: { generalist: { prefix: '', suffix: '' } } },
   tips: [],
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
-  pet: { enabled: true, name: 'Ness' },
+  pet: { enabled: true, name: 'Ness', animate: true },
 }
 
 const C = {
