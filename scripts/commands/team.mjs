@@ -6,7 +6,7 @@
  */
 
 import { loadPersonas } from '../lib/personas.mjs'
-import { loadTeams, runTeam, validateTeam } from '../lib/teams.mjs'
+import { latestRun, loadTeams, readRun, runTeam, statusRows, validateTeam } from '../lib/teams.mjs'
 import { head, info, table, warn } from '../lib/util.mjs'
 
 export default {
@@ -14,11 +14,12 @@ export default {
   aliases: ['teams'],
   group: 'teams',
   summary: 'list, inspect and run a team of personas over a task list',
-  usage: '/team [list | show <id> | run <id> [--parallel N] [--only a,b] [--dry-run]]',
+  usage: '/team [list | show <id> | run <id> [--parallel N] [--only a,b] [--dry-run] | status [<id>]]',
   details: [
+    'status [<id>]: per-task status, exit and seconds of the newest run (of that team, or of any team)',
     'a team is teams/<id>.json: members bind a role to a persona, tasks name a member and dependsOn',
     'each task runs as its own substrate run with a --patch persona overlay, so the profile is untouched',
-    'transcripts and a summary land in .verness/runs/<team>/<timestamp>/',
+    'transcripts, summary.md and a machine-readable summary.json land in .verness/runs/<team>/<timestamp>/',
   ],
   /**
    * @param {object} ctx - command context.
@@ -36,6 +37,23 @@ export default {
         ['id', 'name', 'members', 'tasks', 'concurrency'],
         [...teams.values()].map(t => [t.id, t.name, String(t.members.length), String(t.tasks.length), String(t.concurrency)]),
       )) console.log(`  ${l}`)
+      return 0
+    }
+
+    // Before the team lookup: a run stays readable after its teams/<id>.json is gone.
+    if (sub === 'status') {
+      const id = args[1]
+      const latest = latestRun(id, ctx.runsRoot)
+      if (latest === undefined) {
+        warn(id === undefined ? 'no team runs yet' : `no runs for team: ${id}`)
+        info('start one with /team run <id>')
+        return 1
+      }
+      const run = readRun(latest.dir)
+      const failed = run.tasks.filter(t => t.status !== 'ok').length
+      head(`team ${run.team}: run ${run.stamp}${run.state === 'incomplete' ? ' (incomplete)' : ''}`)
+      for (const l of table(['task', 'persona', 'status', 'exit', 'seconds'], statusRows(run))) console.log(`  ${l}`)
+      info(`${run.tasks.length - failed}/${run.tasks.length} ok · from ${run.source} · ${run.dir}`)
       return 0
     }
 
