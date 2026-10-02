@@ -13,6 +13,8 @@ export default {
   name: 'workspace',
   aliases: ['cwd'],
   group: 'model',
+  // The browser UI picks its own workspace; this one steers the terminal launcher's task runs.
+  web: false,
   summary: 'the directory the agent works in: /workspace <dir> | reset',
   usage: '/workspace [<dir> | reset]',
   details: [

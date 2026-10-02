@@ -73,7 +73,8 @@ export function activeWorkspace(state = readState(), repo = REPO) {
  * @returns {boolean} whether both name the same directory (case-insensitive on Windows and macOS).
  */
 export function samePath(a, b) {
-  const norm = p => resolve(p).replace(/[\\/]+$/, '')
+  // Realpath first: macOS temp and home paths can sit behind a symlink (/var -> /private/var).
+  const norm = p => { try { return realpathSync.native(p) } catch { return resolve(p).replace(/[\\/]+$/, '') } }
   return process.platform === 'linux' ? norm(a) === norm(b) : norm(a).toLowerCase() === norm(b).toLowerCase()
 }
 
