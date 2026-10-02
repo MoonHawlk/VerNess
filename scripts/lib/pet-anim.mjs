@@ -23,13 +23,11 @@ const SAVE = `${ESC}7`
 const RESTORE = `${ESC}8`
 const CYAN = `${ESC}[36m`
 const OFF = `${ESC}[0m`
-/** Rows the editor may draw below its cursor (six dropdown rows and a "more" line), plus one spare. */
-const BELOW_CURSOR = 8
 
 /**
  * @typedef {import('./pet.mjs').PetTrack} PetTrack
- * @typedef {{place(at: {bottom: number, hold?: boolean}): void, start(): void, stop(): void,
- *   running(): boolean}} Animator
+ * @typedef {{place(at: {bottom: number, hold?: boolean, below?: number}): void, start(): void,
+ *   stop(): void, running(): boolean}} Animator
  */
 
 /**
@@ -48,14 +46,19 @@ const BELOW_CURSOR = 8
  * @param {(id: any) => void} o.clearTimeout - timer stop.
  * @param {() => number} [o.random] - 0..1, for jitter.
  * @returns {Animator} the controller. `place` reports the cursor: `bottom` is how many rows it sits
- *   below the art's last row, `hold` pauses painting (the dropdown is open).
+ *   below the art's last row, `hold` pauses painting (the dropdown is open), `below` how many rows the
+ *   editor drew under the cursor. A frame whose rows may have scrolled off the screen is not painted:
+ *   the reachable rows settle on the resting picture and the animator stops.
  */
 export function createAnimator(o) {
   const random = o.random ?? Math.random
   const from = o.from ?? 0
   const column = o.column ?? 0
+  const rest = [...o.drawn]
   const shown = [...o.drawn]
   let want = shown
+  // The most rows the editor has drawn below its cursor during this prompt (its dropdown).
+  let below = 0
   let ti = 0
   let fi = 0
   let timer
@@ -64,18 +67,32 @@ export function createAnimator(o) {
   let hold = false
 
   /** Bring the screen in line with `want`, when it is safe to. */
+  /** @param {number[]} rows - art rows to write. @param {string[]} lines - the picture they come from. */
+  const paint = (rows, lines) => {
+    if (rows.length === 0) return
+    const H = lines.length
+    const right = column > 0 ? `${ESC}[${column}C` : ''
+    o.write(rows.map(i => `${SAVE}${ESC}[${bottom + H - 1 - i}A\r${right}${CYAN}${lines[i]}${OFF}${RESTORE}`).join(''))
+    for (const i of rows) shown[i] = lines[i]
+  }
+  /**
+   * Is art row `i` certainly still on screen? Everything from that row down to the lowest row the
+   * editor has drawn must fit in the terminal; past that it may have scrolled off, and cursor-up
+   * would clamp at the top and overwrite the wrong line.
+   * @param {number} i - an art row.
+   * @returns {boolean} whether it is safe to write.
+   */
+  const reach = i => {
+    const height = o.rows()
+    return height !== undefined && bottom >= 1 && bottom + want.length - 1 - i + below < height
+  }
   const flush = () => {
     if (stopped || bottom === undefined || hold) return
-    const H = want.length
     const rows = want.map((_, i) => i).filter(i => i >= from && want[i] !== shown[i])
-    if (rows.length === 0) return
-    // The highest row painted must still be on screen, with room for the dropdown below the cursor;
-    // otherwise cursor-up would clamp at the top and overwrite the wrong line.
-    const height = o.rows()
-    if (height === undefined || bottom < 1 || bottom + H - 1 - from + BELOW_CURSOR >= height) { stop(); return }
-    const right = column > 0 ? `${ESC}[${column}C` : ''
-    o.write(rows.map(i => `${SAVE}${ESC}[${bottom + H - 1 - i}A\r${right}${CYAN}${want[i]}${OFF}${RESTORE}`).join(''))
-    for (const i of rows) shown[i] = want[i]
+    if (rows.every(reach)) { paint(rows, want); return }
+    // Out of reach: settle what can still be reached on the resting picture, then stop for good.
+    paint(rest.map((_, i) => i).filter(i => i >= from && rest[i] !== shown[i] && reach(i)), rest)
+    stop()
   }
   /** @param {number} ms @param {number} jitter @returns {number} the randomised delay. */
   const delay = (ms, jitter) => Math.max(0, Math.round(ms * (1 + (random() * 2 - 1) * jitter)))
@@ -106,6 +123,7 @@ export function createAnimator(o) {
     place(at) {
       bottom = at.bottom
       hold = at.hold === true
+      below = Math.max(below, at.below ?? 0)
       flush()
     },
     start() {
@@ -138,7 +156,7 @@ export function createAnimator(o) {
  * @param {(fn: () => void, ms: number) => any} [o.setTimeout] - timers, for tests.
  * @param {(id: any) => void} [o.clearTimeout] - timers, for tests.
  * @param {() => number} [o.random] - jitter source, for tests.
- * @returns {{onRender(state: {row: number, dropdown: boolean}): void, stop(): void, running(): boolean,
+ * @returns {{onRender(state: {row: number, dropdown: boolean, below?: number}): void, stop(): void, running(): boolean,
  *   why?: string}} pass `onRender` to the editor and call `stop` once it returns.
  */
 export function petAnimation(o) {
@@ -169,8 +187,8 @@ export function petAnimation(o) {
   out.on?.('resize', stop)
   let started = false
   return {
-    onRender({ row, dropdown }) {
-      anim.place({ bottom: o.after + 1 + row, hold: dropdown })
+    onRender({ row, dropdown, below }) {
+      anim.place({ bottom: o.after + 1 + row, hold: dropdown, below })
       if (!started) { started = true; anim.start() }
     },
     stop,

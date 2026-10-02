@@ -201,7 +201,8 @@ test('nothing is drawn before the editor says where its cursor is', () => {
 
 test('stops instead of painting when the art may have scrolled off the screen', () => {
   const c = fakeClock(); const out = []
-  const a = anim(c, out, { rows: () => 10 })
+  // Row 0 of a 2-row art with the cursor 5 below the last row is 6 up: it needs 7 rows on screen.
+  const a = anim(c, out, { rows: () => 6 })
   a.place({ bottom: 5 }); a.start(); c.tick(100)
   assert.equal(out.length, 0)
   assert.equal(a.running(), false)
@@ -304,6 +305,45 @@ test('on a TTY: starts at the first redraw, blinks, and stop removes its timer a
   p.stop()
   assert.equal(c.pending(), 0)
   assert.equal(out.listeners.size, 0)
+})
+
+// A boot-like prompt: 13 rows printed under the pet (blank, header, command bar, info lines), the
+// editor's status line above the input, so the cursor is 15 rows below her hooves.
+const BOOT_AFTER = 13
+
+test('a default 80x24 terminal: the blink fits until a dropdown may have scrolled her away', () => {
+  const c = fakeClock(); const out = term({ columns: 80, rows: 24 })
+  const p = petAnimation({ vitals: vitals(), cfg: {}, after: BOOT_AFTER, out, env: {}, proc: out, random: () => 0.5, ...c })
+  p.onRender({ row: 1, dropdown: false, below: 0 })
+  c.tick(3500)
+  assert.equal(out.writes.length, 1, 'the eye row is 19 rows up: it fits in 24')
+  c.tick(150)
+  assert.equal(out.writes.length, 2, 'eye open again')
+  p.onRender({ row: 1, dropdown: true, below: 7 })
+  p.onRender({ row: 1, dropdown: false, below: 0 })
+  c.tick(10000)
+  assert.equal(out.writes.length, 2, 'a 7-row dropdown may have scrolled the eye off: nothing more')
+  assert.equal(p.running(), false)
+  assert.equal(c.pending(), 0)
+  p.stop()
+})
+
+test('sleepy: the z reaches the mark row only when the terminal is tall enough', () => {
+  const sleepy = () => { const v = vitals(); v.workers.engine = { up: true, loaded: [] }; return v }
+  const tall = fakeClock(); const big = term({ columns: 80, rows: 30 })
+  const p = petAnimation({ vitals: sleepy(), cfg: {}, after: BOOT_AFTER, out: big, env: {}, proc: big, random: () => 0.5, ...tall })
+  p.onRender({ row: 1, dropdown: false, below: 0 })
+  tall.tick(1800 + 700 * 3)
+  assert.equal(big.writes.length, 4, 'a full drift, back to the mark row')
+  assert.equal(p.running(), true)
+  p.stop()
+  const short = fakeClock(); const small = term({ columns: 80, rows: 23 })
+  const q = petAnimation({ vitals: sleepy(), cfg: {}, after: BOOT_AFTER, out: small, env: {}, proc: small, random: () => 0.5, ...short })
+  q.onRender({ row: 1, dropdown: false, below: 0 })
+  short.tick(10000)
+  assert.equal(small.writes.length, 0, 'the mark row is 23 rows up: out of reach in 23')
+  assert.equal(q.running(), false)
+  assert.equal(short.pending(), 0)
 })
 
 test('a resize stops her', () => {
