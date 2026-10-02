@@ -23,6 +23,7 @@
   release notes written** in the same merge (a new `CHANGELOG.md` entry: Added / Changed / Fixed /
   Upgrade, each line with its task ID; plus a row in the README's Releases table), and a tag on the merge commit: `git tag -a vX.Y.Z -m "VerNess vX.Y.Z"`, then
   `git push origin main epic --follow-tags`.
+- Start the notes from `node scripts/tools/release-notes.mjs` (a draft from the done tasks since the last tag), then edit it by hand.
 - Versions follow semver while pre-1.0: a release with new commands or config fields bumps the
   minor (`0.1.0` -> `0.2.0`); a release of fixes only bumps the patch.
 - Before merging `epic` into `main`, run the clean-clone check below on `epic`.
