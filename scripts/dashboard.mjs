@@ -31,6 +31,19 @@ const esc = v => String(v ?? '')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
   .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
 
+/**
+ * A tool error as text. The substrate logs errors as objects (`{name, code, message?}`), which
+ * `String()` turns into "[object Object]".
+ * @param {unknown} err - `tool/result` data.error.
+ * @returns {string} e.g. "ToolArgsError INVALID_ARGS: bad path".
+ */
+export function errorText(err) {
+  if (err === null || typeof err !== 'object') return String(err)
+  const head = [err.name, err.code].filter(v => typeof v === 'string' && v !== '').join(' ')
+  const msg = typeof err.message === 'string' && err.message !== '' ? err.message : ''
+  return head === '' ? (msg === '' ? JSON.stringify(err) : msg) : msg === '' ? head : `${head}: ${msg}`
+}
+
 /** @param {number} ms - a duration. @returns {string} a compact human duration. */
 function dur(ms) {
   const n = Number(ms ?? 0)
@@ -69,7 +82,7 @@ function detail(summary) {
       }
       case 'tool/result': {
         const okFlag = e.data?.error === undefined
-        timeline.push({ at, kind: okFlag ? 'result' : 'error', text: okFlag ? 'tool result' : `tool error: ${String(e.data?.error).slice(0, 200)}` })
+        timeline.push({ at, kind: okFlag ? 'result' : 'error', text: okFlag ? 'tool result' : `tool error: ${errorText(e.data?.error).slice(0, 200)}` })
         break
       }
       case 'assistant/message': {
