@@ -202,7 +202,7 @@ export function describePersona(p) {
     p.description === '' ? undefined : `  ${p.description}`,
     `  source: ${p.source}`,
     `  prompt: ${p.prefix === '' ? 'no prefix' : `${p.prefix.length} chars prefix`}, ${p.suffix === '' ? 'no suffix' : `${p.suffix.length} chars suffix`}   [enforced]`,
-    `  model: ${p.model.id ?? 'inherits the active route'}${p.model.route === undefined ? '' : ` via ${p.model.route}`}   [enforced]`,
+    `  model: ${p.model.id ?? 'inherits the active route'}${p.model.route === undefined ? '' : ` via ${p.model.route}`}   [enforced; a session /model or /api use wins]`,
     `  tools: allow ${p.tools.allow.length}, deny ${p.tools.deny.length}   [recorded — enforced from M4]`,
     `  skills: ${p.skills.length === 0 ? 'none' : p.skills.join(', ')}   [recorded — enforced from M5]`,
     `  evaluators: ${p.evaluators.length === 0 ? 'none' : p.evaluators.join(', ')}   [recorded — enforced from M7]`,
@@ -219,9 +219,12 @@ export function describePersona(p) {
  * @param {string} [file] - where to write it. Concurrent runs must each pass their own: rewriting the
  *   shared per-persona file while another run's dsh is still reading it could hand that run a
  *   truncated overlay.
+ * @param {{name: string, model?: string, preset?: boolean, error?: string}} [eff] - the persona's resolved
+ *   route (`effectiveRoute(cfg, {persona})`): the overlay carries a model only when a persona preset
+ *   decided it, so a session `/model` or `/api use` choice is never overridden by the overlay.
  * @returns {string} the overlay path, to pass as `dsh --patch <path>`.
  */
-export function writePersonaOverlay(persona, cfg, file = join(RUN_DIR, `persona-${persona.id}.patch.yml`)) {
+export function writePersonaOverlay(persona, cfg, file = join(RUN_DIR, `persona-${persona.id}.patch.yml`), eff = undefined) {
   const { prefix, suffix } = personaPrompt(persona, cfg.tips ?? [])
   const q = s => `'${String(s).replaceAll("'", "''")}'`
   const block = (key, text, pad) => (text.includes('\n')
@@ -234,11 +237,12 @@ export function writePersonaOverlay(persona, cfg, file = join(RUN_DIR, `persona-
     ...block('personaPrefix', prefix, '    '),
     ...block('personaSuffix', `${suffix}\nYour working directory is {{cwd}}.`, '    '),
   ]
-  if (persona.model.id !== undefined) {
-    L.push('- id: agent-default-model', '  config:',
-      // A persona model without a route is a local model preference (see lib/routes.mjs).
-      `    provider: ${persona.model.route ?? cfg.model.route}`,
-      `    model: ${q(persona.model.id)}`)
+  const pin = eff === undefined
+    // Legacy callers: the raw preset. A persona model without a route is a local model preference.
+    ? (persona.model.id === undefined ? undefined : { name: persona.model.route ?? cfg.model.route, model: persona.model.id })
+    : (eff.preset === true && eff.error === undefined && eff.model !== undefined ? eff : undefined)
+  if (pin !== undefined) {
+    L.push('- id: agent-default-model', '  config:', `    provider: ${pin.name}`, `    model: ${q(pin.model)}`)
   }
   mkdirSync(dirname(file), { recursive: true })
   writeFileSync(file, `${L.join('\n')}\n`, 'utf8')

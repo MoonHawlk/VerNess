@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { basename, join } from 'node:path'
 
 import { loadPersonas, writePersonaOverlay } from './personas.mjs'
+import { effectiveRoute, routeEnvironment, warnPreset } from './routes.mjs'
 import { parseJsonc, REPO, human, info, ok, paint, step, table, warn } from './util.mjs'
 
 /** Accepted `onFailure` values; the first is the default. */
@@ -165,7 +166,11 @@ export async function runTeam(team, ctx, opts = {}) {
   const execute = async t => {
     const persona = personaFor(team, t, personas, ctx.activePersonaId)
     // One overlay per task, kept beside its transcript: concurrent tasks must not share the file.
-    const overlay = writePersonaOverlay(persona, ctx.cfg, join(dir, `${t.id}.patch.yml`))
+    // The task runs on its persona's preset model (T-361) unless a session /model or /api choice wins.
+    const eff = effectiveRoute(ctx.cfg, { persona })
+    warnPreset(eff)
+    const overlay = writePersonaOverlay(persona, ctx.cfg, join(dir, `${t.id}.patch.yml`), eff)
+    const env = eff.preset === true ? { ...ctx.routeEnv, ...routeEnvironment(ctx.cfg, { persona }).env } : ctx.routeEnv
     const context = t.dependsOn
       .map(d => done.get(d))
       .filter(r => r !== undefined && r.output !== '')
@@ -183,7 +188,7 @@ export async function runTeam(team, ctx, opts = {}) {
     let attempts = 0
     do {
       attempts++
-      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env: ctx.routeEnv })
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env })
       if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
     } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000

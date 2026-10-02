@@ -23,7 +23,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { activePersonaId, loadPersonas, readState } from './personas.mjs'
-import { REPO } from './util.mjs'
+import { REPO, warn } from './util.mjs'
 
 /** Sandbox modes the substrate understands, keyed by the short names `/access` accepts. */
 export const ACCESS_MODES = {
@@ -230,36 +230,76 @@ export function smallModelNote(id) {
  * Resolve the route and model the next run uses. Every surface (patch, run, doctor, prompt status)
  * reads this, so they can never disagree.
  * @param {object} cfg - the FiNess configuration.
- * @param {{state?: object}} [opts] - the launcher state; `.finess/state.json` unless a test passes one.
- * @returns {{name: string, route: object, model: string|undefined, source: string, error?: string}}
+ * @param {{state?: object, persona?: object|string, env?: object}} [opts] - the launcher state
+ *   (`.finess/state.json` unless a test passes one); the persona to resolve for (an id or a normalized
+ *   persona; the active one by default, a team task passes its own); the environment keys are checked in.
+ * @returns {{name: string, route: object, model: string|undefined, source: string, preset?: boolean, warning?: string, error?: string}}
  */
-export function effectiveRoute(cfg, { state = readState() } = {}) {
+export function effectiveRoute(cfg, { state = readState(), persona: who, env = process.env } = {}) {
   const routes = knownRoutes(cfg, { state })
-  const persona = loadPersonas(cfg).get(activePersonaId(cfg, state))
+  const persona = typeof who === 'object' && who !== null ? who : loadPersonas(cfg).get(who ?? activePersonaId(cfg, state))
   const configured = cfg.activeRoute === '' || cfg.activeRoute === undefined ? cfg.model.route : cfg.activeRoute
-  const name = state.route ?? persona?.model?.route ?? configured
+  // Precedence (T-361): explicit session choice (`/api use`, `/model`) > persona preset > config default.
+  // A preset that cannot run (unknown route, key not set) is dropped with one warning, never a crash.
+  const bad = state.route === undefined ? presetProblem(persona, routes, env) : undefined
+  const preset = bad === undefined && state.route === undefined ? persona?.model : undefined
+  const name = state.route ?? preset?.route ?? configured
+  const warned = bad === undefined ? {} : { warning: bad }
   const route = routes[name]
   if (route === undefined) {
-    return { name, route: routes[cfg.model.route], model: undefined, source: 'none', error: `route "${name}" is not declared (config model.route, extraRoutes, or /api use)` }
+    return { name, route: routes[cfg.model.route], model: undefined, source: 'none', ...warned, error: `route "${name}" is not declared (config model.route, extraRoutes, or /api use)` }
   }
   // An override is bound to the route it was chosen for. A legacy override without a route predates
   // API routes, so it can only have meant the local one.
   const overrideRoute = state.modelRoute ?? (state.model === undefined ? undefined : cfg.model.route)
-  if (state.model !== undefined && overrideRoute === name) return { name, route, model: state.model, source: '/model override' }
-  const personaRoute = persona?.model?.route ?? cfg.model.route
-  if (persona?.model?.id !== undefined && personaRoute === name) return { name, route, model: persona.model.id, source: `persona ${persona.id}` }
+  if (state.model !== undefined && overrideRoute === name) return { name, route, model: state.model, source: '/model override', ...warned }
+  const presetRoute = preset?.route ?? cfg.model.route
+  if (preset?.id !== undefined && presetRoute === name) return { name, route, model: preset.id, source: `persona ${persona.id}`, preset: true, ...warned }
   const model = route.kind === 'local' ? route.id : (route.id ?? route.model)
-  return { name, route, model, source: 'route default', ...(model === undefined ? { error: `route "${name}" has no model selected — run /api use ${name} <model>` } : {}) }
+  return { name, route, model, source: 'route default', ...(preset?.route === name ? { preset: true } : {}), ...warned, ...(model === undefined ? { error: `route "${name}" has no model selected — run /api use ${name} <model>` } : {}) }
+}
+
+/**
+ * Why a persona's `model` preset cannot run, if it cannot.
+ * @param {object|undefined} persona - a normalized persona.
+ * @param {Record<string, object>} routes - from `knownRoutes`.
+ * @param {Record<string, string|undefined>} env - the environment keys are looked up in.
+ * @returns {string|undefined} the warning text, undefined when the preset is absent or usable.
+ */
+function presetProblem(persona, routes, env) {
+  const m = persona?.model
+  if (m?.route === undefined) return undefined
+  const r = routes[m.route]
+  if (r === undefined) return `persona ${persona.id}: model route "${m.route}" is not declared; using the default`
+  if (r.apiKeyEnv !== undefined && env[r.apiKeyEnv] === undefined && r.apiKeyValue === undefined) {
+    return `persona ${persona.id}: route "${m.route}" needs ${r.apiKeyEnv}, which is not set; using the default`
+  }
+  return undefined
+}
+
+/** Preset warnings already shown, so a persona that cannot use its preset says so once per process. */
+const warnedPresets = new Set()
+
+/**
+ * Print a resolution's preset warning, once per distinct text.
+ * @param {{warning?: string}} eff - from `effectiveRoute`.
+ * @returns {void}
+ */
+export function warnPreset(eff) {
+  if (eff.warning === undefined || warnedPresets.has(eff.warning)) return
+  warnedPresets.add(eff.warning)
+  warn(eff.warning)
 }
 
 /**
  * The environment a run needs for the effective route and access mode.
  * @param {object} cfg - the FiNess configuration.
+ * @param {{persona?: object|string}} [opts] - resolve for this persona instead of the active one.
  * @returns {{env: Record<string,string>, missingKey?: string}} extra variables, and the
  *   name of a required key that is not set, if any.
  */
-export function routeEnvironment(cfg) {
-  const { route } = effectiveRoute(cfg)
+export function routeEnvironment(cfg, { persona } = {}) {
+  const { route } = effectiveRoute(cfg, { persona })
   const env = {}
   const access = readState().access
   if (access !== undefined && process.env.DSH_PERMISSION_MODE === undefined) env.DSH_PERMISSION_MODE = access

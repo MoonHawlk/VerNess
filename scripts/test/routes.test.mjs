@@ -39,6 +39,9 @@ test('parseRef: a pasted URL yields the repo and nothing after it', () => {
 // The persona is an inline config definition under an id no personas/ file uses, so the repo's
 // persona files cannot change what these tests see.
 const PERSONA = 'routes-test-persona'
+// A persona preset on a keyless route is dropped (T-361), so these routes' keys must look set.
+process.env.GATEWAY_API_KEY ??= 'test'
+process.env.HOSTED_API_KEY ??= 'test'
 /**
  * @param {object} [over] - fields to override.
  * @param {object} [personaModel] - the test persona's `model` preference.
