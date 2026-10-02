@@ -15,6 +15,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { validateChoiceQuestion } from '../../packages/contracts/src/decision.ts'
+import { formatPath } from '../../packages/contracts/src/issue.ts'
 import { applyTemperature } from './calibration.mjs'
 import { REPO } from './util.mjs'
 
@@ -85,7 +87,25 @@ export async function decisionHealth(dc) {
 }
 
 /**
+ * Validate every question before it is sent (T-385): a malformed question or one with more than
+ * `MAX_CHOICE_OPTIONS` options is a caller bug, reported here instead of degrading silently.
+ * @param {Record<string, object>} questions - typed questions by key.
+ * @returns {string | undefined} one line per problem (`<key>.<path>: <message>`), or undefined when all are valid.
+ */
+export function questionErrors(questions) {
+  const lines = []
+  for (const [key, q] of Object.entries(questions ?? {})) {
+    const r = validateChoiceQuestion(q)
+    if (!r.ok) for (const e of r.errors) lines.push(`${formatPath([key, ...e.path])}: ${e.message}`)
+  }
+  return lines.length > 0 ? lines.join('; ') : undefined
+}
+
+/**
  * Ask the decision service one or more typed questions about a piece of state.
+ *
+ * Questions are validated first (`questionErrors`); an invalid set is never sent and comes back as
+ * `{ok: false, error: 'invalid question: …'}`.
  *
  * `503` is backpressure, not failure: the server caps concurrency (`LAYA_MAX_CONCURRENT`, default
  * 16) and rejects the excess, so a fan-out must retry rather than treat it as an error.
@@ -96,6 +116,8 @@ export async function decisionHealth(dc) {
  * @returns {Promise<{ok: boolean, status?: number, ms: number, body?: any, error?: string}>} the result.
  */
 export async function askDecision(dc, state, questions, opts = {}) {
+  const invalid = questionErrors(questions)
+  if (invalid !== undefined) return { ok: false, ms: 0, error: `invalid question: ${invalid}` }
   const headers = { 'content-type': 'application/json' }
   const key = process.env[dc.apiKeyEnv]
   if (key !== undefined && key !== '') headers.authorization = `Bearer ${key}`

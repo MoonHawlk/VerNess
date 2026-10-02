@@ -8,7 +8,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { ROUTING_QUESTIONS, logShadowDecision, modelAnswers, optionHash, readAnswer } from '../lib/decisions.mjs'
+import { ROUTING_QUESTIONS, askDecision, logShadowDecision, modelAnswers, optionHash, questionErrors, readAnswer } from '../lib/decisions.mjs'
 
 test('option hash is stable and order-independent', () => {
   const a = optionHash({ criteria: { x: '1', y: '2' } })
@@ -44,6 +44,21 @@ test('modelAnswers builds one entry per routing question with its hash', () => {
   assert.equal(m.level.hash, optionHash(ROUTING_QUESTIONS.level))
   assert.deepEqual(m.level.probabilities, { simple: 0.5 })
   assert.equal(m.tier.answer, undefined)
+})
+
+test('the routing questions pass the choice validator (T-385)', () => {
+  assert.equal(questionErrors(ROUTING_QUESTIONS), undefined)
+})
+
+test('askDecision refuses a question with more than 8 options before any request (T-385)', async () => {
+  const criteria = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`p${i}`, `persona ${i}`]))
+  const questions = { level: ROUTING_QUESTIONS.level, persona: { type: 'choice', instructions: 'Who owns this?', criteria } }
+  assert.match(questionErrors(questions), /^persona\.criteria: 9 options exceeds the limit of 8/)
+  // Port 9 (discard) on loopback: if validation did not short-circuit, this would be a fetch error instead.
+  const r = await askDecision({ baseURL: 'http://127.0.0.1:9', timeoutMs: 1000, apiKeyEnv: 'VERNESS_TEST_NO_KEY' }, 'x', questions, { retries: 0 })
+  assert.equal(r.ok, false)
+  assert.equal(r.ms, 0)
+  assert.match(r.error, /^invalid question: persona\.criteria: 9 options exceeds the limit of 8/)
 })
 
 test('logShadowDecision writes a v2 record with a 12-hex id', () => {
