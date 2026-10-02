@@ -9,6 +9,10 @@
  * Each task is a separate substrate run wearing its own persona, applied as a `--patch` overlay so
  * the shared profile is never mutated. That is what makes concurrent, differently-skilled tasks
  * possible today, without waiting for the supervisor subsystem (M7).
+ *
+ * Failure policy (T-167): `onFailure` is `stop` (default: nothing new starts), `skip` (only the
+ * failed task's dependents are skipped) or `retry-once` (one more attempt, then `skip`). A team sets
+ * the default; a task overrides it. Dependents of a failed task never run: they are `skipped`.
  * @module scripts/lib/teams
  */
 
@@ -17,6 +21,9 @@ import { basename, join } from 'node:path'
 
 import { loadPersonas, writePersonaOverlay } from './personas.mjs'
 import { parseJsonc, REPO, human, info, ok, paint, step, table, warn } from './util.mjs'
+
+/** Accepted `onFailure` values; the first is the default. */
+export const FAILURE_POLICIES = ['stop', 'skip', 'retry-once']
 
 /** @returns {string} the teams directory. */
 export const teamsDir = () => join(REPO, 'teams')
@@ -42,12 +49,14 @@ export function loadTeams() {
         name: raw.name ?? id,
         description: raw.description ?? '',
         concurrency: raw.concurrency ?? 1,
+        onFailure: raw.onFailure ?? 'stop',
         members: raw.members ?? [],
         tasks: (raw.tasks ?? []).map((t, i) => ({
           id: t.id ?? `task-${i + 1}`,
           prompt: t.prompt ?? '',
           member: t.member ?? t.persona,
           dependsOn: t.dependsOn ?? [],
+          onFailure: t.onFailure,
         })),
         source: `teams/${f}`,
       })
@@ -66,6 +75,8 @@ export function loadTeams() {
  */
 export function validateTeam(team, personas) {
   const problems = []
+  const policyOk = p => FAILURE_POLICIES.includes(p)
+  if (team.onFailure !== undefined && !policyOk(team.onFailure)) problems.push(`team onFailure "${team.onFailure}" must be one of ${FAILURE_POLICIES.join(', ')}`)
   const byRole = new Map(team.members.map(m => [m.role ?? m.persona, m]))
   for (const m of team.members) {
     if (!personas.has(m.persona)) problems.push(`member "${m.role ?? m.persona}" names unknown persona "${m.persona}"`)
@@ -75,6 +86,9 @@ export function validateTeam(team, personas) {
     if (t.prompt.trim() === '') problems.push(`task "${t.id}" has an empty prompt`)
     if (t.member !== undefined && !byRole.has(t.member) && !personas.has(t.member)) {
       problems.push(`task "${t.id}" names unknown member/persona "${t.member}"`)
+    }
+    if (t.onFailure !== undefined && !policyOk(t.onFailure)) {
+      problems.push(`task "${t.id}" onFailure "${t.onFailure}" must be one of ${FAILURE_POLICIES.join(', ')}`)
     }
     for (const d of t.dependsOn) if (!ids.has(d)) problems.push(`task "${t.id}" depends on unknown task "${d}"`)
   }
@@ -101,20 +115,21 @@ function personaFor(team, task, personas, fallbackId) {
  * @param {object} ctx - the command context (`cfg`, `sh`, `activePersona`, `runTask`).
  * @param {{concurrency?: number, only?: string[], dryRun?: boolean, runsRoot?: string}} [opts] - run
  *   options; `runsRoot` overrides `.finess/runs` (tests).
- * @returns {Promise<{dir: string, results: object[]}>} the output directory and per-task results.
+ * @returns {Promise<{dir: string, results: object[], skipped: object[]}>} the output directory, the
+ *   results of tasks that ran, and the skipped tasks (`{id, reason}`).
  */
 export async function runTeam(team, ctx, opts = {}) {
   const personas = loadPersonas(ctx.cfg)
   const problems = validateTeam(team, personas)
   if (problems.length > 0) {
     for (const p of problems) warn(p)
-    return { dir: '', results: [] }
+    return { dir: '', results: [], skipped: [] }
   }
 
   const selected = opts.only === undefined || opts.only.length === 0
     ? team.tasks
     : team.tasks.filter(t => opts.only.includes(t.id))
-  if (selected.length === 0) { warn('no matching tasks'); return { dir: '', results: [] } }
+  if (selected.length === 0) { warn('no matching tasks'); return { dir: '', results: [], skipped: [] } }
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const dir = join(opts.runsRoot ?? runsDir(), team.id, stamp)
@@ -127,12 +142,17 @@ export async function runTeam(team, ctx, opts = {}) {
       info(`${t.id}  persona ${p?.id ?? '?'}${t.dependsOn.length > 0 ? `  after ${t.dependsOn.join(', ')}` : ''}`)
       info(`   ${t.prompt.length > 120 ? `${t.prompt.slice(0, 117)}...` : t.prompt}`)
     }
-    return { dir: '', results: [] }
+    return { dir: '', results: [], skipped: [] }
   }
   mkdirSync(dir, { recursive: true })
 
+  /** The policy in force for a task: its own, else the team's. */
+  const policyOf = t => t.onFailure ?? team.onFailure ?? 'stop'
   /** @type {Map<string, object>} */
   const done = new Map()
+  /** @type {object[]} */
+  const skipped = []
+  let halted = false
   const pending = [...selected]
   const running = new Set()
   const results = []
@@ -158,25 +178,51 @@ export async function runTeam(team, ctx, opts = {}) {
     // what makes concurrency real: a synchronous spawn blocks the event loop, so Promise.race below
     // would only ever see one task at a time (T-144).
     const run = ctx.dshAsync ?? ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
-    const r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env: ctx.routeEnv })
+    const maxAttempts = policyOf(t) === 'retry-once' ? 2 : 1
+    let r
+    let attempts = 0
+    do {
+      attempts++
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env: ctx.routeEnv })
+      if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
+    } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000
-    const rec = { id: t.id, persona: persona.id, code: r.code, seconds, output: r.out, file: join(dir, `${t.id}.md`) }
+    const rec = { id: t.id, persona: persona.id, code: r.code, seconds, attempts, output: r.out, file: join(dir, `${t.id}.md`) }
     writeFileSync(rec.file, [
       `# ${t.id}`, '',
       `- persona: ${persona.id} (${persona.name})`,
       `- exit: ${r.code}`,
       `- seconds: ${seconds.toFixed(1)}`,
+      attempts > 1 ? `- attempts: ${attempts}` : '',
       t.dependsOn.length === 0 ? '' : `- after: ${t.dependsOn.join(', ')}`,
       '', '## Prompt', '', '```', prompt, '```', '', '## Output', '', r.out, '',
     ].filter(l => l !== '').join('\n'), 'utf8')
     done.set(t.id, rec)
     results.push(rec)
+    if (r.code !== 0 && policyOf(t) === 'stop') halted = true
     const mark = r.code === 0 ? ok : warn
     mark(`${t.id} (${persona.id}) ${r.code === 0 ? 'done' : `exit ${r.code}`} in ${seconds.toFixed(1)}s -> ${human(Buffer.byteLength(r.out))}`)
     return rec
   }
 
+  /** Move a pending task to `skipped`. */
+  const skip = (t, reason) => {
+    pending.splice(pending.indexOf(t), 1)
+    skipped.push({ id: t.id, reason })
+    warn(`${t.id} skipped: ${reason}`)
+  }
+
   while (pending.length > 0 || running.size > 0) {
+    // Dependents of a failed or skipped task never run (to a fixpoint, so chains cascade); a halt
+    // (`stop`) skips everything not yet started. Tasks already running are left to finish.
+    for (let again = true; again;) {
+      again = false
+      for (const t of [...pending]) {
+        const bad = t.dependsOn.find(d => (done.has(d) && done.get(d).code !== 0) || skipped.some(s => s.id === d))
+        if (bad !== undefined) { skip(t, `${bad} did not succeed`); again = true } else if (halted) { skip(t, 'run stopped after a failure'); again = true }
+      }
+    }
+    if (pending.length === 0 && running.size === 0) break
     const ready = pending.filter(t => t.dependsOn.every(d => done.has(d)))
     if (ready.length === 0 && running.size === 0) {
       warn(`deadlock: ${pending.map(t => t.id).join(', ')} wait on tasks that never ran`)
@@ -193,20 +239,36 @@ export async function runTeam(team, ctx, opts = {}) {
 
   writeFileSync(join(dir, 'summary.md'), [
     `# ${team.name} — ${stamp}`, '',
-    ...table(['task', 'persona', 'exit', 'seconds'], results.map(r => [r.id, r.persona, String(r.code), r.seconds.toFixed(1)])),
+    ...table(['task', 'persona', 'status', 'exit', 'seconds'], summaryRows(selected, results, skipped)),
     '',
   ].join('\n'), 'utf8')
-  writeFileSync(join(dir, 'summary.json'), `${JSON.stringify(buildSummary(team, stamp, concurrency, selected, results), null, 2)}\n`, 'utf8')
+  writeFileSync(join(dir, 'summary.json'), `${JSON.stringify(buildSummary(team, stamp, concurrency, selected, results, skipped), null, 2)}\n`, 'utf8')
   step('team run complete')
-  for (const l of table(['task', 'persona', 'exit', 'seconds'], results.map(r => [r.id, r.persona, String(r.code), r.seconds.toFixed(1)]))) console.log(`  ${l}`)
+  for (const l of table(['task', 'persona', 'status', 'exit', 'seconds'], summaryRows(selected, results, skipped))) console.log(`  ${l}`)
   info(`transcripts: ${dir}`)
-  return { dir, results }
+  return { dir, results, skipped }
+}
+
+/**
+ * Rows of the run's end-of-run table, in definition order.
+ * @param {object[]} selected - the tasks selected for this run.
+ * @param {object[]} results - per-task result records.
+ * @param {{id: string, reason: string}[]} skipped - skipped tasks.
+ * @returns {string[][]} rows of task, persona, status, exit, seconds.
+ */
+function summaryRows(selected, results, skipped) {
+  const byId = new Map(results.map(r => [r.id, r]))
+  return selected.map(t => {
+    const r = byId.get(t.id)
+    if (r === undefined) return [t.id, '-', skipped.some(s => s.id === t.id) ? 'skipped' : 'not-run', '-', '-']
+    return [t.id, r.persona, r.code === 0 ? 'ok' : 'failed', String(r.code), r.seconds.toFixed(1)]
+  })
 }
 
 /**
  * A task's status word from its exit code.
  * @param {number|null|undefined} code - the exit code; `undefined` means the task never ran.
- * @returns {'ok'|'failed'|'not-run'} the status.
+ * @returns {'ok'|'failed'|'not-run'} the status (`skipped` is recorded by the runner, not derived).
  */
 const statusOf = code => (code === undefined ? 'not-run' : code === 0 ? 'ok' : 'failed')
 
@@ -219,10 +281,12 @@ const statusOf = code => (code === undefined ? 'not-run' : code === 0 ? 'ok' : '
  * @param {number} concurrency - the effective concurrency.
  * @param {object[]} selected - the tasks selected for this run.
  * @param {object[]} results - per-task result records from the runner.
+ * @param {{id: string, reason: string}[]} [skipped] - tasks the failure policy skipped.
  * @returns {object} the summary.
  */
-export function buildSummary(team, stamp, concurrency, selected, results) {
+export function buildSummary(team, stamp, concurrency, selected, results, skipped = []) {
   const byId = new Map(results.map(r => [r.id, r]))
+  const skipById = new Map(skipped.map(s => [s.id, s.reason]))
   const tasks = selected.map(t => {
     const r = byId.get(t.id)
     return {
@@ -230,7 +294,10 @@ export function buildSummary(team, stamp, concurrency, selected, results) {
       member: t.member ?? null,
       persona: r?.persona ?? null,
       dependsOn: t.dependsOn,
-      status: statusOf(r === undefined ? undefined : r.code),
+      status: skipById.has(t.id) && r === undefined ? 'skipped' : statusOf(r === undefined ? undefined : r.code),
+      onFailure: t.onFailure ?? team.onFailure ?? 'stop',
+      attempts: r?.attempts ?? 0,
+      skipReason: skipById.get(t.id) ?? null,
       exit: r === undefined ? null : r.code,
       seconds: r === undefined ? null : Number(r.seconds.toFixed(1)),
       file: r === undefined ? null : basename(r.file),
@@ -243,6 +310,7 @@ export function buildSummary(team, stamp, concurrency, selected, results) {
     stamp,
     finishedAt: new Date().toISOString(),
     concurrency,
+    onFailure: team.onFailure ?? 'stop',
     ok: tasks.every(t => t.status === 'ok'),
     tasks,
   }

@@ -60,9 +60,9 @@ test('runTeam writes summary.json in definition order with per-task status', asy
   assert.equal(s.team, 't170')
   assert.equal(s.ok, false)
   assert.deepEqual(s.tasks.map(t => t.id), ['slow', 'fast', 'last'], 'definition order, not completion order')
-  assert.deepEqual(s.tasks.map(t => t.status), ['ok', 'failed', 'ok'])
-  assert.deepEqual(s.tasks.map(t => t.exit), [0, 3, 0])
-  assert.ok(s.tasks.every(t => typeof t.seconds === 'number'))
+  assert.deepEqual(s.tasks.map(t => t.status), ['ok', 'failed', 'skipped'], 'a dependent of a failed task is skipped')
+  assert.deepEqual(s.tasks.map(t => t.exit), [0, 3, null])
+  assert.ok(s.tasks.filter(t => t.status !== 'skipped').every(t => typeof t.seconds === 'number'))
   assert.equal(s.tasks[0].file, 'slow.md', 'a basename, portable across machines')
   assert.equal(s.tasks[0].persona, 'software-engineer')
 
@@ -72,7 +72,7 @@ test('runTeam writes summary.json in definition order with per-task status', asy
   assert.deepEqual(statusRows(run).map(r => r.slice(0, 4)), [
     ['slow', 'software-engineer', 'ok', '0'],
     ['fast', 'software-engineer', 'failed', '3'],
-    ['last', 'software-engineer', 'ok', '0'],
+    ['last', '-', 'skipped', '-'],
   ])
 })
 
