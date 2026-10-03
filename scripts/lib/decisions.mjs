@@ -12,7 +12,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { validateChoiceQuestion } from '../../packages/contracts/src/decision.ts'
@@ -270,4 +270,59 @@ export function logShadowDecision(record, dir = decisionsDir()) {
   const id = randomBytes(6).toString('hex')
   appendFileSync(join(dir, `${day}.jsonl`), `${JSON.stringify({ v: 2, id, at: new Date().toISOString(), ...record })}\n`, 'utf8')
   return id
+}
+
+/**
+ * Would this shadow record's answer have replaced an LLM call? (T-232, docs/09 "Pipeline")
+ *
+ * Rule: only a real task counts (`source: 'repl'`; `/decide` is the operator asking, no LLM call to
+ * replace), and the model's valid `pipeline` answer must be `decision` - "a deterministic or
+ * rule-driven loop; little generation needed", the one pipeline that runs without a model turn.
+ * `level`/`tier` only choose how much model, never none. Confidence is not gated: the bands are
+ * unset until calibration (phase 2), so this is an upper bound; it is "would have", never "did".
+ * @param {{source?: string, model?: any}} rec - a shadow record.
+ * @returns {boolean} whether acting on the model would have skipped the LLM turn.
+ */
+export function wouldAvoidLlm(rec) {
+  const p = rec?.model?.pipeline
+  return rec?.source === 'repl' && p?.invalid !== true && p?.answer === 'decision'
+}
+
+/**
+ * @param {string} [dir] - the decisions directory.
+ * @returns {object[]} every shadow record (`YYYY-MM-DD.jsonl`; labels and temperatures are not records); bad lines skipped.
+ */
+export function readDecisionRecords(dir = decisionsDir()) {
+  if (!existsSync(dir)) return []
+  const out = []
+  for (const f of readdirSync(dir).filter(n => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort()) {
+    for (const line of readFileSync(join(dir, f), 'utf8').split('\n')) {
+      try { const r = JSON.parse(line); if (r !== null && typeof r === 'object') out.push(r) } catch { /* blank or torn line */ }
+    }
+  }
+  return out
+}
+
+/**
+ * Is the sidecar on this machine (so a call costs no money)?
+ * @param {string} baseURL - the decisions base URL.
+ * @returns {boolean} whether the host is loopback.
+ */
+export function isLocalSidecar(baseURL) {
+  try { return ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(new URL(baseURL).hostname) } catch { return false }
+}
+
+/**
+ * Pure aggregation for `/cost`: decision calls apart from LLM calls.
+ * @param {object[]} records - shadow records.
+ * @returns {{calls: number, meanMs: number | undefined, wouldAvoid: number, tasks: number}} `tasks` = real-task records, the denominator of `wouldAvoid`.
+ */
+export function summarizeDecisions(records) {
+  const ms = records.map(r => r.ms).filter(x => typeof x === 'number' && Number.isFinite(x))
+  return {
+    calls: records.length,
+    meanMs: ms.length > 0 ? ms.reduce((a, b) => a + b, 0) / ms.length : undefined,
+    wouldAvoid: records.filter(wouldAvoidLlm).length,
+    tasks: records.filter(r => r.source === 'repl').length,
+  }
 }
