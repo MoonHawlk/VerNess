@@ -39,7 +39,9 @@ import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, r
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
 import { takeSnapshot } from './lib/snapshots.mjs'
-import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, mcpRowLines, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, decisionsDir, loadTemperatures, logShadowDecision, mcpRowLines, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { latestGate } from './lib/labels.mjs'
+import { anyBand, compositeRecord, compositeRoute, escalations, llmFallback } from './lib/routing.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.finess', 'run')
@@ -484,17 +486,25 @@ function resolveRoute(cfg) {
 /** Refit temperatures, read once per REPL start (`/decisions-data refit` writes them). */
 let shadowTemperatures
 
+/** The calibration gate per question, recomputed once per REPL start, only when some band is set. */
+let shadowGate
+
 /**
  * Shadow-route one task: ask the decision model what it would do, log it beside what the rules
- * decide, and change nothing. This is how the labelled set for calibration gets built, and it is the
- * only mode the decision layer runs in until it has earned more (ADR-0009, T-223).
+ * decide and what the composite (T-204) would choose, and change nothing. This is how the labelled
+ * set for calibration gets built (ADR-0009, T-223).
+ *
+ * The composite is acted on only when `decisions.shadow` is false, the question has bands, and its
+ * gate passes; then the answer comes back in `applied`. Nothing consumes `applied` yet (the
+ * capability router is WS-E Task 6). With `shadow: false` and no bands, no call is made, as before.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @param {string} text - the task text.
- * @returns {Promise<void>} resolves once the decision is logged.
+ * @returns {Promise<Record<string, string>>} answers the composite applies; empty in shadow mode.
  */
 async function shadowRoute(cfg, text) {
   const dc = decisionConfig(cfg)
-  if (dc.enabled !== true || dc.shadow !== true) return
+  const banded = anyBand(dc.bands)
+  if (dc.enabled !== true || (dc.shadow !== true && !banded)) return {}
   if (process.env[dc.apiKeyEnv] === undefined) {
     try { process.env[dc.apiKeyEnv] = readFileSync(join(RUN_DIR_LOCAL, 'laya.key'), 'utf8').trim() } catch { /* no key file */ }
   }
@@ -503,15 +513,28 @@ async function shadowRoute(cfg, text) {
   const r = await askDecision(dc, text, asked, { retries: 1 })
   if (!r.ok) {
     info(paint(C.dim, `shadow: ${decisionFailure(r)}`))
-    return
+    return {}
   }
   shadowTemperatures ??= loadTemperatures()
+  if (banded) shadowGate ??= latestGate(decisionsDir())
   const model = modelAnswers(r.body, shadowTemperatures, asked)
+  const shadow = dc.shadow !== false
+  let comp = compositeRoute({ rules, model, bands: dc.bands, gate: shadowGate, shadow, ms: r.ms })
+  const up = escalations(comp.per)
+  // The LLM fallback is only consulted when the answer would be acted on (never in shadow mode).
+  if (!shadow && up.length > 0) {
+    const fb = await llmFallback(dc, up)
+    info(paint(C.dim, `decision: ${up.join(', ')} in the low band; ${fb.note}`))
+    comp = compositeRoute({ rules, model, bands: dc.bands, gate: shadowGate, llm: fb.answers, shadow, ms: r.ms })
+  }
   const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
   // guard is logged beside the routing answers, never acted on; the rules' baseline is "ok" (nothing is refused).
-  logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules: { ...rules, guard: 'ok' }, agreement: agree.length })
+  logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules: { ...rules, guard: 'ok' }, agreement: agree.length, composite: compositeRecord(comp) })
+  const pick = q => `${comp.per[q].answer}[${comp.per[q].source}]`
   info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`
-    + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`))
+    + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`
+    + `; composite ${pick('level')}/${pick('tier')}/${pick('pipeline')}${shadow ? ' (shadow)' : ''}`))
+  return comp.applied
 }
 
 /**
@@ -1280,6 +1303,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
       info('restart without --no-model to run tasks; quick-tools (/help) still work here')
       continue
     }
+    // Its `applied` answers have no consumer yet: the capability router (WS-E Task 6) will take them.
     await shadowRoute(cfg, taskText)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.

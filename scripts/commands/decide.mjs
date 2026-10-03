@@ -11,9 +11,18 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
-  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute,
+  ROUTING_QUESTIONS, askDecision, decisionConfig, decisionHealth, decisionsDir, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute,
 } from '../lib/decisions.mjs'
+import { latestGate } from '../lib/labels.mjs'
+import { anyBand, compositeRecord, compositeRoute } from '../lib/routing.mjs'
 import { head, info, paint, RUN_DIR, table, warn } from '../lib/util.mjs'
+
+/**
+ * One composite cell: the answer, where it came from and its band.
+ * @param {{answer: string, source: string, band: string, why: string}} d - a question's composite decision.
+ * @returns {string} e.g. `agent (rules, mid)`.
+ */
+const compositeCell = d => `${d.answer} (${d.source}${d.band === 'none' ? '' : `, ${d.band}`})`
 
 /**
  * Load the sidecar key written by the lifecycle command, so the caller need not export it.
@@ -46,9 +55,13 @@ export default {
     if (text === '') { warn('give me a task to route: /decide <task text>'); return 1 }
 
     const rules = ruleRoute(text)
+    const gate = anyBand(dc.bands) ? latestGate(decisionsDir()) : undefined
+    const shadow = dc.shadow !== false
     if (!(await decisionHealth(dc))) {
+      const comp = compositeRoute({ rules, bands: dc.bands, gate, shadow })
       head('rules only — the decision service is not answering')
-      for (const l of table(['question', 'rules'], [['level', rules.level], ['tier', rules.tier], ['pipeline', rules.pipeline]])) console.log(`  ${l}`)
+      const qs = Object.keys(ROUTING_QUESTIONS)
+      for (const l of table(['question', 'rules', 'composite'], qs.map(q => [q, rules[q], compositeCell(comp.per[q])]))) console.log(`  ${l}`)
       info(`start it with: /decision up   (expected at ${dc.baseURL})`)
       return 1
     }
@@ -58,6 +71,8 @@ export default {
 
     const rows = []
     const answers = modelAnswers(r.body, loadTemperatures())
+    // `/decide` never calls the LLM fallback: it only shows what the composite would choose.
+    const comp = compositeRoute({ rules, model: answers, bands: dc.bands, gate, shadow, ms: r.ms })
     for (const key of Object.keys(ROUTING_QUESTIONS)) {
       const a = answers[key]
       const agree = a.answer === rules[key]
@@ -66,10 +81,12 @@ export default {
         a.invalid === true ? paint('yellow', 'invalid option') : `${a.answer ?? '?'} (${(a.confidence ?? 0).toFixed(2)})`,
         rules[key],
         agree ? paint('green', 'agree') : paint('yellow', 'differ'),
+        compositeCell(comp.per[key]),
       ])
     }
     head(`decision in ${r.ms} ms`)
-    for (const l of table(['question', 'decision model', 'rules', ''], rows)) console.log(`  ${l}`)
+    for (const l of table(['question', 'decision model', 'rules', '', 'composite'], rows)) console.log(`  ${l}`)
+    if (!anyBand(dc.bands)) info('composite: decisions.bands unset, so every question resolves to the rules (set them after /dd gate passes)')
 
     const top = answers.level.probabilities
     if (top !== undefined) {
@@ -85,6 +102,7 @@ export default {
       model: answers,
       rules,
       agreement: Object.keys(ROUTING_QUESTIONS).filter(k => answers[k].answer === rules[k]).length,
+      composite: compositeRecord(comp),
     })
     return 0
   },

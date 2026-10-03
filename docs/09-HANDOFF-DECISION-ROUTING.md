@@ -102,6 +102,46 @@ and never `act_probability` (no usable signal, issue #185).
 Thresholds are set **from measured data in phase 2**, not chosen by taste. Until then, every band
 falls back to rules.
 
+### The composite (T-204)
+
+`compositeRoute` in `scripts/lib/routing.mjs` is the table above as a pure function. Per question
+it returns `{answer, source: rules|model|llm, band: high|mid|low|none, cost, why}`; `none` means
+the question was not banded (bands unset or malformed, model answer missing or invalid, or no
+finite confidence). In order:
+
+1. bands for the question unset or malformed → `rules`, `none`;
+2. model answer missing, invalid, or without a confidence → `rules`, `none`;
+3. band from the (refit) confidence: `≥ high` → `high`, `≤ low` → `low`, else `mid`;
+4. gate not passed → `rules` (the band is still logged). The gate is not stored: it is recomputed
+   from the logs and labels (`latestGate`) once per REPL start, and only when some band is set;
+5. `high` → `model`; `mid` → `rules`;
+6. `low` → `llm` with a valid LLM answer, otherwise `rules` with `escalate: true`.
+
+Bands are per question in `decisions.bands`, unset by default, so every question resolves to
+`rules`, which is today's behaviour:
+
+```jsonc
+"decisions": {
+  "shadow": true,
+  // set a question only after `/dd gate` prints PASS for it
+  "bands": { "pipeline": { "high": 0.85, "low": 0.4 } },
+}
+```
+
+An answer is **applied** only when `decisions.shadow` is `false`, the question has bands, and its
+gate passes. `shadowRoute` returns those answers; nothing consumes them yet (the capability router,
+WS-E Task 6, will). With `shadow: false` and no bands, no decision call is made at all. Every shadow
+record and `/decide` carry a `composite` field with what it would choose and from which source.
+
+Cost: the decision call's `ms` is one forward pass shared by all three questions and is logged once
+per record; a question's own cost is only its LLM call, if any.
+
+**The LLM fallback is a stub.** `llmFallback` makes no call and returns no answers, even with
+`decisions.llm.route` set (it only names the route in its note); a low-band question therefore
+stays on the rules with `escalate: true`. It is consulted only when the answer would be applied,
+never in shadow mode, so task text never reaches a paid route for a decision nobody acts on. The
+real provider is WS-G M3's `LlmDecisionProvider`.
+
 ## First session plan
 
 ```powershell
