@@ -41,8 +41,13 @@ export default {
     }
     const md = renderSessionMarkdown(readSessionEvents(join(s.dir, 'session.v4.jsonl.zstd')), { id: s.id.slice(0, 8) })
     const file = resolve(out ?? join(REPO, '.finess', 'exports', `${localDay(s.at.getTime())}-${s.id.slice(0, 8)}.md`))
-    mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, md)
+    try {
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, md)
+    } catch (e) {
+      warn(`could not write ${file}: ${e.code ?? e.message}`)
+      return 1
+    }
     ok(`exported ${s.id.slice(0, 8)} (${s.turns} turn(s)) to ${file}`)
     info('plain Markdown: keep it, share it, or paste it into another tool')
     return 0
