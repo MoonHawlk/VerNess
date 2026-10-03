@@ -160,6 +160,9 @@
       // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
       // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
       { "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },
+      // The browser UI's brand: FiNess mark and name in the substrate's brand slots, tab title and
+      // favicon (T-398). Web profile only; its client half is packages/client-ui-brand/client.js.
+      { "id": "finess-client-ui-brand", "package": "@finess/client-ui-brand", "path": "packages/client-ui-brand", "enabled": true, "surfaces": ["web"] },
     ],
     // Browser-UI bundles, added to the WEB profile only with `dsh plugin add` so their own patch
     // applies (a plain plugin row would skip it and also land in the headless profile).
