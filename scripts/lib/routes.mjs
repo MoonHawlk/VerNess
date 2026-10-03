@@ -319,3 +319,58 @@ export function routeEnvironment(cfg, { persona } = {}) {
 export function accessMode() {
   return process.env.DSH_PERMISSION_MODE ?? readState().access ?? 'workspace-write'
 }
+
+// ------------------------------------------------------------------------------ fallback (T-453)
+
+/**
+ * Why a route cannot run right now, if it cannot. Pure: the engine probe result is passed in.
+ * @param {object} route - a route spec from `knownRoutes` (has `kind`).
+ * @param {{engineUp: boolean, env: Record<string, string|undefined>}} facts - probe result and environment.
+ * @returns {string|undefined} the reason, undefined when usable.
+ */
+export function unavailableReason(route, { engineUp, env }) {
+  if (route.kind === 'local') return engineUp ? undefined : 'local engine not answering'
+  if (route.apiKeyEnv !== undefined && route.apiKeyValue === undefined && (env[route.apiKeyEnv] ?? '') === '') return `${route.apiKeyEnv} not set`
+  return undefined
+}
+
+/**
+ * Pick the route a task runs on when the default one is unavailable (`model.fallback`, an ordered list
+ * of `{ route, id }`). Only the config default is ever replaced: an explicit session choice
+ * (`/model`, `/api use`) or a persona preset is respected as is. Pure over injected probe results.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {{state?: object, persona?: object|string, env?: Record<string, string|undefined>, engineUp: boolean}} opts
+ *   `engineUp` is the local engine probe result.
+ * @returns {{use: boolean, from: string, reason?: string, name?: string, model?: string, route?: object, line?: string, candidates: {route: string, id: string, usable: boolean, why?: string}[]}}
+ *   `use` is true when a fallback replaces the default; `candidates` lists each entry with its status.
+ */
+export function chooseFallback(cfg, { state = readState(), persona, env = process.env, engineUp }) {
+  const eff = effectiveRoute(cfg, { state, persona, env })
+  const base = { use: false, from: eff.name, candidates: [] }
+  const list = (Array.isArray(cfg.model?.fallback) ? cfg.model.fallback : [])
+    .filter(f => f !== null && typeof f === 'object' && typeof f.route === 'string' && typeof f.id === 'string')
+  if (list.length === 0) return base
+  const routes = knownRoutes(cfg, { state })
+  const facts = { engineUp, env }
+  base.candidates = list.map(f => {
+    const r = routes[f.route]
+    const why = r === undefined ? 'route not declared' : (f.route === eff.name && f.id === eff.model ? 'is the default' : unavailableReason(r, facts))
+    return { route: f.route, id: f.id, usable: why === undefined, ...(why === undefined ? {} : { why }) }
+  })
+  // Explicit choices win: session (`/model`, `/api use`) first, then a persona preset.
+  if (state.route !== undefined || state.model !== undefined || eff.preset === true || eff.error !== undefined || eff.source !== 'route default') return base
+  const reason = unavailableReason(eff.route, facts)
+  if (reason === undefined) return base
+  const pick = base.candidates.find(c => c.usable)
+  if (pick === undefined) return { ...base, reason }
+  return { ...base, use: true, reason, name: pick.route, model: pick.id, route: routes[pick.route], line: `default route ${eff.name} unavailable (${reason}) - using ${pick.route}/${pick.id} for this task` }
+}
+
+/**
+ * Environment a fallback route needs (its key placeholder, or the real key already set).
+ * @param {object} route - the fallback route spec.
+ * @returns {Record<string, string>} extra variables.
+ */
+export function fallbackEnv(route) {
+  return route.apiKeyEnv !== undefined && process.env[route.apiKeyEnv] === undefined && route.apiKeyValue !== undefined ? { [route.apiKeyEnv]: route.apiKeyValue } : {}
+}

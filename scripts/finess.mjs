@@ -22,7 +22,7 @@ import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
-import { ACCESS_MODES, accessMode, catalogProviders, effectiveRoute, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
+import { ACCESS_MODES, accessMode, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
@@ -49,7 +49,7 @@ const DEFAULTS = {
     baseURL: 'http://127.0.0.1:11434/v1', apiKeyEnv: 'OLLAMA_API_KEY',
     apiKeyValue: 'ollama-local-no-auth', contextWindow: 32768, maxTokens: 4096,
     engine: 'ollama', source: undefined, keepAliveMinutes: 10, autoInstallEngine: true,
-    reasoning: false, autoServe: true, autoPull: true,
+    reasoning: false, autoServe: true, autoPull: true, fallback: [],
   },
   extraRoutes: {}, activeRoute: '',
   personas: { active: 'generalist', definitions: { generalist: { prefix: '', suffix: '' } } },
@@ -671,7 +671,7 @@ function makeCtx(cfg, commands, convo) {
  * @param {string[]} args - an optional model id, or `reset`.
  * @returns {number} exit code.
  */
-function cmdModel(cfg, args) {
+async function cmdModel(cfg, args) {
   const { route, r, model } = resolveRoute(cfg)
   if (args.length === 0) {
     const state = readState()
@@ -679,6 +679,7 @@ function cmdModel(cfg, args) {
     info(`configured model  : ${r.id ?? '(none)'}`)
     info(`persona preference: ${loadPersonas(cfg).get(activePersonaId(cfg))?.model?.id ?? '(none)'}`)
     info(`/model override   : ${state.model ?? '(none)'}`)
+    for (const [, v, s] of await fallbackRows(cfg)) info(`fallback          : ${v} - ${s}${state.route !== undefined || state.model !== undefined ? ' (not applied: you chose a model)' : ''}`)
     const small = smallModelNote(model)
     if (small !== undefined) warn(small)
     const list = sh('ollama', ['list'], { capture: true, allowFail: true })
@@ -863,11 +864,12 @@ async function cmdSetup(cfg) {
 
 /**
  * @param {string} baseURL - the route base URL.
+ * @param {number} [ms] - probe budget.
  * @returns {Promise<boolean>} whether an engine server answers there.
  */
-async function engineAnswers(baseURL) {
+async function engineAnswers(baseURL, ms = 2500) {
   try {
-    const r = await fetch(`${String(baseURL).replace(/\/v1\/?$/, '')}/api/version`, { signal: AbortSignal.timeout(2500) })
+    const r = await fetch(`${String(baseURL).replace(/\/v1\/?$/, '')}/api/version`, { signal: AbortSignal.timeout(ms) })
     return r.ok
   } catch { return false }
 }
@@ -905,6 +907,7 @@ async function cmdDoctor(cfg) {
     ['submodule', 'upstream/deepseek-harness', existsSync(join(REPO, 'upstream/deepseek-harness/package.json')) ? 'ok' : 'run setup'],
     ['persona', activePersonaId(cfg), `${(cfg.tips ?? []).length} tip(s)`],
     ...routeRows(cfg),
+    ...(await fallbackRows(cfg)),
     ['decisions', decisionConfig(cfg).baseURL, (await decisionHealth(decisionConfig(cfg))) ? 'serving' : (decisionConfig(cfg).enabled === true ? 'not serving' : 'off (optional)')],
   ]
   const w = Math.max(...rows.map(r => r[0].length))
@@ -952,6 +955,30 @@ async function cmdWeb(cfg, rest) {
 }
 
 /**
+ * Probe what `model.fallback` needs (the local engine, within 1 s, only when a list is set) and let
+ * the pure chooser decide.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {Promise<ReturnType<typeof chooseFallback>>} the decision.
+ */
+async function pickFallback(cfg) {
+  const any = Array.isArray(cfg.model.fallback) && cfg.model.fallback.length > 0
+  return chooseFallback(cfg, { engineUp: any ? await engineAnswers(cfg.model.baseURL, 1000) : true })
+}
+
+/**
+ * Doctor and /model lines for the fallback list: each entry's status and which one would run now.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @returns {Promise<string[][]>} rows of [label, value, status]; empty when no list is set.
+ */
+async function fallbackRows(cfg) {
+  const d = await pickFallback(cfg)
+  if (d.candidates.length === 0) return []
+  const list = d.candidates.map(c => `${c.route}/${c.id}${c.usable ? '' : ` (${c.why})`}`).join(', ')
+  const now = d.use ? `would use ${d.name}/${d.model} now` : (d.reason === undefined ? 'default is fine - none needed' : 'none usable now')
+  return [['fallback', list, now]]
+}
+
+/**
  * Make the effective route runnable: a local route needs its engine up and the chosen model pulled
  * (once per model per process); an API route needs its key. Says what is wrong instead of failing
  * inside the substrate with a less readable error.
@@ -960,7 +987,17 @@ async function cmdWeb(cfg, rest) {
  * @returns {Promise<{route: string, model: string, env: Record<string,string>}|undefined>} the run
  *   environment, or undefined when the route cannot run.
  */
-async function prepareRoute(cfg, ready) {
+async function prepareRoute(cfg, ready, { fallback = false } = {}) {
+  const fb = fallback ? await pickFallback(cfg) : undefined
+  if (fb?.use === true) {
+    // Said every time a fallback is used; never silent. The overlay pins this one task's model.
+    console.log(paint(C.yellow, `  !! ${fb.line}`))
+    mkdirSync(RUN_DIR_LOCAL, { recursive: true })
+    const overlay = join(RUN_DIR_LOCAL, 'fallback.patch.yml')
+    const q = x => `'${String(x).replaceAll("'", "''")}'`
+    writeFileSync(overlay, `# GENERATED per-task fallback overlay - safe to delete.\n- id: agent-default-model\n  config:\n    provider: ${fb.name}\n    model: ${q(fb.model)}\n`, 'utf8')
+    return { route: fb.name, model: fb.model, env: { ...routeEnvironment(cfg).env, ...fallbackEnv(fb.route) }, overlay }
+  }
   const { route, r, model, env, missingKey, error } = resolveRoute(cfg)
   if (error !== undefined) { warn(error); return undefined }
   if (missingKey !== undefined) {
@@ -993,7 +1030,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     if (dshVersion === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
     if (!existsSync(join(profileDir(cfg.profile.name), 'package.json'))) die(`profile "${cfg.profile.name}" is missing`, 'run: ./turn_on.sh setup')
     syncPatch(cfg)
-    first = await prepareRoute(cfg, ready)
+    first = await prepareRoute(cfg, ready, { fallback: true })
     // A one-shot run has nothing to fall back to; the REPL still opens, so /api local or /api use can
     // repair the route (every turn re-checks it).
     if (first === undefined && (task.length > 0 || cfg.profile.template !== 'headless')) {
@@ -1012,7 +1049,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const prior = wants ? convo.id() : undefined
     if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir })
+    dsh([...args, ...(first?.overlay === undefined ? [] : ['--patch', first.overlay]), ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir })
     if (before !== undefined) convo.capture(before)
     return
   }
@@ -1170,9 +1207,10 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     await shadowRoute(cfg, taskText)
     // A command may have switched route, model or access since the last turn (/api, /models, /access),
     // so the route is re-resolved every turn rather than frozen at boot.
-    const turn = await prepareRoute(loadConfig(), ready)
+    const turn = await prepareRoute(loadConfig(), ready, { fallback: true })
     if (turn === undefined) continue
     env = turn.env
+    if (turn.overlay !== undefined) overlayArgs = [...overlayArgs, '--patch', turn.overlay]
     // Every turn after the first adopts the session the first one created, so the model keeps its
     // own history instead of meeting each question cold.
     const prior = convo.id()
