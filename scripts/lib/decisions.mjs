@@ -61,6 +61,42 @@ export const ROUTING_QUESTIONS = {
   },
 }
 
+/**
+ * Guardrail on an inbound task (T-243), asked in the same call as the routing questions. Shadow only:
+ * it is logged and never blocks. The rule baseline is "ok" - the harness refuses nothing today.
+ */
+export const GUARD_QUESTION = {
+  type: 'choice',
+  instructions: 'Is this request safe for an engineering assistant to act on as written?',
+  criteria: {
+    ok: 'an ordinary engineering request; proceed',
+    'needs-review': 'destructive, irreversible, or touches secrets or production; a human should look first',
+    refuse: 'clearly harmful, malicious, or outside what an engineering assistant should do',
+  },
+}
+
+/** Supervisor verdict after one `/loop-task` round (T-231): what should the loop do next? Shadow only. */
+export const SUPERVISOR_QUESTION = {
+  type: 'choice',
+  instructions: 'Given the objective and what the last round did, what should the loop do next?',
+  criteria: {
+    continue: 'progress is being made; run another round',
+    retry: 'the last round went wrong or was rejected; run it again with a correction',
+    complete: 'the objective is met; stop',
+    escalate: 'stuck, looping or needs a human; stop and ask',
+  },
+}
+
+/** Every question that can be logged, labelled, reported and gated: the routing three plus the shadow-only extras. */
+export const LABEL_QUESTIONS = { ...ROUTING_QUESTIONS, guard: GUARD_QUESTION, supervisor: SUPERVISOR_QUESTION }
+
+/**
+ * The rules' side of the supervisor question, from `classifyRound`'s kind.
+ * @param {string} kind - done | blocked | working.
+ * @returns {string} the equivalent option.
+ */
+export const ruleSupervisor = kind => (kind === 'done' ? 'complete' : kind === 'blocked' ? 'escalate' : 'continue')
+
 /** @param {object} cfg - the FiNess configuration. @returns {object} the decisions config block. */
 export function decisionConfig(cfg) {
   const d = cfg.decisions ?? {}
@@ -215,11 +251,12 @@ export function loadTemperatures(dir = decisionsDir()) {
  * probability map and option-set hash — what calibration (T-221, T-222) scores.
  * @param {any} body - the parsed SystemOne response body.
  * @param {Record<string, {T: number}>} [temperatures] - refit temperatures (`loadTemperatures`).
+ * @param {Record<string, object>} [questions] - the questions asked; the routing three by default.
  * @returns {Record<string, {answer?: string, confidence?: number, probabilities?: Record<string, number>, invalid?: boolean, hash: string}>} per question.
  */
-export function modelAnswers(body, temperatures) {
+export function modelAnswers(body, temperatures, questions = ROUTING_QUESTIONS) {
   const model = {}
-  for (const [k, q] of Object.entries(ROUTING_QUESTIONS)) model[k] = { ...readAnswer(body, k, q, temperatures), hash: optionHash(q) }
+  for (const [k, q] of Object.entries(questions)) model[k] = { ...readAnswer(body, k, q, temperatures), hash: optionHash(q) }
   return model
 }
 
