@@ -8,7 +8,7 @@
  * @module scripts/commands/routing
  */
 
-import { ROUTING_QUESTIONS, decisionsDir } from '../lib/decisions.mjs'
+import { LABEL_QUESTIONS, ROUTING_QUESTIONS, decisionsDir } from '../lib/decisions.mjs'
 import { latestGate, readShadow } from '../lib/labels.mjs'
 import { head, info, table, warn } from '../lib/util.mjs'
 
@@ -134,10 +134,12 @@ export function printRouting(dir, limit) {
   for (const l of table(['when', 'task', ...questions], rows)) console.log(`  ${l}`)
 
   head('agreement, model == rules, over the whole log')
-  const agr = agreement(records, questions)
-  const gate = latestGate(dir, questions)
-  const width = Math.max(...questions.map(q => q.length))
-  for (const q of questions) {
+  // Includes the shadow-only extras (guard, supervisor); they are not table columns.
+  const all = Object.keys(LABEL_QUESTIONS)
+  const agr = agreement(records, all)
+  const gate = latestGate(dir, all)
+  const width = Math.max(...all.map(q => q.length))
+  for (const q of all) {
     const a = agr[q]
     const share = a.rate === null ? 'no comparable records' : `${Math.round(a.rate * 100)}% (${a.agree}/${a.n})`
     console.log(`  ${q.padEnd(width)}  ${share.padEnd(22)}  gate: ${gate[q].pass ? 'PASS' : `HOLD — ${gate[q].why}`}`)

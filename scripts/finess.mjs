@@ -36,7 +36,7 @@ import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
-import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.finess', 'run')
@@ -487,15 +487,17 @@ async function shadowRoute(cfg, text) {
     try { process.env[dc.apiKeyEnv] = readFileSync(join(RUN_DIR_LOCAL, 'laya.key'), 'utf8').trim() } catch { /* no key file */ }
   }
   const rules = ruleRoute(text)
-  const r = await askDecision(dc, text, ROUTING_QUESTIONS, { retries: 1 })
+  const asked = { ...ROUTING_QUESTIONS, guard: GUARD_QUESTION }
+  const r = await askDecision(dc, text, asked, { retries: 1 })
   if (!r.ok) {
     info(paint(C.dim, `shadow: ${decisionFailure(r)}`))
     return
   }
   shadowTemperatures ??= loadTemperatures()
-  const model = modelAnswers(r.body, shadowTemperatures)
+  const model = modelAnswers(r.body, shadowTemperatures, asked)
   const agree = Object.keys(ROUTING_QUESTIONS).filter(k => model[k].answer === rules[k])
-  logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules, agreement: agree.length })
+  // guard is logged beside the routing answers, never acted on; the rules' baseline is "ok" (nothing is refused).
+  logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules: { ...rules, guard: 'ok' }, agreement: agree.length })
   info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`
     + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`))
 }

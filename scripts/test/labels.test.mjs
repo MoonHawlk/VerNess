@@ -88,7 +88,7 @@ test('latestGate: recomputed from the logs and labels; unlabelled questions hold
   }
   writeFileSync(join(dir, '2026-09-27.jsonl'), `${lines.join('\n')}\n`)
   const g = latestGate(dir)
-  assert.deepEqual(Object.keys(g), Object.keys(ROUTING_QUESTIONS))
+  assert.deepEqual(Object.keys(g), [...Object.keys(ROUTING_QUESTIONS), 'guard', 'supervisor'])
   // level: accuracy .8 = rules .8; ECE = .8·.1 + .2·.4 = .16 < rules .2, but > .15.
   assert.deepEqual({ pass: g.level.pass, why: g.level.why, n: g.level.n, hash: g.level.hash }, { pass: false, why: 'ECE 0.16 > 0.15', n: 60, hash })
   assert.deepEqual({ pass: g.tier.pass, why: g.tier.why, n: g.tier.n }, { pass: false, why: 'insufficient data (0 < 50)', n: 0 })

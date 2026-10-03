@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
 import { GATE, MIN_LABELS } from '../lib/calibration.mjs'
-import { ROUTING_QUESTIONS, decisionsDir, optionHash, temperaturesFile } from '../lib/decisions.mjs'
+import { LABEL_QUESTIONS, decisionsDir, optionHash, temperaturesFile } from '../lib/decisions.mjs'
 import {
   appendLabel, currentReport, labelCounts, latestGate, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled,
 } from '../lib/labels.mjs'
@@ -34,7 +34,7 @@ const GOOD_LABELS = 200
  */
 function sameOptions(rec, q) {
   const h = rec.model?.[q]?.hash
-  return h === undefined || h === optionHash(ROUTING_QUESTIONS[q])
+  return h === undefined || h === optionHash(LABEL_QUESTIONS[q])
 }
 
 /**
@@ -115,7 +115,7 @@ async function label(dir, questions, limit, relabel) {
       head(`[${i + 1}/${pending.length}] ${String(rec.at ?? '').slice(0, 16).replace('T', ' ')} · ${rec.source ?? '?'}`)
       console.log(`  task: ${String(rec.task ?? '').slice(0, 500)}`)
       for (const q of qs) {
-        const question = ROUTING_QUESTIONS[q]
+        const question = LABEL_QUESTIONS[q]
         const options = Object.keys(question.criteria)
         console.log(`\n  ${paint('cyan', q)} - ${question.instructions}`)
         for (const [n, [k, desc]] of Object.entries(question.criteria).entries()) {
@@ -250,7 +250,7 @@ export default {
   aliases: ['dd'],
   group: 'decisions',
   summary: 'label shadow decisions so the decision model can be measured: /decisions-data label',
-  usage: '/decisions-data [status] | label [--question level|tier|pipeline] [--limit N] [--relabel <id | task words>] | report [--write] | refit | gate',
+  usage: '/decisions-data [status] | label [--question level|tier|pipeline|guard|supervisor] [--limit N] [--relabel <id | task words>] | report [--write] | refit | gate',
   details: [
     'status  labels per question against the 50 the gate needs (200 is better)',
     'label   blind labelling loop over unlabelled shadow records; saved as you go',
@@ -268,9 +268,9 @@ export default {
     const sub = args[0] ?? 'status'
     const dir = decisionsDir()
     const qAt = args.indexOf('--question')
-    const questions = qAt >= 0 ? [args[qAt + 1]] : Object.keys(ROUTING_QUESTIONS)
-    if (!questions.every(q => Object.hasOwn(ROUTING_QUESTIONS, q))) {
-      warn(`unknown question: ${questions.join(', ')} - use ${Object.keys(ROUTING_QUESTIONS).join(', ')}`)
+    const questions = qAt >= 0 ? [args[qAt + 1]] : Object.keys(LABEL_QUESTIONS)
+    if (!questions.every(q => Object.hasOwn(LABEL_QUESTIONS, q))) {
+      warn(`unknown question: ${questions.join(', ')} - use ${Object.keys(LABEL_QUESTIONS).join(', ')}`)
       return 1
     }
     const lAt = args.indexOf('--limit')

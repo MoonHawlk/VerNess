@@ -22,6 +22,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { classifyRound, detectStall, observeSession, renderDigest, repeatReminder, roundPrompt } from './lib/loop.mjs'
+import { shadowSupervise } from './lib/loop-shadow.mjs'
 import { registerJob } from './lib/procs.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { workspaceKey } from './lib/workspace.mjs'
@@ -118,6 +119,9 @@ async function loopTaskInner(ctx, objective, opts, job) {
     log.push({ round, seconds, kind: verdict.kind, newCalls: stall.newCalls, detail: verdict.detail.slice(0, 120) })
     info(`${verdict.kind}${verdict.detail === '' ? '' : `: ${verdict.detail.slice(0, 100)}`}`
       + `  (${stall.newCalls} new tool call(s), ${parsed.usage.output} out tok, ${seconds.toFixed(1)}s)`)
+
+    // Shadow only (T-231): log what the model would do next beside the rules' verdict; the loop never reads it.
+    await shadowSupervise(ctx.cfg, { objective, digest: renderDigest(after), round, kind: verdict.kind }, { ask: ctx.askDecision, dir: opts.decisionsDir })
 
     if (verdict.kind === 'blocked') { outcome = 'blocked'; detail = verdict.detail; break }
 
