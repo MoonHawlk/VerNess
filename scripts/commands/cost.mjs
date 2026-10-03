@@ -7,6 +7,7 @@
  * @module scripts/commands/cost
  */
 
+import { decisionConfig, isLocalSidecar, readDecisionRecords, summarizeDecisions } from '../lib/decisions.mjs'
 import { aggregateUsage, listSessions, priceUsage } from '../lib/sessions.mjs'
 import { head, info, num, table, warn } from '../lib/util.mjs'
 
@@ -47,6 +48,8 @@ export default {
     )) console.log(`  ${l}`)
     console.log(`  ${(unpriced.length > 0 ? 'total (priced routes only)' : 'total').padEnd(20)} ${total.toFixed(4)} ${currency}`)
 
+    for (const l of decisionLines(summarizeDecisions(readDecisionRecords()), decisionConfig(ctx.cfg), ctx.cfg.pricing ?? {})) info(l)
+
     if (!anyReported) {
       info('every route here is local: no tokens billed, no accounting reported — cost is zero by construction')
     }
@@ -56,4 +59,23 @@ export default {
     }
     return 0
   },
+}
+
+/**
+ * Decision-model calls, kept apart from the LLM table above. Shadow mode acts on nothing, so the
+ * saving is reported as "would have" (rule: `wouldAvoidLlm`), never as money actually saved.
+ * @param {{calls: number, meanMs?: number, wouldAvoid: number, tasks: number}} dec - `summarizeDecisions`.
+ * @param {{baseURL: string, shadow?: boolean}} dc - resolved decisions config.
+ * @param {Record<string, any>} pricing - the `pricing` table.
+ * @returns {string[]} lines to print; empty when no decision was ever recorded.
+ */
+export function decisionLines(dec, dc, pricing) {
+  if (dec.calls === 0) return []
+  const shadow = dc.shadow !== false
+  const cost = isLocalSidecar(dc.baseURL) ? 'cost 0.0000 (local sidecar)'
+    : pricing.decisions === undefined ? 'price not configured' : 'priced by config'
+  return [
+    `decision model: ${dec.calls} call(s), mean ${dec.meanMs === undefined ? '—' : `${Math.round(dec.meanMs)}ms`}, ${cost}`,
+    `${shadow ? 'would have avoided' : 'LLM calls avoided'} ${dec.wouldAvoid} of ${dec.tasks} task(s)${shadow ? ' (shadow)' : ''}`,
+  ]
 }
