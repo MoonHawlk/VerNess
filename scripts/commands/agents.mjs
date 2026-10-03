@@ -37,7 +37,7 @@ export default {
         p.source,
       ]),
     )) console.log(`  ${l}`)
-    info('* = active. tools column is allow/deny counts — recorded now, enforced from M4')
+    info('* = active. tools column is allow/deny counts [enforced]; /permissions shows the active policy')
 
     head(`teams (${teams.size})`)
     if (teams.size === 0) info('none yet — add teams/<id>.json (see teams/README.md)')

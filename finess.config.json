@@ -81,9 +81,9 @@
   "activeRoute": "",
 
   // ----------------------------------------------------------------- personas
-  // Until the persona subsystem lands (M4), a persona is its identity text:
-  // it is injected through the existing system-prompt seam. `tools` and
-  // `skills` are recorded now and enforced from M4 on — they do nothing yet.
+  // A persona's identity text is injected through the existing system-prompt
+  // seam; its `tools` allow/deny/approval is enforced by @finess/tool-policy.
+  // `skills` are recorded now and enforced from M5 on — they do nothing yet.
   "personas": {
     "active": "generalist",
     "definitions": {
@@ -162,6 +162,9 @@
       // One corrective line (a concrete fixed call) on a failed tool result - small local models
       // misuse glob/pwsh/edit args and skip read-before-write (T-438). Zero prompt tokens.
       { "id": "finess-tool-hints", "package": "@finess/tool-hints", "path": "packages/tool-hints", "enabled": true },
+      // The active persona's tools allow/deny/approval, enforced on tools/pre-execute (T-042). Sync and
+      // every per-run persona overlay write its config; a denied call returns a reason the model reads.
+      { "id": "finess-tool-policy", "package": "@finess/tool-policy", "path": "packages/tool-policy", "enabled": true },
       // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
       // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
       { "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },

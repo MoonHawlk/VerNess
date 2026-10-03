@@ -3,8 +3,9 @@
  *
  * A persona is a file in `personas/<id>.json`: identity, prompt text, model preference, tool policy,
  * skills, tips and evaluators. Today the substrate enforces the *prompt* part (through the
- * `system-prompt` seam) and the *model* part (through `agent-default-model`); `tools`, `skills` and
- * `evaluators` are recorded and take effect when M4–M7 land. `describePersona` says which is which,
+ * `system-prompt` seam), the *model* part (through `agent-default-model`) and the *tool policy*
+ * (through `@finess/tool-policy` on `tools/pre-execute`); `skills` and `evaluators` are recorded and
+ * take effect when M5–M7 land. `describePersona` says which is which,
  * so no surface ever implies unimplemented policy is active.
  *
  * A persona can also be applied to a single run without touching the profile, by writing a
@@ -16,6 +17,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { configOf, policyOf } from '../../packages/tool-policy/index.js'
 import { formatPath } from '../../packages/contracts/src/issue.ts'
 import { locate } from '../../packages/contracts/src/locate.ts'
 import { validatePersonaFile } from '../../packages/contracts/src/validate-persona.ts'
@@ -203,12 +205,59 @@ export function describePersona(p) {
     `  source: ${p.source}`,
     `  prompt: ${p.prefix === '' ? 'no prefix' : `${p.prefix.length} chars prefix`}, ${p.suffix === '' ? 'no suffix' : `${p.suffix.length} chars suffix`}   [enforced]`,
     `  model: ${p.model.id ?? 'inherits the active route'}${p.model.route === undefined ? '' : ` via ${p.model.route}`}   [enforced; a session /model or /api use wins]`,
-    `  tools: allow ${p.tools.allow.length}, deny ${p.tools.deny.length}   [recorded — enforced from M4]`,
+    `  tools: allow ${p.tools.allow.length}, deny ${p.tools.deny.length}   [enforced]`,
     `  skills: ${p.skills.length === 0 ? 'none' : p.skills.join(', ')}   [recorded — enforced from M5]`,
     `  evaluators: ${p.evaluators.length === 0 ? 'none' : p.evaluators.join(', ')}   [recorded — enforced from M7]`,
   ]
   if (p.broken !== undefined) lines.push(`  BROKEN: ${p.broken}`)
   return lines.filter(l => l !== undefined)
+}
+
+/** The tool-policy plugin's row id (`finess.config.json` settings.plugins). */
+export const TOOL_POLICY_ID = 'finess-tool-policy'
+
+/**
+ * The patch block that hands a persona's tool policy to `@finess/tool-policy` (T-042). A patch
+ * replaces the row's config wholesale, so an overlay always restates it, even for an empty policy,
+ * or the profile persona's policy would leak into the run. Empty when no such row is configured (a
+ * patch on a missing row only warns, but there is nothing to say). Values are JSON, which is YAML.
+ * @param {object} persona - a normalized persona.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {(row: object) => boolean} [onSurface] - whether the row is in this profile.
+ * @returns {string[]} the lines, or none.
+ */
+export function toolPolicyLines(persona, cfg, onSurface = () => true) {
+  const row = (cfg.settings?.plugins ?? []).find(p => p.id === TOOL_POLICY_ID)
+  if (row === undefined || !onSurface(row)) return []
+  const c = configOf(persona)
+  const L = [
+    `# Persona "${persona.id}" tool policy, enforced by ${TOOL_POLICY_ID} on tools/pre-execute.`,
+    `- id: ${TOOL_POLICY_ID}`,
+    '  config:',
+    `    persona: ${JSON.stringify(c.persona)}`,
+    `    allow: ${JSON.stringify(c.allow)}`,
+    `    deny: ${JSON.stringify(c.deny)}`,
+    `    approval: ${JSON.stringify(c.approval)}`,
+  ]
+  if (c.broken !== undefined) L.push(`    broken: ${JSON.stringify(c.broken)}`)
+  return L
+}
+
+/**
+ * The active persona's tool policy exactly as the plugin will see it (`configOf` then `policyOf`), so
+ * `/tools` and `/permissions` agree with the enforcement. A missing persona fails closed like a broken one.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {object} [opts] - options.
+ * @param {object} [opts.state] - the launcher state; `.finess/state.json` by default.
+ * @param {string} [opts.dir] - the persona directory, for tests.
+ * @returns {{id: string, persona: object|undefined, policy: import('../../packages/tool-policy/index.js').Policy, row: object|undefined}}
+ *   the persona, its policy, and the plugin row (undefined = not configured, so nothing is enforced).
+ */
+export function activePolicy(cfg, { state = readState(), dir } = {}) {
+  const id = activePersonaId(cfg, state)
+  const persona = loadPersonas(cfg, dir === undefined ? {} : { dir }).get(id)
+  const policy = policyOf(configOf(persona ?? { id, broken: 'missing', source: `personas/${id}.json` }))
+  return { id, persona, policy, row: (cfg.settings?.plugins ?? []).find(p => p.id === TOOL_POLICY_ID) }
 }
 
 /**
@@ -237,6 +286,7 @@ export function writePersonaOverlay(persona, cfg, file = join(RUN_DIR, `persona-
     ...block('personaPrefix', prefix, '    '),
     ...block('personaSuffix', `${suffix}\nYour working directory is {{cwd}}.`, '    '),
   ]
+  L.push(...toolPolicyLines(persona, cfg))
   const pin = eff === undefined
     // Legacy callers: the raw preset. A persona model without a route is a local model preference.
     ? (persona.model.id === undefined ? undefined : { name: persona.model.route ?? cfg.model.route, model: persona.model.id })

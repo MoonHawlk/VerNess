@@ -66,7 +66,7 @@ export default {
     ctx.sync()
     ok(`active persona is now ${p.name} (${id})`)
     if (p.model.id !== undefined) info(`it prefers model ${p.model.id} — applied on the next task`)
-    if (p.tools.deny.length > 0) info(`it declares ${p.tools.deny.length} denied tool(s) — recorded, enforced from M4`)
+    if (p.tools.allow.length + p.tools.deny.length > 0) info(`its tool policy (allow ${p.tools.allow.length}, deny ${p.tools.deny.length}) is enforced from the next task — /permissions`)
     return 0
   },
 }
