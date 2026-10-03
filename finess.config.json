@@ -125,6 +125,13 @@
     // pip install "laya[serve]" into this venv; `decision up` does it for you.
     "venv": ".finess/py",
     "checkpoint": "english",
+    // Register laya[mcp] (stdio) so the MODEL can call the decision tools as mcp__laya__*.
+    // Optional; it complements harness-side routing, never replaces it. Needs: pip install "laya[mcp]".
+    "mcp": false,
+    // A hosted provider (Jev) speaks the same wire, so it is config only, no code. Swap the
+    // keys above (venv/checkpoint only matter for the local sidecar):
+    //   "baseURL": "https://jev.example.com", "apiKeyEnv": "JEV_API_KEY", "timeoutMs": 10000,
+    // `cost` then reports "price not configured" until pricing.decisions is set.
   },
 
   // ---------------------------------------------------------------------- pet

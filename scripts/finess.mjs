@@ -36,7 +36,7 @@ import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
-import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
+import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, mcpRowLines, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.finess', 'run')
@@ -392,6 +392,8 @@ export function renderPatch(cfg, { surface, repo, state = readState() }) {
       L.push(`        repo: ${yq(repo)}`)
     }
   }
+  // The command is a machine path, so only the per-machine copy carries it (never the committed one).
+  if (repo !== undefined) L.push(...mcpRowLines(decisionConfig(cfg), { repo }))
   L.push('    # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared')
   L.push('    # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and')
   L.push('    # catalog providers given only the variable their key is read from.')
