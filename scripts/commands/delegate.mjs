@@ -39,7 +39,7 @@ export default {
     if (persona === undefined || prompt === '') { warn('usage: /delegate <persona> <task...>'); return 1 }
     const personas = loadPersonas(ctx.cfg)
     if (!personas.has(persona)) { warn(`no such persona: ${persona}`); info(`available: ${[...personas.keys()].join(', ')}`); return 1 }
-    const { results } = await runTeam(delegateTeam(persona, prompt), ctx, { runsRoot: ctx.runsRoot })
+    const { results } = await runTeam(delegateTeam(persona, prompt), ctx, { runsRoot: ctx.runsRoot, jobsRoot: ctx.jobsRoot, kind: 'delegate' })
     return results.length > 0 && results.every(r => r.code === 0) ? 0 : 1
   },
 }

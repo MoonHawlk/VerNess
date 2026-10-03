@@ -642,6 +642,8 @@ function makeCtx(cfg, commands, convo) {
     // Agent runs (teams, loop-task) start in the active workspace unless a caller picks a cwd.
     dsh: (a, o = {}) => dsh(a, { cwd: activeWorkspace().dir, ...o }),
     dshAsync: (a, o = {}) => dshAsync(a, { cwd: activeWorkspace().dir, ...o }),
+    // Running /delegate, /team run and /loop-task register here so /task can list and cancel them.
+    jobsRoot: join(RUN_DIR_LOCAL, 'jobs'),
     sync: () => syncPatch(cfg),
     routeEnv: env,
     activePersonaId: activePersonaId(cfg),

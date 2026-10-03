@@ -60,7 +60,7 @@ test('a failing delegation exits 1 and lists as failed', async () => {
   assert.equal(listRuns({ root: runsRoot })[0].status, 'failed')
 })
 
-test('/task list shows runs newest first with status; cancel is refused', async () => {
+test('/task list shows runs newest first with status; cancel of an unknown job fails', async () => {
   const runsRoot = join(root, 'd')
   const mk = (team, stamp, summary) => {
     const d = join(runsRoot, team, stamp)
@@ -75,8 +75,8 @@ test('/task list shows runs newest first with status; cancel is refused', async 
   assert.deepEqual(rows.map(r => r.id), ['beta/2026-03-01T00-00-00-000Z', 'alpha/2026-02-01T00-00-00-000Z', 'alpha/2026-01-01T00-00-00-000Z'])
   assert.deepEqual(rows.map(r => r.status), ['failed', 'running', 'ok'])
   assert.equal(listRuns({ root: runsRoot, limit: 1 }).length, 1)
-  const { value, out } = await quiet(() => taskCmd.run({ runsRoot }, ['list']))
+  const { value, out } = await quiet(() => taskCmd.run({ runsRoot, jobsRoot: join(root, 'jobs-none') }, ['list']))
   assert.equal(value, 0)
   assert.ok(out.indexOf('beta') < out.indexOf('alpha'))
-  assert.equal((await quiet(() => taskCmd.run({ runsRoot }, ['cancel', 'x']))).value, 1)
+  assert.equal((await quiet(() => taskCmd.run({ runsRoot, jobsRoot: join(root, 'jobs-none') }, ['cancel', 'x']))).value, 1)
 })

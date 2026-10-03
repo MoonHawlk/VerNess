@@ -22,6 +22,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { classifyRound, detectStall, observeSession, renderDigest, repeatReminder, roundPrompt } from './lib/loop.mjs'
+import { registerJob } from './lib/procs.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { workspaceKey } from './lib/workspace.mjs'
 import { REPO, head, info, ok, paint, step, table, warn } from './lib/util.mjs'
@@ -41,11 +42,19 @@ export const DEFAULT_ROUND_TIMEOUT = 600
  * @returns {Promise<{outcome: string, rounds: number, detail: string}>} the result.
  */
 export async function runLoopTask(ctx, objective, opts = {}) {
+  // Registered while it runs so `/task list|cancel` can see and stop it (T-169).
+  const job = ctx.jobsRoot === undefined ? undefined : registerJob(ctx.jobsRoot, { kind: 'loop', label: objective })
+  try { return await loopTaskInner(ctx, objective, opts, job) } finally { job?.remove() }
+}
+
+/** The loop behind {@link runLoopTask}; `job` is the registry handle, when there is one. */
+async function loopTaskInner(ctx, objective, opts, job) {
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
   const constraints = opts.constraints ?? []
   const roundTimeout = opts.roundTimeout ?? DEFAULT_ROUND_TIMEOUT
   const profile = ctx.cfg.profile.name
-  const run = ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
+  // Async when the context has it, so the round is a registered, killable child; stubs may stay sync.
+  const run = ctx.dshAsync ?? ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
   // The session lands under the directory the run started in (`ctx.dsh` uses the active workspace).
   const workspace = ctx.workspaceKey ?? workspaceKey(REPO)
 
@@ -66,6 +75,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
   let detail = `no conclusion after ${maxRounds} rounds`
 
   for (let round = 1; round <= maxRounds; round++) {
+    if (job?.cancelled() === true) { outcome = 'cancelled'; detail = 'cancelled (/task cancel)'; break }
     const state = identity === undefined
       ? { turns: 0, calls: [], answers: [], errors: [] }
       : observeSession(sessionDirFor(identity, workspace))
@@ -75,8 +85,15 @@ export async function runLoopTask(ctx, objective, opts = {}) {
     step(`round ${round}/${maxRounds}`)
     const args = ['--profile', profile, '--json', ...(identity === undefined ? [] : ['--session-id', identity]), prompt]
     const t0 = Date.now()
-    const r = run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000 })
+    const r = await run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000, onSpawn: job?.track })
     const seconds = (Date.now() - t0) / 1000
+    if (job?.cancelled() === true) {
+      outcome = 'cancelled'
+      detail = `cancelled during round ${round} (/task cancel)`
+      log.push({ round, seconds, kind: 'cancelled', newCalls: 0, detail })
+      warn(detail)
+      break
+    }
     const parsed = parseRound(r.out)
     if (r.timedOut === true) {
       outcome = 'timeout'
@@ -106,7 +123,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
 
     if (verdict.kind === 'done') {
       if (opts.verify === false) { outcome = 'done'; detail = verdict.detail; break }
-      const check = await verifyRound(ctx, objective, verdict.detail, run, profile, roundTimeout)
+      const check = await verifyRound(ctx, objective, verdict.detail, run, profile, roundTimeout, job)
       if (check.pass) { outcome = 'done'; detail = verdict.detail; ok(`verified: ${check.detail.slice(0, 120)}`); break }
       warn(`verification rejected the claim: ${check.detail.slice(0, 160)}`)
       if (check.detail !== '') constraints.push(`A previous round claimed completion and an independent check rejected it: ${check.detail.slice(0, 200)}`)
@@ -154,9 +171,10 @@ export async function runLoopTask(ctx, objective, opts = {}) {
  * @param {(args: string[], opts: object) => {code: number, out: string}} run - the substrate runner.
  * @param {string} profile - the profile name.
  * @param {number} [timeout] - seconds the check may take.
+ * @param {{track: Function}} [job] - run-registry handle, so the check is cancellable too.
  * @returns {Promise<{pass: boolean, detail: string}>} the verdict.
  */
-async function verifyRound(ctx, objective, claim, run, profile, timeout) {
+async function verifyRound(ctx, objective, claim, run, profile, timeout, job) {
   const prompt = [
     'You are verifying someone else\'s work. You have not seen how it was done.',
     '',
@@ -166,7 +184,7 @@ async function verifyRound(ctx, objective, claim, run, profile, timeout) {
     'Check the claim yourself with your tools. Do not assume it is true.',
     'Reply with exactly one line: "PASS: <why>" or "NEEDS_WORK: <what is missing>".',
   ].join('\n')
-  const r = run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000 })
+  const r = await run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000, onSpawn: job?.track })
   const text = parseRound(r.out).answer
   const pass = /^\s*PASS\b/im.test(text)
   const m = /^\s*(?:PASS|NEEDS_WORK):\s*(.+)$/im.exec(text)

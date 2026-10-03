@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { basename, join } from 'node:path'
 
 import { loadPersonas, writePersonaOverlay } from './personas.mjs'
+import { registerJob } from './procs.mjs'
 import { effectiveRoute, routeEnvironment, warnPreset } from './routes.mjs'
 import { parseJsonc, REPO, human, info, ok, paint, step, table, warn } from './util.mjs'
 
@@ -115,11 +116,18 @@ function personaFor(team, task, personas, fallbackId) {
  * @param {object} team - the team to run.
  * @param {object} ctx - the command context (`cfg`, `sh`, `activePersona`, `runTask`).
  * @param {{concurrency?: number, only?: string[], dryRun?: boolean, runsRoot?: string}} [opts] - run
- *   options; `runsRoot` overrides `.finess/runs` (tests).
+ *   options; `runsRoot` overrides `.finess/runs` (tests); `jobsRoot` turns on the run registry, `kind` names the job.
  * @returns {Promise<{dir: string, results: object[], skipped: object[]}>} the output directory, the
  *   results of tasks that ran, and the skipped tasks (`{id, reason}`).
  */
 export async function runTeam(team, ctx, opts = {}) {
+  // Registered while it runs so `/task list|cancel` can see and stop it (T-169).
+  const job = opts.jobsRoot === undefined || opts.dryRun === true ? undefined : registerJob(opts.jobsRoot, { kind: opts.kind ?? 'team', label: team.name })
+  try { return await runTeamInner(team, ctx, opts, job) } finally { job?.remove() }
+}
+
+/** The runner behind {@link runTeam}; `job` is the registry handle, when there is one. */
+async function runTeamInner(team, ctx, opts, job) {
   const personas = loadPersonas(ctx.cfg)
   const problems = validateTeam(team, personas)
   if (problems.length > 0) {
@@ -188,7 +196,7 @@ export async function runTeam(team, ctx, opts = {}) {
     let attempts = 0
     do {
       attempts++
-      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env })
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, onSpawn: job?.track })
       if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
     } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000
@@ -204,7 +212,7 @@ export async function runTeam(team, ctx, opts = {}) {
     ].filter(l => l !== '').join('\n'), 'utf8')
     done.set(t.id, rec)
     results.push(rec)
-    if (r.code !== 0 && policyOf(t) === 'stop') halted = true
+    if ((r.code !== 0 && policyOf(t) === 'stop') || job?.cancelled() === true) halted = true
     const mark = r.code === 0 ? ok : warn
     mark(`${t.id} (${persona.id}) ${r.code === 0 ? 'done' : `exit ${r.code}`} in ${seconds.toFixed(1)}s -> ${human(Buffer.byteLength(r.out))}`)
     return rec
