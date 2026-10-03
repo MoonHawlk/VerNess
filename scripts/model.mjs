@@ -21,12 +21,15 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileS
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { gatherFacts, hintForLog, lastErrorLine, runChecks } from './lib/engine-checks.mjs'
 import { startBackground } from './lib/util.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const WIN = process.platform === 'win32'
 const RUN_DIR = join(REPO, '.finess', 'run')
 const RUN_FILE = join(RUN_DIR, 'model.json')
+/** The engine server's stderr from the start we made (T-452); read back when it never answers. */
+export const ENGINE_LOG = join(RUN_DIR, 'engine.log')
 
 const C = {
   dim: '[2m', red: '[31m', green: '[32m',
@@ -121,6 +124,29 @@ function installEngine() {
 }
 
 /**
+ * Say why the engine server did not come up: the last error of its own log (when we started it)
+ * with the matching fix, then whatever the environment checks find.
+ * @param {string} base - the route base URL.
+ * @param {string} ref - the model that was to run.
+ * @param {boolean} startedByUs - whether this call started the server (its log is then fresh).
+ */
+async function explainStartFailure(base, ref, startedByUs) {
+  let logged
+  if (startedByUs) {
+    try { logged = lastErrorLine(readFileSync(ENGINE_LOG, 'utf8')) } catch { /* no log */ }
+  }
+  if (logged !== undefined) {
+    info(`the server said: ${logged}`)
+    const hint = hintForLog(logged, process.env)
+    if (hint !== undefined) info(`fix: ${hint}`)
+    info(`full log: ${ENGINE_LOG}`)
+  }
+  const binary = sh('ollama', ['--version'], { capture: true, allowFail: true })
+  const facts = await gatherFacts({ baseURL: base, model: ref, engineAnswering: false, binary: binary.code === 0 ? binary.out : undefined })
+  for (const f of runChecks(facts)) { warn(f.message); info(`fix: ${f.fix}`) }
+}
+
+/**
  * Bring the model up: engine present, server running, weights fetched, weights warm.
  * @param {object} cfg - the FiNess configuration.
  * @param {string} [model] - the model to bring up; defaults to the configured one.
@@ -143,14 +169,18 @@ export async function modelUp(cfg, model) {
   if ((await engineVersion(base)) === undefined) {
     step(`starting the engine server on ${apiRoot(base)}`)
     // Hidden console on Windows: a detached start makes each Ollama helper flash a terminal window.
-    const started = startBackground(WIN ? 'ollama.exe' : 'ollama', ['serve'])
+    const started = startBackground(WIN ? 'ollama.exe' : 'ollama', ['serve'], { errFile: ENGINE_LOG })
     if (started.error !== undefined) info(started.error.split(/\r?\n/)[0])
     pid = started.pid
     startedByUs = true
     for (let i = 0; i < 24 && (await engineVersion(base)) === undefined; i++) await new Promise(r => setTimeout(r, 500))
   }
   const ver = await engineVersion(base)
-  if (ver === undefined) { fail(`no engine server answering on ${apiRoot(base)}`); return false }
+  if (ver === undefined) {
+    fail(`no engine server answering on ${apiRoot(base)}`)
+    await explainStartFailure(base, ref, startedByUs)
+    return false
+  }
   ok(`server up (api ${ver})${startedByUs ? ` pid ${pid}` : ' — was already running'}`)
 
   const tags = await getJson(`${apiRoot(base)}/api/tags`)

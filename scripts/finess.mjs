@@ -28,6 +28,7 @@ import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { notifyDone } from './lib/notify.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
+import { gatherFacts, runChecks } from './lib/engine-checks.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { loadRecipes } from './lib/recipes.mjs'
 import { CAPS, MAX_TASK_CHARS, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
@@ -894,11 +895,13 @@ function routeRows(cfg) {
 /** Print what is installed and what is missing. @param {typeof DEFAULTS} cfg - configuration. */
 async function cmdDoctor(cfg) {
   const dshv = version('dsh', '--version')
+  const engineVer = version(cfg.model.engine ?? 'ollama')
+  const engineUp = await engineAnswers(cfg.model.baseURL)
   const rows = [
     ['node', process.versions.node, nodeOk() ? 'ok' : `needs ${NODE_MIN.join('.')}+`],
     ['pnpm', version('pnpm') ?? '-', version('pnpm') === undefined ? 'missing' : 'ok'],
     ['dsh', dshv ?? '-', dshv === cfg.substrate.version ? 'ok' : `want ${cfg.substrate.version}`],
-    ['engine', version(cfg.model.engine ?? 'ollama') ?? '-', (await engineAnswers(cfg.model.baseURL)) ? 'serving' : 'not serving'],
+    ['engine', engineVer ?? '-', engineUp ? 'serving' : 'not serving'],
     ['engram', version('engram') ?? '-', version('engram') === undefined ? 'optional' : 'ok'],
     ['profile', profileDir(cfg.profile.name), existsSync(profileDir(cfg.profile.name)) ? 'ok' : 'run setup'],
     ['web ui', profileDir(webProfileName(cfg)), existsSync(join(profileDir(webProfileName(cfg)), 'package.json')) ? 'ok' : 'created on first `web`'],
@@ -911,6 +914,15 @@ async function cmdDoctor(cfg) {
   for (const [k, v, s] of rows) {
     const bad = /missing|run setup|needs|want|not serving|not declared|no model|too small/.test(s)
     console.log(`  ${k.padEnd(w)}  ${v}  ${paint(bad ? C.yellow : C.dim, `(${s})`)}`)
+  }
+  // T-452: an engine that is not serving gets the reasons it may not start, each with a fix.
+  if (!engineUp) {
+    const e = effectiveRoute(cfg)
+    const found = runChecks(await gatherFacts({
+      baseURL: cfg.model.baseURL, model: e.route?.kind === 'local' ? e.model : undefined,
+      engineAnswering: false, binary: engineVer,
+    }))
+    for (const f of found) { console.log(`  ${paint(C.yellow, '!!')} engine: ${f.message}`); console.log(`     fix: ${f.fix}`) }
   }
 }
 
