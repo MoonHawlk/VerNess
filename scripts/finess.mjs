@@ -36,6 +36,7 @@ import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
+import { executePipeline } from './lib/pipeline.mjs'
 import { logRouterShadow, routeByCapability, routerRecord } from './lib/router.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
@@ -1283,7 +1284,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const attachments = [...shellAttached, ...refs.attachments]
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)), attachments })
     const t0 = Date.now()
-    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, task: true })
+    // T-254: every REPL task runs through the pipeline executor; only `standard` exists before M7.
+    const run = executePipeline('standard', { base: args, overlays: overlayArgs, sessionId: prior, task: outgoing, env, cwd: activeWorkspace().dir }, { run: dsh })
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0; shellAttached.length = 0 }
