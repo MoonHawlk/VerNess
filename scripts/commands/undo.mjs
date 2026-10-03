@@ -6,7 +6,7 @@
  * @module scripts/commands/undo
  */
 
-import { applyUndo, isGitRepo, readSnapshots, undoPlan } from '../lib/snapshots.mjs'
+import { applyUndo, git, isGitRepo, readSnapshots, snapshotAvailable, undoPlan } from '../lib/snapshots.mjs'
 import { activeWorkspace } from '../lib/workspace.mjs'
 import { head, info, line, ok, warn } from '../lib/util.mjs'
 
@@ -35,16 +35,24 @@ export default {
     if (!isGitRepo(dir)) { info(`the workspace is not a git repository - no snapshots, nothing to undo (${dir})`); return 0 }
     const [snap] = readSnapshots(dir, ctx.snapshotRoot)
     if (snap === undefined) { info('no snapshot yet - one is taken before each task that may write'); return 0 }
-    const plan = undoPlan(dir, snap)
+    if (!snapshotAvailable(dir, snap)) { warn(`the snapshot from ${snap.at} is no longer in git (pruned?) - cannot undo`); return 1 }
+    let plan
+    try { plan = undoPlan(dir, snap) } catch (e) { warn(e.message); return 1 }
+    const notes = () => {
+      for (const f of plan.kept) warn(`${f} was untracked before and is tracked now - left as it is`)
+      for (const f of plan.drifted) warn(`${f} changed but was untracked before - left as it is`)
+    }
     if (plan.restore.length === 0 && plan.remove.length === 0) {
       info(`the workspace already matches the snapshot from ${snap.at}`)
-      for (const f of plan.drifted) warn(`${f} changed but was untracked before - left as it is`)
+      notes()
       return 0
     }
     head(`undo to the snapshot from ${snap.at}${snap.task ? ` (before: ${snap.task})` : ''}`)
     for (const c of plan.restore) line(`  ${(VERB[c.status] ?? 'restore').padEnd(15)} ${c.path}`)
     for (const f of plan.remove) line(`  ${'delete (new)'.padEnd(15)} ${f}`)
-    for (const f of plan.drifted) warn(`${f} changed but was untracked before - left as it is`)
+    notes()
+    const headNow = git(dir, ['rev-parse', '--verify', '-q', 'HEAD']).out.trim()
+    if (snap.head && headNow !== snap.head) warn('HEAD moved since the snapshot (the task committed?) - undo restores files only, commits stay')
     if (!args.includes('--yes')) { info('nothing changed yet - run /undo --yes to apply'); return 0 }
     const res = applyUndo(dir, snap, plan)
     for (const e of res.errors) warn(e)

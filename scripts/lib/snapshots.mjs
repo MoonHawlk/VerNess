@@ -116,9 +116,10 @@ export function takeSnapshot(dir, { root, task } = {}) {
 /**
  * What undo would do (pure).
  * @param {{snapshot: {untracked: string[], stats?: object}, changed: {status: string, path: string}[], untrackedNow: string[], statNow?: (f: string) => ({size: number, mtimeMs: number}|undefined)}} f - facts.
- * @returns {{restore: {status: string, path: string}[], remove: string[], drifted: string[]}}
- *   tracked paths to restore, new untracked files to delete, and pre-existing untracked files that
- *   changed (their content was never snapshotted, so they stay as they are).
+ * @returns {{restore: {status: string, path: string}[], remove: string[], drifted: string[], kept: string[]}}
+ *   tracked paths to restore, new untracked files to delete, pre-existing untracked files that
+ *   changed, and pre-existing untracked files the task started tracking (both left as they are:
+ *   their content was never snapshotted).
  */
 export function planUndo({ snapshot, changed, untrackedNow, statNow = () => undefined }) {
   const before = new Set(snapshot.untracked ?? [])
@@ -130,7 +131,11 @@ export function planUndo({ snapshot, changed, untrackedNow, statNow = () => unde
     const now = statNow(f)
     if (now === undefined || now.size !== was.size || Math.round(now.mtimeMs) !== was.mtimeMs) drifted.push(f)
   }
-  return { restore: [...changed].sort((a, b) => a.path.localeCompare(b.path)), remove, drifted }
+  // Untracked before but tracked now (the task ran `git add`): restoring would delete the user's
+  // file, whose content was never snapshotted, so it is kept.
+  const sorted = [...changed].sort((a, b) => a.path.localeCompare(b.path))
+  const kept = sorted.filter(c => before.has(c.path)).map(c => c.path)
+  return { restore: sorted.filter(c => !before.has(c.path)), remove, drifted, kept }
 }
 
 /** @param {string} rel - a path git reported. @returns {boolean} whether it stays inside the workspace. */
@@ -151,43 +156,77 @@ export function truncateLines(text, max = 200) {
   return { lines: all.slice(0, max), dropped: Math.max(0, all.length - max) }
 }
 
+
 /**
- * What changed since a snapshot, scoped to the workspace.
+ * Run git and fail loudly: a failed call must never read as "nothing changed".
+ * @param {string} dir - cwd. @param {string[]} args - git arguments.
+ * @returns {string} stdout.
+ */
+function gitOut(dir, args) {
+  const r = git(dir, args)
+  if (!r.ok) throw new Error(`git ${args[0]} failed: ${r.err.trim() || 'no output'}`)
+  return r.out
+}
+
+/**
+ * @param {string} dir - workspace. @param {object} snap - the record.
+ * @returns {boolean} whether the snapshot's commit still exists (a stash-create commit is
+ *   unreachable, so `git gc` may prune it).
+ */
+export const snapshotAvailable = (dir, snap) => typeof snap?.base === 'string' && git(dir, ['cat-file', '-e', `${snap.base}^{commit}`]).ok
+
+/** @param {string} dir - workspace. @param {object} snap - the record. @returns {{status: string, path: string}[]} tracked changes. */
+const changedSince = (dir, snap) => parseNameStatus(gitOut(dir, ['diff', '--relative', '--no-renames', '--name-status', '-z', snap.base, '--', '.']))
+
+/** @param {string} dir - workspace. @returns {string[]} untracked files, or throws. */
+const untrackedStrict = dir => splitZ(gitOut(dir, ['ls-files', '-z', '--others', '--exclude-standard', '--', '.']))
+
+/**
+ * What changed since a snapshot, scoped to the workspace. Throws when git fails.
  * @param {string} dir - workspace. @param {object} snap - the record.
  * @returns {{stat: string, diff: string, changed: {status: string, path: string}[], added: string[]}} the facts.
  */
 export function diffSince(dir, snap) {
-  const stat = git(dir, ['diff', '--relative', '--stat', snap.base, '--', '.']).out
-  const diff = git(dir, ['diff', '--relative', snap.base, '--', '.']).out
-  const changed = parseNameStatus(git(dir, ['diff', '--relative', '--no-renames', '--name-status', '-z', snap.base, '--', '.']).out)
+  const stat = gitOut(dir, ['diff', '--relative', '--stat', snap.base, '--', '.'])
+  const diff = gitOut(dir, ['diff', '--relative', snap.base, '--', '.'])
+  const changed = changedSince(dir, snap)
   const before = new Set(snap.untracked ?? [])
-  const added = untrackedFiles(dir).filter(f => !before.has(f))
+  const added = untrackedStrict(dir).filter(f => !before.has(f))
   return { stat, diff, changed, added }
 }
 
-/** @param {string} dir - workspace. @param {object} snap - the record. @returns {ReturnType<typeof planUndo>} the plan. */
+/** @param {string} dir - workspace. @param {object} snap - the record. @returns {ReturnType<typeof planUndo>} the plan; throws when git fails. */
 export function undoPlan(dir, snap) {
-  const changed = parseNameStatus(git(dir, ['diff', '--relative', '--no-renames', '--name-status', '-z', snap.base, '--', '.']).out)
   const statNow = f => { try { const s = statSync(join(dir, f)); return { size: s.size, mtimeMs: s.mtimeMs } } catch { return undefined } }
-  return planUndo({ snapshot: snap, changed, untrackedNow: untrackedFiles(dir), statNow })
+  return planUndo({ snapshot: snap, changed: changedSince(dir, snap), untrackedNow: untrackedStrict(dir), statNow })
 }
+
+/** @param {string[]} kept - paths to leave alone. @returns {string[]} the pathspec: the workspace minus them. */
+export const restoreSpec = kept => ['.', ...kept.map(p => `:(exclude,literal)${p}`)]
 
 /**
  * Apply a plan: restore tracked files from the snapshot (working tree only), then delete the new
- * untracked files. Never resets, never touches ignored files.
+ * untracked files. Never resets, never touches ignored files or `plan.kept`.
  * @param {string} dir - workspace. @param {object} snap - the record. @param {ReturnType<typeof planUndo>} plan - the plan.
  * @returns {{ok: boolean, errors: string[]}} the outcome.
  */
 export function applyUndo(dir, snap, plan) {
   const errors = []
+  const kept = plan.kept ?? []
+  let removeAdded = []
   if (plan.restore.length > 0) {
-    let r = git(dir, ['restore', `--source=${snap.base}`, '--worktree', '--', '.'])
-    // git < 2.23 has no `restore`; checkout also writes the index for those paths.
-    if (!r.ok && /not a git command|unknown/i.test(r.err)) r = git(dir, ['checkout', snap.base, '--', '.'])
+    let r = git(dir, ['restore', `--source=${snap.base}`, '--worktree', '--', ...restoreSpec(kept)])
+    // git < 2.23 has no `restore`. checkout is overlay mode (also writes the index for those paths)
+    // and keeps files the task added, so those are deleted by hand.
+    if (!r.ok && /not a git command|unknown/i.test(r.err)) {
+      r = git(dir, ['checkout', snap.base, '--', ...restoreSpec(kept)])
+      removeAdded = plan.restore.filter(c => c.status === 'A').map(c => c.path)
+    }
     if (!r.ok) errors.push(`restore failed: ${r.err.trim()}`)
   }
-  for (const f of plan.remove) {
-    if (!safeRel(f)) continue
+  const keep = new Set(kept)
+  for (const f of [...plan.remove, ...removeAdded]) {
+    if (!safeRel(f) || keep.has(f)) continue
     const p = join(dir, f)
     try { if (existsSync(p)) rmSync(p, { force: true }) } catch (e) { errors.push(`could not delete ${f}: ${e.message}`) }
   }

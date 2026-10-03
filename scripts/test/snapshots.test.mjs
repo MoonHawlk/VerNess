@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -41,13 +41,15 @@ test('planUndo deletes only files that were not untracked before and flags drift
   const snapshot = { untracked: ['old.txt', 'kept.txt'], stats: { 'old.txt': { size: 1, mtimeMs: 5 }, 'kept.txt': { size: 2, mtimeMs: 6 } } }
   const plan = planUndo({
     snapshot,
-    changed: [{ status: 'M', path: 'z.js' }, { status: 'D', path: 'a.js' }],
+    changed: [{ status: 'M', path: 'z.js' }, { status: 'D', path: 'a.js' }, { status: 'A', path: 'kept.txt' }],
     untrackedNow: ['old.txt', 'kept.txt', 'new.txt', '../escape.txt'],
     statNow: f => (f === 'old.txt' ? { size: 9, mtimeMs: 5 } : { size: 2, mtimeMs: 6 }),
   })
   assert.deepEqual(plan.remove, ['new.txt'])
   assert.deepEqual(plan.drifted, ['old.txt'])
   assert.deepEqual(plan.restore.map(c => c.path), ['a.js', 'z.js'])
+  // Untracked before, tracked now: restoring would delete the user's file.
+  assert.deepEqual(plan.kept, ['kept.txt'])
 })
 
 test('safeRel refuses paths that leave the workspace', () => {
@@ -100,6 +102,7 @@ test('a task edits, deletes and adds files; /undo --yes restores the snapshot', 
     writeFileSync(join(repo, 'staged.txt'), 'staged by user\n')
     g(repo, 'add', 'staged.txt')
     writeFileSync(join(repo, 'notes.txt'), 'mine\n')
+    writeFileSync(join(repo, 'n[1].txt'), 'also mine\n')
     mkdirSync(join(repo, 'build'))
 
     const ctx = { workspaceDir: repo, snapshotRoot: root }
@@ -107,7 +110,7 @@ test('a task edits, deletes and adds files; /undo --yes restores the snapshot', 
     const snap = takeSnapshot(repo, { root, task: 'refactor' })
     assert.ok(snap.ok)
     assert.equal(snap.record.clean, false)
-    assert.deepEqual(snap.record.untracked, ['notes.txt'])
+    assert.deepEqual(snap.record.untracked, ['n[1].txt', 'notes.txt'])
     assert.equal(g(repo, 'stash', 'list'), stashBefore, 'stash create must not touch the stash list')
     assert.equal(readFileSync(join(repo, 'a.txt'), 'utf8'), 'one\nuser edit\n', 'snapshot leaves the tree alone')
 
@@ -117,6 +120,7 @@ test('a task edits, deletes and adds files; /undo --yes restores the snapshot', 
     mkdirSync(join(repo, 'src'))
     writeFileSync(join(repo, 'src', 'new.js'), 'export {}\n')
     writeFileSync(join(repo, 'build', 'out.bin'), 'artifact')
+    g(repo, 'add', '--', 'n[1].txt')
 
     const d = quiet(() => diffCmd.run(ctx, []))
     assert.equal(d.code, 0)
@@ -128,6 +132,7 @@ test('a task edits, deletes and adds files; /undo --yes restores the snapshot', 
     const plan = undoPlan(repo, readSnapshots(repo, root)[0])
     assert.deepEqual(plan.remove, ['src/new.js'])
     assert.deepEqual(plan.restore.map(c => `${c.status} ${c.path}`), ['M a.txt', 'D gone.txt'])
+    assert.deepEqual(plan.kept, ['n[1].txt'])
 
     // Without --yes nothing changes.
     const dry = quiet(() => undoCmd.run(ctx, []))
@@ -142,9 +147,10 @@ test('a task edits, deletes and adds files; /undo --yes restores the snapshot', 
     assert.equal(readFileSync(join(repo, 'gone.txt'), 'utf8'), 'keep me\n')
     assert.equal(existsSync(join(repo, 'src', 'new.js')), false)
     assert.equal(readFileSync(join(repo, 'notes.txt'), 'utf8'), 'mine\n', 'pre-existing untracked file kept')
+    assert.equal(readFileSync(join(repo, 'n[1].txt'), 'utf8'), 'also mine\n', 'untracked-then-added file kept')
     assert.ok(existsSync(join(repo, 'build', 'out.bin')), 'ignored files are never deleted')
     // The user's staged change survives in the index.
-    assert.equal(g(repo, 'diff', '--cached', '--name-only').trim(), 'staged.txt')
+    assert.deepEqual(g(repo, 'diff', '--cached', '--name-only').trim().split('\n'), ['n[1].txt', 'staged.txt'])
     assert.equal(g(repo, 'show', ':staged.txt'), 'staged by user\n')
 
     const again = quiet(() => undoCmd.run(ctx, []))
@@ -175,6 +181,14 @@ test('a clean snapshot restores to HEAD; outside git both commands say so and no
     writeFileSync(join(repo, 'a.txt'), 'changed\n')
     assert.equal(quiet(() => undoCmd.run({ workspaceDir: repo, snapshotRoot: root }, ['--yes'])).code, 0)
     assert.equal(readFileSync(join(repo, 'a.txt'), 'utf8'), 'one\n')
+
+    // A pruned snapshot commit is reported, never read as "nothing changed".
+    const bogus = { at: 't', base: '0123456789abcdef0123456789abcdef01234567', head: '', untracked: [] }
+    writeFileSync(join(root, readdirSync(root)[0]), JSON.stringify([bogus]))
+    assert.equal(quiet(() => diffCmd.run({ workspaceDir: repo, snapshotRoot: root }, [])).code, 1)
+    const u = quiet(() => undoCmd.run({ workspaceDir: repo, snapshotRoot: root }, ['--yes']))
+    assert.equal(u.code, 1)
+    assert.match(u.out, /no longer in git/)
 
     const none = takeSnapshot(plain, { root })
     assert.equal(none.ok, false)

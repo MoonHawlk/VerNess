@@ -3,7 +3,7 @@
  * @module scripts/commands/diff
  */
 
-import { diffSince, isGitRepo, readSnapshots, truncateLines } from '../lib/snapshots.mjs'
+import { diffSince, isGitRepo, readSnapshots, snapshotAvailable, truncateLines } from '../lib/snapshots.mjs'
 import { activeWorkspace } from '../lib/workspace.mjs'
 import { head, info, line, warn } from '../lib/util.mjs'
 
@@ -32,7 +32,10 @@ export default {
     if (!isGitRepo(dir)) { info(`the workspace is not a git repository - no snapshots, nothing to diff (${dir})`); return 0 }
     const [snap] = readSnapshots(dir, ctx.snapshotRoot)
     if (snap === undefined) { info('no snapshot yet - one is taken before each task that may write'); return 0 }
-    const { stat, diff, added } = diffSince(dir, snap)
+    if (!snapshotAvailable(dir, snap)) { warn(`the snapshot from ${snap.at} is no longer in git (pruned?) - cannot diff`); return 1 }
+    let facts
+    try { facts = diffSince(dir, snap) } catch (e) { warn(e.message); return 1 }
+    const { stat, diff, added } = facts
     head(`changes since ${snap.at}${snap.task ? ` (before: ${snap.task})` : ''}`)
     if (stat.trim() === '' && added.length === 0) { info('nothing changed'); return 0 }
     for (const l of truncateLines(stat, Infinity).lines) line(l)
