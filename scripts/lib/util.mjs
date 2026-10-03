@@ -5,6 +5,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process'
+import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -148,12 +149,13 @@ export function shAsync(cmd, args, opts = {}) {
  * PowerShell (`'` doubled), so neither layer can split or expand it.
  * @param {string} file - the executable.
  * @param {string[]} args - its arguments.
+ * @param {string} [errFile] - file that receives the server's stderr.
  * @returns {string} the `-Command` text.
  */
-export function hiddenStartCommand(file, args) {
+export function hiddenStartCommand(file, args, errFile) {
   const ps = s => `'${String(s).replaceAll("'", "''")}'`
   const argv = args.map(a => (a === '' || /[\s"]/.test(a) ? `"${String(a).replaceAll('"', '\\"')}"` : a)).join(' ')
-  return `(Start-Process -FilePath ${ps(file)}${argv === '' ? '' : ` -ArgumentList ${ps(argv)}`} -WindowStyle Hidden -PassThru).Id`
+  return `(Start-Process -FilePath ${ps(file)}${argv === '' ? '' : ` -ArgumentList ${ps(argv)}`} -WindowStyle Hidden${errFile === undefined ? '' : ` -RedirectStandardError ${ps(errFile)}`} -PassThru).Id`
 }
 
 /**
@@ -168,22 +170,26 @@ export function hiddenStartCommand(file, args) {
  * console of its own that is hidden, which its helpers inherit, and it survives the launcher.
  * @param {string} file - the executable (on Windows, resolved through PATH by PowerShell).
  * @param {string[]} args - its arguments.
- * @param {{env?: Record<string,string>, cwd?: string}} [opts] - extra environment and working directory.
+ * @param {{env?: Record<string,string>, cwd?: string, errFile?: string}} [opts] - extra environment,
+ *   working directory, and a file that receives the server's stderr (so a start that dies says why).
  * @returns {{pid?: number, error?: string}} the server's PID, or why it did not start.
  */
 export function startBackground(file, args, opts = {}) {
   const env = { ...process.env, ...opts.env }
   const cwd = opts.cwd ?? REPO
+  if (opts.errFile !== undefined) mkdirSync(dirname(opts.errFile), { recursive: true })
   if (!WIN) {
+    let fd
     try {
-      const child = spawn(file, args, { detached: true, stdio: 'ignore', env, cwd })
+      fd = opts.errFile === undefined ? 'ignore' : openSync(opts.errFile, 'w')
+      const child = spawn(file, args, { detached: true, stdio: ['ignore', 'ignore', fd], env, cwd })
       child.on('error', () => { /* callers probe readiness and report it */ })
       child.unref()
       return { pid: child.pid }
-    } catch (e) { return { error: String(e.message ?? e) } }
+    } catch (e) { return { error: String(e.message ?? e) } } finally { if (typeof fd === 'number') closeSync(fd) }
   }
   // Start-Process inherits this PowerShell's environment, which is `env`.
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', hiddenStartCommand(file, args)], {
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', hiddenStartCommand(file, args, opts.errFile)], {
     env, cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   })
   const pid = Number.parseInt(String(r.stdout ?? '').trim(), 10)

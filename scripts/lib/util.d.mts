@@ -25,8 +25,8 @@ export function winQuote(a: string): string
 export function sh(cmd: string, args: string[], opts?: ShOptions): ShResult
 export function spawnAsync(file: string, args: string[], opts?: ShOptions & { shell?: boolean }): Promise<ShResult>
 export function shAsync(cmd: string, args: string[], opts?: ShOptions): Promise<ShResult>
-export function hiddenStartCommand(file: string, args: string[]): string
-export function startBackground(file: string, args: string[], opts?: { env?: Record<string, string>, cwd?: string }): { pid?: number, error?: string }
+export function hiddenStartCommand(file: string, args: string[], errFile?: string): string
+export function startBackground(file: string, args: string[], opts?: { env?: Record<string, string>, cwd?: string, errFile?: string }): { pid?: number, error?: string }
 export function human(bytes: number): string
 export function num(n: number): string
 export function table(headers: string[], rows: (string | number)[][]): string[]
