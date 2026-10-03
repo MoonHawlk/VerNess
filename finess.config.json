@@ -77,6 +77,14 @@
   // A hosted route with no entry shows tokens only and "price not configured".
   "pricing": {},
 
+  // Capability router (T-253), advisory only: it logs which model it would pick and
+  // never changes the route. Optional "models" block; see docs/11-MODELS-AND-API.md:
+  //   "models": {
+  //     "capabilities": { "ollama-local/qwen3:8b": { "tool_calling": "medium", "context": 32768, "latencyMs": 400 } },
+  //     "tiers": { "frontier": { "reasoning": "high", "tool_calling": "high" } },
+  //     "pin": "route/model", "deny": ["route" or "route/model"], "routerShadow": true
+  //   }
+
   // Route the agent actually uses. Empty string = the `model` route above.
   "activeRoute": "",
 

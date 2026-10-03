@@ -22,7 +22,7 @@ import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
-import { ACCESS_MODES, accessMode, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
+import { ACCESS_MODES, accessMode, catalogModelSpec, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
@@ -36,6 +36,7 @@ import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
+import { logRouterShadow, routeByCapability, routerRecord } from './lib/router.mjs'
 import { ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -498,6 +499,27 @@ async function shadowRoute(cfg, text) {
   logShadowDecision({ source: 'repl', task: text.slice(0, 500), ms: r.ms, model, rules, agreement: agree.length })
   info(paint(C.dim, `shadow ${r.ms}ms: model ${model.level.answer}/${model.tier.answer}/${model.pipeline.answer}`
     + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`))
+}
+
+/**
+ * Capability-router shadow (T-253): rank models for this task's rule tier and the active persona's
+ * requirements, log the pick next to what actually runs, and change nothing. Never fails a task.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} text - the task text.
+ * @param {{route: string, model: string}} turn - what `prepareRoute` chose (fallback included).
+ * @returns {void}
+ */
+function routerShadow(cfg, text, turn) {
+  if (cfg.models?.routerShadow === false) return
+  try {
+    const state = readState()
+    const persona = loadPersonas(cfg).get(activePersonaId(cfg, state))
+    const actual = `${turn.route}/${turn.model}`
+    const specFor = (route, model, spec) => (spec.kind === 'catalog' ? catalogModelSpec(cfg, route, model) : undefined)
+    const r = routeByCapability(cfg, { state, persona, tier: ruleRoute(text).tier, specFor, facts: { env: process.env }, actual })
+    logRouterShadow(routerRecord(r, { task: text, actual, persona: persona?.id }))
+    if (r.pick?.key !== actual) info(`router (advisory, tier ${r.tier}): would pick ${r.pick?.key ?? 'nothing eligible'}; running ${actual}`)
+  } catch (e) { info(`router shadow skipped: ${e.message}`) }
 }
 
 /**
@@ -1239,6 +1261,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // so the route is re-resolved every turn rather than frozen at boot.
     const turn = await prepareRoute(loadConfig(), ready, { fallback: true })
     if (turn === undefined) continue
+    routerShadow(loadConfig(), taskText, turn)
     env = turn.env
     if (turn.overlay !== undefined) overlayArgs = [...overlayArgs, '--patch', turn.overlay]
     // Every turn after the first adopts the session the first one created, so the model keeps its
