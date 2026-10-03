@@ -219,6 +219,21 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-450 Real-terminal check of the wrapped editor (T-302): conhost wrap at the last column, drag-resize with the dropdown open, emoji sequences
 - [ ] T-451 First CI run (T-446) after the next push: confirm all six jobs, then require it on `main`
 
+## WS-P — Performance between chats (plan `14-PERFORMANCE-PLAN.md`)
+Measured 2026-10-03: ~3 s to boot a new dsh per message, 91% of generated text is reasoning, a 2.3 s title LLM call per new session, ~20 KB request per step, ~1 s awaited decision call. Target: < 1.5 s to first token on the next message.
+- [ ] T-455 Per-turn trace: launcher stage timestamps + substrate step timings into `.finess/perf.jsonl`; `/perf` waterfall and p50/p95; dashboard panel
+- [ ] T-456 `scripts/tools/bench.mjs`: fixed prompts x N on the active route, p50/p95 per stage; launcher-only part as a CI regression gate
+- [ ] T-457 `model.reasoning: off | on | auto` (auto = off under 4B), rendered as the model's no-think switch
+- [ ] T-458 No session-title LLM call on local routes (keep the first-prompt fallback title, or use a cheap hosted model)
+- [ ] T-459 Keep the model resident while FiNess runs (`model.keepAlive`, default 30m); `/down` and `/off` still unload
+- [ ] T-460 Shadow decision call in parallel with the task, never awaited before the spawn
+- [ ] T-461 Launcher pre-task diet: config read once per turn, mtime-cached session listing and budget usage, concurrent snapshot/attach/probe, skip the probe after a recent answer; < 100 ms before the spawn
+- [ ] T-462 Persistent dsh session for the REPL instead of one process per message (research the substrate's stdio/ACP app, SDK client or web API first, with file:line); cancel aborts the turn; fallback to spawn-per-message
+- [ ] T-463 Smaller requests: offer only the persona's permitted tools (T-234 `tools.restrict`), trimmed descriptions for small models
+- [ ] T-464 Stable prompt prefix for the engine's prompt cache: system prompt and tools byte-identical across turns, volatile context last; verify with `prompt_eval_count`
+- [ ] T-465 Right-size the model per task through the capability router (T-253): small fast model for chat, 4B+ or API for tool work
+- [ ] T-466 Stream the first token in the terminal and web UI; judge latency by time-to-first-token
+
 ## Parking lot (not scheduled)
 - Memory layer (`ctx.memory`), Hermes-style two-file snapshot; decide after M5
 - MCP tool policy integration; Spark/Snowflake/BigQuery/ClickHouse adapters
