@@ -117,7 +117,7 @@ const track = child => {
  * be killed; `timeoutMs` and `signal` kill that tree.
  * @param {string} file - executable (or a whole command line when `opts.shell` is set).
  * @param {string[]} args - arguments.
- * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, shell?: boolean, timeoutMs?: number, signal?: AbortSignal, onSpawn?: (child: object) => void}} [opts] - options; `onSpawn` sees the child (job registry).
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, shell?: boolean, timeoutMs?: number, signal?: AbortSignal, onSpawn?: (child: object) => void, stdin?: number}} [opts] - options; `stdin` is an open fd fed to the child (a staged task) instead of a closed stdin; `onSpawn` sees the child (job registry).
  * @returns {Promise<{code: number, out: string, timedOut?: boolean}>} exit status and captured output.
  */
 export function spawnAsync(file, args, opts = {}) {
@@ -137,7 +137,7 @@ export function spawnAsync(file, args, opts = {}) {
       child = spawn(file, args, {
         cwd: opts.cwd ?? REPO,
         env: { ...process.env, ...opts.env },
-        stdio: opts.capture === true ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
+        stdio: opts.capture === true ? [opts.stdin ?? 'ignore', 'pipe', 'pipe'] : [opts.stdin ?? 'ignore', 'inherit', 'inherit'],
         shell: opts.shell === true,
         detached: !WIN,
         windowsHide: true,
@@ -165,7 +165,7 @@ export function spawnAsync(file, args, opts = {}) {
  * The asynchronous `sh`: same quoting, same shell rule on Windows, but it does not block.
  * @param {string} cmd - executable name.
  * @param {string[]} args - arguments.
- * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string}} [opts] - options.
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, stdin?: number}} [opts] - options.
  * @returns {Promise<{code: number, out: string}>} exit status and captured output.
  */
 export function shAsync(cmd, args, opts = {}) {

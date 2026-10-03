@@ -85,7 +85,7 @@ async function loopTaskInner(ctx, objective, opts, job) {
     step(`round ${round}/${maxRounds}`)
     const args = ['--profile', profile, '--json', ...(identity === undefined ? [] : ['--session-id', identity]), prompt]
     const t0 = Date.now()
-    const r = await run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000, onSpawn: job?.track })
+    const r = await run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000, onSpawn: job?.track, task: true })
     const seconds = (Date.now() - t0) / 1000
     if (job?.cancelled() === true) {
       outcome = 'cancelled'
@@ -184,7 +184,7 @@ async function verifyRound(ctx, objective, claim, run, profile, timeout, job) {
     'Check the claim yourself with your tools. Do not assume it is true.',
     'Reply with exactly one line: "PASS: <why>" or "NEEDS_WORK: <what is missing>".',
   ].join('\n')
-  const r = await run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000, onSpawn: job?.track })
+  const r = await run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000, onSpawn: job?.track, task: true })
   const text = parseRound(r.out).answer
   const pass = /^\s*PASS\b/im.test(text)
   const m = /^\s*(?:PASS|NEEDS_WORK):\s*(.+)$/im.exec(text)

@@ -27,7 +27,7 @@ const mkCtx = (runsRoot, code = 0, calls = []) => ({
   activePersonaId: 'software-engineer',
   routeEnv: {},
   runsRoot,
-  dshAsync: async a => { calls.push(a); return { code, out: 'done' } },
+  dshAsync: async (a, o) => { calls.push(a); calls.opts = [...(calls.opts ?? []), o]; return { code, out: 'done' } },
 })
 
 test('delegate runs one task under the persona and writes run artifacts', async () => {
@@ -38,6 +38,8 @@ test('delegate runs one task under the persona and writes run artifacts', async 
   assert.equal(calls.length, 1)
   assert.ok(calls[0].at(-1).startsWith('fix the bug'))
   assert.ok(calls[0].includes('--patch'))
+  // The prompt is marked as the task, so a long one reaches dsh through stdin (T-448).
+  assert.equal(calls.opts[0].task, true)
   const runs = listRuns({ root: runsRoot })
   assert.equal(runs.length, 1)
   assert.equal(runs[0].team, 'delegate')

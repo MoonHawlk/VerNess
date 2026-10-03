@@ -77,3 +77,10 @@ test('runLoopTask: the round budget defaults to 600 seconds', async () => {
   await runLoopTask(ctx, 'x', { loopsDir: LOOPS })
   assert.deepEqual(seen, [600000])
 })
+
+test('runLoopTask: a round marks its prompt as the task, so a long one goes through stdin (T-448)', async () => {
+  const seen = []
+  const ctx = { cfg: { profile: { name: 'p' } }, dsh: (a, o) => { seen.push(o.task); return { code: 1, out: '', timedOut: true } } }
+  await runLoopTask(ctx, 'x', { loopsDir: LOOPS })
+  assert.deepEqual(seen, [true])
+})

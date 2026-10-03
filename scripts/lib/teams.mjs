@@ -196,7 +196,7 @@ async function runTeamInner(team, ctx, opts, job) {
     let attempts = 0
     do {
       attempts++
-      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, onSpawn: job?.track })
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, onSpawn: job?.track, task: true })
       if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
     } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000
