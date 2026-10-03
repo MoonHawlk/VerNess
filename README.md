@@ -12,6 +12,7 @@ Built on the **DeepSeek Harness (dsh)** / Cordis substrate. FiNess adds the seve
 - [FiNess, explained simply](#finess-explained-simply)
 - [Setup](#setup)
 - [Usage](#usage)
+- [Common commands (cheat sheet)](docs/COMMANDS.md)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Dependencies](#dependencies)
@@ -62,11 +63,20 @@ talks to the AI, runs its tools and saves conversations.
 ### What you can type
 
 Anything that is not a command goes to the AI as a task. Commands start with `/`, and most cost
-nothing because the AI is not involved.
+nothing because the AI is not involved. **Every command with an example, by feature:
+[docs/COMMANDS.md](docs/COMMANDS.md).**
 
-- **core**: `/help` list commands · `/doctor` what is missing · `/new` fresh conversation ·
-  `/resume` pick up an old one · `/loop-task` keep working on one goal over several rounds ·
-  `/pet` Ness's status · `/sync` apply config edits · `/web` browser chat · `/off` turn everything off
+- **context**: `@file`, `@folder/` or `@https://page` attach it to the task · `!git status` runs
+  a command locally (no AI) · `!!cmd` also attaches its output · `/btw <note>` a note for the next
+  task · `# <line>` a line in the project brief · `/context` how full the context window is
+- **any project**: `/workspace <dir>` point FiNess at another folder · `/workspace reset` come back
+- **shortcuts**: `/recipe` one-line task templates (code-review, write-tests, explain,
+  summarize-docs, commit-message, plan) · `/delegate <persona> <task>` one task with a chosen hat ·
+  `/task list` recent runs
+- **core**: `/help` list commands · `/doctor` what is missing · `/config` the settings · `/new` fresh
+  conversation · `/resume` pick up an old one · `/loop-task` keep working on one goal over several
+  rounds · `/pet` Ness's status · `/sync` apply config edits · `/web` browser chat · `/off` turn
+  everything off · `/exit` leave
 - **model**: `/up` start the model · `/down` free its memory · `/model` show or switch ·
   `/models` install or search local models · `/api` use a hosted AI (key in `.env`) ·
   `/access` how far the AI may reach: read-only, workspace (default) or full
@@ -100,9 +110,8 @@ because of it. `/cost` shows zero on a local model. Grade Laya with `/dd label`,
   pick the model yourself.
 - Laya does not decide anything, and its gate is not built.
 - Each hat's list of allowed tools is written down but not enforced until M4.
-- The FiNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look, and
-  quick-commands do not appear in its `/` menu yet.
-- `/btw`, `/config`, `/exit` and other planned commands are in `docs/03-BACKLOG.md`.
+- The FiNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look.
+- Planned commands (`/compact`, `/todos`, `/export`, ...) are in `docs/03-BACKLOG.md`.
 
 The full version: [docs/13-EXPLAINED-SIMPLY.md](docs/13-EXPLAINED-SIMPLY.md).
 
