@@ -505,6 +505,7 @@ async function shadowRoute(cfg, text) {
 /**
  * Capability-router shadow (T-253): rank models for this task's rule tier and the active persona's
  * requirements, log the pick next to what actually runs, and change nothing. Never fails a task.
+ * Logs every task; prints only when the decision shadow (`decisions.enabled` + `shadow`) is on.
  * @param {typeof DEFAULTS} cfg - configuration.
  * @param {string} text - the task text.
  * @param {{route: string, model: string}} turn - what `prepareRoute` chose (fallback included).
@@ -519,7 +520,9 @@ function routerShadow(cfg, text, turn) {
     const specFor = (route, model, spec) => (spec.kind === 'catalog' ? catalogModelSpec(cfg, route, model) : undefined)
     const r = routeByCapability(cfg, { state, persona, tier: ruleRoute(text).tier, specFor, facts: { env: process.env }, actual })
     logRouterShadow(routerRecord(r, { task: text, actual, persona: persona?.id }))
-    if (r.pick?.key !== actual) info(`router (advisory, tier ${r.tier}): would pick ${r.pick?.key ?? 'nothing eligible'}; running ${actual}`)
+    // Silent by default; printed only beside the Laya shadow line, which the user opted into.
+    const dc = decisionConfig(cfg)
+    if (dc.enabled === true && dc.shadow === true && r.pick?.key !== actual) info(`router (advisory, tier ${r.tier}): would pick ${r.pick?.key ?? 'nothing eligible'}; running ${actual}`)
   } catch (e) { info(`router shadow skipped: ${e.message}`) }
 }
 
