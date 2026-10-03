@@ -188,7 +188,7 @@ export async function runTeam(team, ctx, opts = {}) {
     let attempts = 0
     do {
       attempts++
-      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env })
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, task: true })
       if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
     } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000

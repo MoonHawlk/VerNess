@@ -5,19 +5,27 @@
  *
  * Pure apart from the injected `fs`, `fetch` and `spawn`, so every rule is unit-tested.
  *
- * Caps are characters, not bytes, and sized for Windows: the task reaches the substrate as one argv
- * element, and CreateProcess refuses a command line past 32,767 UTF-16 units. So the totals here stay
- * well under that on every platform, with room for the brief and `/btw` notes.
+ * Caps are characters, not bytes. They guard the model's context, not the command line: a long task
+ * reaches the substrate through stdin (scripts/lib/taskarg.mjs, T-448), so no argv limit applies.
+ * `attach.maxChars` / `attach.maxTotal` in the config override the per-item and total caps.
  * @module scripts/lib/attach
  */
 
 import { resolve } from 'node:path'
 
 /** Default caps, in characters. */
-export const CAPS = { perItem: 12000, total: 20000, dirEntries: 200, fetchBytes: 2 * 1024 * 1024, fetchMs: 10000 }
+export const CAPS = { perItem: 50000, total: 150000, dirEntries: 200, fetchBytes: 2 * 1024 * 1024, fetchMs: 10000 }
 
-/** The longest composed task the launcher hands to the substrate (Windows command-line limit, with margin). */
-export const MAX_TASK_CHARS = 30000
+/**
+ * The attachment caps a config asks for, falling back to {@link CAPS} for a missing or bad value.
+ * @param {{attach?: {maxChars?: unknown, maxTotal?: unknown}}} [cfg] - the merged configuration.
+ * @returns {{perItem: number, total: number}} the per-item and total caps.
+ */
+export function attachCaps(cfg) {
+  const pick = (v, d) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : d)
+  const total = pick(cfg?.attach?.maxTotal, CAPS.total)
+  return { perItem: Math.min(pick(cfg?.attach?.maxChars, CAPS.perItem), total), total }
+}
 
 /**
  * @typedef {{label: string, body: string, truncated?: boolean}} Attachment

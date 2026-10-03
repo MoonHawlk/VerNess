@@ -10,7 +10,7 @@ import * as fs from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CAPS, attachedChars, expandRefs, findRefs, htmlToText, runShell, shellAttachment, shellSpec } from '../lib/attach.mjs'
+import { CAPS, attachCaps, attachedChars, expandRefs, findRefs, htmlToText, runShell, shellAttachment, shellSpec } from '../lib/attach.mjs'
 import { classifyLine } from '../lib/commands.mjs'
 import { composeTask } from '../lib/notes.mjs'
 import { REPO } from '../lib/util.mjs'
@@ -110,14 +110,24 @@ test('expandRefs: @url fetches without credentials, strips html, refuses binary 
   assert.ok(r.warnings.some(w => /timed out after 10 s/.test(w)))
 })
 
+test('attachCaps: attach.maxChars / attach.maxTotal override the defaults; bad values fall back', () => {
+  assert.deepEqual(attachCaps(undefined), { perItem: CAPS.perItem, total: CAPS.total })
+  assert.deepEqual(attachCaps({ attach: { maxChars: 1000, maxTotal: 5000 } }), { perItem: 1000, total: 5000 })
+  assert.deepEqual(attachCaps({ attach: { maxChars: '9', maxTotal: -1 } }), { perItem: CAPS.perItem, total: CAPS.total })
+  // A per-item cap never exceeds the total.
+  assert.deepEqual(attachCaps({ attach: { maxChars: 9000, maxTotal: 4000 } }), { perItem: 4000, total: 4000 })
+  assert.ok(CAPS.perItem >= 50000 && CAPS.total >= 150000)
+})
+
 test('pending !! output and @ references share one total', async () => {
   const dir = sandbox()
   try {
-    const pending = [shellAttachment('x', { code: 0, out: 'q'.repeat(CAPS.total) })]
+    const caps = { perItem: 12000, total: 20000 }
+    const pending = [shellAttachment('x', { code: 0, out: 'q'.repeat(caps.total) }, caps.perItem)]
     const used = attachedChars(pending)
-    assert.equal(used, CAPS.perItem)
-    const r = await expandRefs('@big.txt @a.txt', { cwd: dir, fs, caps: { total: CAPS.total - used } })
-    assert.equal(attachedChars(r.attachments), CAPS.total - used)
+    assert.equal(used, caps.perItem)
+    const r = await expandRefs('@big.txt @a.txt', { cwd: dir, fs, caps: { perItem: caps.perItem, total: caps.total - used } })
+    assert.equal(attachedChars(r.attachments), caps.total - used)
     assert.ok(r.warnings.some(w => /@a\.txt skipped/.test(w)))
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

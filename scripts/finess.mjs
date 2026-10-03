@@ -29,8 +29,9 @@ import { loadTeams } from './lib/teams.mjs'
 import { notifyDone } from './lib/notify.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
+import { stageTask } from './lib/taskarg.mjs'
 import { loadRecipes } from './lib/recipes.mjs'
-import { CAPS, MAX_TASK_CHARS, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
+import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
@@ -57,6 +58,7 @@ const DEFAULTS = {
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness', animate: true },
   notes: { maxChars: 2000, briefMaxChars: 4000 },
+  attach: { maxChars: 50000, maxTotal: 150000 },
   notify: { afterSeconds: 30, desktop: false },
 }
 
@@ -160,14 +162,15 @@ export async function makeCliContext(cfg) {
  * Run a command, inheriting stdio unless capturing.
  * @param {string} cmd - executable name.
  * @param {string[]} args - arguments.
- * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, allowFail?: boolean}} [opts] - options.
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, allowFail?: boolean, stdin?: number}} [opts] - options; `stdin` is an open fd fed to the child.
  * @returns {{code: number, out: string}} exit status and captured output.
  */
 function sh(cmd, args, opts = {}) {
+  const io = opts.capture === true ? 'pipe' : 'inherit'
   const base = {
     cwd: opts.cwd ?? REPO,
     env: { ...process.env, ...opts.env },
-    stdio: opts.capture === true ? 'pipe' : 'inherit',
+    stdio: opts.stdin === undefined ? io : [opts.stdin, io, io],
     encoding: 'utf8',
   }
   // Node refuses to spawn a Windows `.cmd` shim without a shell (EINVAL, since 20.12), and
@@ -216,40 +219,52 @@ let dshEntry
  * `sh()` has to use `cmd.exe` on Windows because `dsh` is a `.cmd` shim, and that mangles real task
  * text three ways: a newline in an argument ends the command, the command line is capped near 8191
  * characters, and `%` is expanded. Resolving the shim to its JS file and spawning `process.execPath`
- * with it sidesteps all three, on every platform.
+ * with it sidesteps all three, on every platform. The direct path still caps the whole command line
+ * at 32,767 characters, so a task (`opts.task`: the last argument is the task text) past
+ * `ARGV_TASK_MAX`, or any task on the shim path, goes through stdin from a temp file instead
+ * (scripts/lib/taskarg.mjs, T-448).
  * @param {string[]} args - arguments for dsh.
- * @param {{env?: Record<string,string>, capture?: boolean, timeoutMs?: number, cwd?: string}} [opts] - options; `timeoutMs` kills the run and sets `timedOut`; `cwd` (default: this repo) is the agent's working directory.
+ * @param {{env?: Record<string,string>, capture?: boolean, timeoutMs?: number, cwd?: string, task?: boolean}} [opts] - options; `timeoutMs` kills the run and sets `timedOut`; `cwd` (default: this repo) is the agent's working directory.
  * @returns {{code: number, out: string, timedOut?: boolean}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
   resolveDshEntry()
-  // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
-  if (dshEntry === null) return sh('dsh', args, opts)
-  const r = spawnSync(process.execPath, [dshEntry, ...args], {
-    cwd: opts.cwd ?? REPO,
-    env: { ...process.env, ...opts.env },
-    stdio: opts.capture === true ? 'pipe' : 'inherit',
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    ...(opts.timeoutMs > 0 ? { timeout: opts.timeoutMs, killSignal: 'SIGKILL' } : {}),
-  })
-  // A spawn that never started (ENAMETOOLONG on an oversized Windows command line) has no output of its own.
-  if (r.error !== undefined && r.error.code !== 'ETIMEDOUT') warn(`the substrate did not start: ${r.error.message}`)
-  return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), timedOut: r.error?.code === 'ETIMEDOUT' }
+  const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })
+  try {
+    // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
+    if (dshEntry === null) return sh('dsh', staged.args, { ...opts, stdin: staged.stdin })
+    const io = opts.capture === true ? 'pipe' : 'inherit'
+    const r = spawnSync(process.execPath, [dshEntry, ...staged.args], {
+      cwd: opts.cwd ?? REPO,
+      env: { ...process.env, ...opts.env },
+      stdio: staged.stdin === undefined ? io : [staged.stdin, io, io],
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      ...(opts.timeoutMs > 0 ? { timeout: opts.timeoutMs, killSignal: 'SIGKILL' } : {}),
+    })
+    // A spawn that never started (ENAMETOOLONG on an oversized Windows command line) has no output of its own.
+    if (r.error !== undefined && r.error.code !== 'ETIMEDOUT') warn(`the substrate did not start: ${r.error.message}`)
+    return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), timedOut: r.error?.code === 'ETIMEDOUT' }
+  } finally { staged.cleanup() }
 }
 
 /**
  * `dsh` without blocking the event loop: what lets the team runner's `--parallel` actually overlap
- * runs (T-144). Same entry resolution and the same shim fallback, just awaited.
+ * runs (T-144). Same entry resolution, shim fallback and stdin staging, just awaited.
  * @param {string[]} args - arguments for dsh.
- * @param {{env?: Record<string,string>, capture?: boolean, cwd?: string}} [opts] - options.
+ * @param {{env?: Record<string,string>, capture?: boolean, cwd?: string, task?: boolean}} [opts] - options.
  * @returns {Promise<{code: number, out: string}>} exit status and captured output.
  */
-function dshAsync(args, opts = {}) {
+async function dshAsync(args, opts = {}) {
   resolveDshEntry()
-  return dshEntry === null
-    ? shAsync('dsh', args, opts)
-    : spawnAsync(process.execPath, [dshEntry, ...args], opts)
+  // A fresh stage per call: a retry must not reuse an fd the last run already read to EOF.
+  const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })
+  const o = { ...opts, stdin: staged.stdin }
+  try {
+    return await (dshEntry === null
+      ? shAsync('dsh', staged.args, o)
+      : spawnAsync(process.execPath, [dshEntry, ...staged.args], o))
+  } finally { staged.cleanup() }
 }
 
 /** Resolve, once, the JS entry point behind the global `dsh` shim; null when it cannot be found. */
@@ -1012,7 +1027,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const prior = wants ? convo.id() : undefined
     if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir })
+    dsh([...args, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, task: cfg.profile.template === 'headless' })
     if (before !== undefined) convo.capture(before)
     return
   }
@@ -1122,10 +1137,11 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
       else if (res.code !== 0) info(`exit ${res.code}`)
       if (parsed.attach) {
         // Pending `!!` output shares the attachment total with the next task's `@` references.
-        const left = CAPS.total - attachedChars(shellAttached)
-        if (left <= 0) warn(`not attached - pending !! output already uses the ${CAPS.total}-character total`)
+        const caps = attachCaps(loadConfig())
+        const left = caps.total - attachedChars(shellAttached)
+        if (left <= 0) warn(`not attached - pending !! output already uses the ${caps.total}-character total`)
         else {
-          const a = shellAttachment(parsed.text, res, Math.min(CAPS.perItem, left))
+          const a = shellAttachment(parsed.text, res, Math.min(caps.perItem, left))
           shellAttached.push(a)
           ok(`output attached to your next task (${a.body.length} characters${a.truncated ? ', truncated' : ''})`)
         }
@@ -1184,21 +1200,15 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // The brief opens every new session in full; a continuing one gets only the lines added since.
     const brief = prior === undefined ? readBrief(REPO) : briefAdded.join('\n')
     // `@path` and `@https://...` attach a file, a directory listing or a page as text (T-181, T-447).
-    const refs = await expandRefs(taskText, { cwd: activeWorkspace().dir, fs: nodeFs, fetch: globalThis.fetch, caps: { total: CAPS.total - attachedChars(shellAttached) } })
+    const caps = attachCaps(loadConfig())
+    const refs = await expandRefs(taskText, { cwd: activeWorkspace().dir, fs: nodeFs, fetch: globalThis.fetch, caps: { perItem: caps.perItem, total: caps.total - attachedChars(shellAttached) } })
     for (const n of refs.notes) info(n)
     for (const w of refs.warnings) warn(w)
     for (const m of refs.missing) info(`${m} is not a file here - left as text`)
     const attachments = [...shellAttached, ...refs.attachments]
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)), attachments })
-    if (outgoing.length > MAX_TASK_CHARS) {
-      warn(`the task with its context is ${outgoing.length} characters, over the ${MAX_TASK_CHARS} a command line carries - not sent`)
-      // Never leave the next task stuck behind the same pending output.
-      if (shellAttached.length > 0) { shellAttached.length = 0; info('the pending !! output was dropped') }
-      info('attach less (fewer @ files, a shorter !! output) or trim the brief')
-      continue
-    }
     const t0 = Date.now()
-    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir })
+    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, task: true })
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0; shellAttached.length = 0 }

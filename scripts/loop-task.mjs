@@ -75,7 +75,7 @@ export async function runLoopTask(ctx, objective, opts = {}) {
     step(`round ${round}/${maxRounds}`)
     const args = ['--profile', profile, '--json', ...(identity === undefined ? [] : ['--session-id', identity]), prompt]
     const t0 = Date.now()
-    const r = run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000 })
+    const r = run(args, { capture: true, env: ctx.routeEnv, timeoutMs: roundTimeout * 1000, task: true })
     const seconds = (Date.now() - t0) / 1000
     const parsed = parseRound(r.out)
     if (r.timedOut === true) {
@@ -166,7 +166,7 @@ async function verifyRound(ctx, objective, claim, run, profile, timeout) {
     'Check the claim yourself with your tools. Do not assume it is true.',
     'Reply with exactly one line: "PASS: <why>" or "NEEDS_WORK: <what is missing>".',
   ].join('\n')
-  const r = run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000 })
+  const r = run(['--profile', profile, '--json', prompt], { capture: true, env: ctx.routeEnv, timeoutMs: (timeout ?? DEFAULT_ROUND_TIMEOUT) * 1000, task: true })
   const text = parseRound(r.out).answer
   const pass = /^\s*PASS\b/im.test(text)
   const m = /^\s*(?:PASS|NEEDS_WORK):\s*(.+)$/im.exec(text)
