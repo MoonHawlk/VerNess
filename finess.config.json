@@ -77,6 +77,16 @@
   // A hosted route with no entry shows tokens only and "price not configured".
   "pricing": {},
 
+  // Budgets (T-091). All optional; unset = no limit. Checked before each REPL task, /loop-task
+  // round and team task: one warning line at 80%, the task is not started at 100% (run
+  // `/budget allow once` to let one task through). `/budget` shows used and remaining.
+  //   sessionTokens  input+output tokens of the current session
+  //   dailyTokens    tokens across today's sessions (local date); local routes count too
+  //   dailyCost      priced cost today, from `pricing` above (unpriced routes count 0)
+  //   taskSeconds    wall-clock limit per task / loop round / team task; the run is killed
+  // Example:
+  //   "budget": { "sessionTokens": 200000, "dailyTokens": 1000000, "dailyCost": 5, "taskSeconds": 300 }
+
   // Route the agent actually uses. Empty string = the `model` route above.
   "activeRoute": "",
 
