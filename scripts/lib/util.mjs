@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { killTree } from './procs.mjs'
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const WIN = process.platform === 'win32'
@@ -91,24 +92,45 @@ export function sh(cmd, args, opts = {}) {
   return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() }
 }
 
+/** Children started by spawnAsync, so Ctrl+C (and process exit) can take their whole trees down (T-433). */
+const live = new Set()
+const reap = () => { for (const c of live) killTree(c.pid, { force: true }) }
+const onSigint = () => {
+  reap()
+  // Ours is the only listener: keep the default meaning of Ctrl+C.
+  if (process.listenerCount('SIGINT') === 1) process.exit(130)
+}
+const track = child => {
+  if (live.size === 0) { process.on('SIGINT', onSigint); process.on('exit', reap) }
+  live.add(child)
+  child.once('close', () => {
+    live.delete(child)
+    if (live.size === 0) { process.removeListener('SIGINT', onSigint); process.removeListener('exit', reap) }
+  })
+}
+
 /**
  * Spawn a process without blocking the event loop, so several can run at once. Mirrors `spawnSync`'s
  * contract: stdin is closed (a child reading a non-TTY stdin would otherwise wait forever), a spawn
  * failure resolves with code 1 instead of rejecting, and the promise settles on `close`, after the
- * output streams are drained.
+ * output streams are drained. Off Windows the child leads its own process group so the whole tree can
+ * be killed; `timeoutMs` and `signal` kill that tree.
  * @param {string} file - executable (or a whole command line when `opts.shell` is set).
  * @param {string[]} args - arguments.
- * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, shell?: boolean}} [opts] - options.
- * @returns {Promise<{code: number, out: string}>} exit status and captured output.
+ * @param {{capture?: boolean, env?: Record<string,string>, cwd?: string, shell?: boolean, timeoutMs?: number, signal?: AbortSignal, onSpawn?: (child: object) => void}} [opts] - options; `onSpawn` sees the child (job registry).
+ * @returns {Promise<{code: number, out: string, timedOut?: boolean}>} exit status and captured output.
  */
 export function spawnAsync(file, args, opts = {}) {
   return new Promise(res => {
     const chunks = []
     let settled = false
+    let timedOut = false
+    let timer
     const done = code => {
       if (settled) return
       settled = true
-      res({ code, out: Buffer.concat(chunks).toString('utf8').trim() })
+      clearTimeout(timer)
+      res({ code, out: Buffer.concat(chunks).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}) })
     }
     let child
     try {
@@ -117,11 +139,20 @@ export function spawnAsync(file, args, opts = {}) {
         env: { ...process.env, ...opts.env },
         stdio: opts.capture === true ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 'inherit'],
         shell: opts.shell === true,
+        detached: !WIN,
+        windowsHide: true,
       })
     } catch (e) {
       chunks.push(Buffer.from(String(e.message)))
       done(1)
       return
+    }
+    track(child)
+    opts.onSpawn?.(child)
+    if (opts.timeoutMs > 0) timer = setTimeout(() => { timedOut = true; killTree(child.pid) }, opts.timeoutMs)
+    if (opts.signal !== undefined) {
+      if (opts.signal.aborted) killTree(child.pid)
+      else opts.signal.addEventListener('abort', () => killTree(child.pid), { once: true })
     }
     child.stdout?.on('data', c => chunks.push(c))
     child.stderr?.on('data', c => chunks.push(c))

@@ -4,8 +4,8 @@
  * @module scripts/lib/util
  */
 
-type ShOptions = { capture?: boolean, env?: Record<string, string>, cwd?: string }
-type ShResult = { code: number, out: string }
+type ShOptions = { capture?: boolean, env?: Record<string, string>, cwd?: string, timeoutMs?: number, signal?: AbortSignal, onSpawn?: (child: any) => void }
+type ShResult = { code: number, out: string, timedOut?: boolean }
 type Colour = 'dim' | 'red' | 'green' | 'yellow' | 'cyan' | 'bold' | 'off'
 
 export const REPO: string

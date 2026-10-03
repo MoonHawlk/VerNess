@@ -87,6 +87,7 @@ export default {
         concurrency: pAt >= 0 ? Number(args[pAt + 1]) : undefined,
         only: oAt >= 0 ? String(args[oAt + 1] ?? '').split(',').filter(s => s !== '') : undefined,
         dryRun: args.includes('--dry-run'),
+        jobsRoot: ctx.jobsRoot,
       }), r => r.results.every(x => x.code === 0) && r.skipped.length === 0)
       return results.some(r => r.code !== 0) || skipped.length > 0 ? 1 : 0
     }
