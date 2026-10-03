@@ -38,7 +38,7 @@ export function buildContextReport(parts, window) {
   const hints = []
   if (over) {
     const has = label => rows.some(r => r.label === label && r.tokens > 0)
-    if (has('conversation so far')) hints.push('/new starts a fresh conversation')
+    if (has('conversation so far')) hints.push('/compact --yes summarizes it into a fresh session (one model turn)', '/new starts a fresh conversation')
     if (has('side notes')) hints.push('/btw drop <n> or /btw clear removes notes')
     if (has('project brief')) hints.push('shorten .finess/brief.md')
     hints.push('a model with a larger context window fits more')

@@ -34,6 +34,7 @@ import { shAsync, spawnAsync } from './lib/util.mjs'
 import { stageTask } from './lib/taskarg.mjs'
 import { loadRecipes } from './lib/recipes.mjs'
 import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
+import { autoPercentOf, compactSettings, renderCompactRow } from './lib/compact.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
@@ -61,6 +62,8 @@ const DEFAULTS = {
   pet: { enabled: true, name: 'Ness', animate: true },
   notes: { maxChars: 2000, briefMaxChars: 4000 },
   attach: { maxChars: 50000, maxTotal: 150000 },
+  // autoPercent: automatic compaction starts at this % of the window (20-95; 0 keeps the substrate default).
+  compact: { autoPercent: 75, summaryChars: 3000 },
   notify: { afterSeconds: 30, desktop: false },
   // Unset = no limit. See `budget` in finess.config.json and /budget.
   budget: { sessionTokens: undefined, dailyTokens: undefined, dailyCost: undefined, taskSeconds: undefined },
@@ -443,6 +446,7 @@ export function renderPatch(cfg, { surface, repo, state = readState() }) {
   L.push('  config:')
   L.push(`    mode: ${cfg.settings.toolsMode ?? 'native'}`)
   L.push('')
+  L.push(...renderCompactRow(compactSettings(autoPercentOf(cfg.compact?.autoPercent), Object.values(routes).filter(r => r.kind !== 'catalog').map(r => ({ contextWindow: r.contextWindow ?? 32768, maxTokens: r.maxTokens ?? 4096 })))))
   return L.join('\n')
 }
 
