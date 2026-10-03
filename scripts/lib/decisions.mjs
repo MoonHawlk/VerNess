@@ -13,12 +13,12 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { validateChoiceQuestion } from '../../packages/contracts/src/decision.ts'
 import { formatPath } from '../../packages/contracts/src/issue.ts'
 import { applyTemperature } from './calibration.mjs'
-import { REPO } from './util.mjs'
+import { REPO, WIN } from './util.mjs'
 
 /** Where shadow-mode decisions are recorded (gitignored). */
 export const decisionsDir = () => join(REPO, '.finess', 'decisions')
@@ -106,6 +106,7 @@ export function decisionConfig(cfg) {
     apiKeyEnv: d.apiKeyEnv ?? 'LAYA_API_KEY',
     timeoutMs: d.timeoutMs ?? 20000,
     shadow: d.shadow ?? true,
+    mcp: d.mcp ?? false,
     ...d,
   }
 }
@@ -347,6 +348,44 @@ export function readDecisionRecords(dir = decisionsDir()) {
  */
 export function isLocalSidecar(baseURL) {
   try { return ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(new URL(baseURL).hostname) } catch { return false }
+}
+
+/**
+ * The sidecar venv's interpreter; the one place the Windows/POSIX layout differs.
+ * @param {{venv?: string}} dc - the resolved decisions config.
+ * @param {{win?: boolean, repo?: string}} [o] - platform and checkout root (tests pass both).
+ * @returns {string} absolute path to `Scripts\python.exe` or `bin/python`.
+ */
+export function venvPython(dc, { win = WIN, repo = REPO } = {}) {
+  const base = resolve(repo, dc.venv ?? '.finess/py')
+  return win ? join(base, 'Scripts', 'python.exe') : join(base, 'bin', 'python')
+}
+
+/**
+ * The optional `laya[mcp]` loader row (T-240): the model gets Laya's tools as `mcp__laya__*`. It
+ * complements harness-side control (path A) and never replaces it. Substrate shape:
+ * docs/research/dsh-mcp-and-http-seams.md section 1 (mcp-client README.md:34-53, index.ts:119-142);
+ * entry point `python -m laya.mcp.server`, stdio only (docs/research/laya-model-digest.md section 4).
+ * Entry point confirmed in the installed package (laya/mcp/server.py: `main()` and the `__main__`
+ * guard); the `mcp` extra itself must be installed first: `pip install "laya[mcp]"` in the venv.
+ * @param {object} dc - the resolved decisions config.
+ * @param {{win?: boolean, repo?: string}} [o] - platform and checkout root.
+ * @returns {string[]} patch lines for the `insert:` list (4-space indent); empty when `mcp` is off.
+ */
+export function mcpRowLines(dc, o = {}) {
+  if (dc.mcp !== true) return []
+  const q = x => `'${String(x).replaceAll("'", "''")}'`
+  return [
+    '    # laya[mcp]: optional model-facing tools (decisions.mcp). Not harness control flow.',
+    '    - id: mcp-laya',
+    "      name: '@deepseek-ai/dsh-mcp-client'",
+    '      config:',
+    '        serverName: laya',
+    '        transport: stdio',
+    `        command: ${q(venvPython(dc, o))}`,
+    "        args: ['-m', 'laya.mcp.server']",
+    '        failOnStartupError: false',
+  ]
 }
 
 /**
