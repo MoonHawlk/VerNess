@@ -154,10 +154,11 @@ optional; anything omitted falls back to `DEFAULTS` in `scripts/finess.mjs`.
 | `settings.linkedSubstratePackages` | substrate packages our plugins import; linked, never copied |
 
 ### What personas do today, honestly
-The persona subsystem is M4. Until then a persona is **its identity text**, injected through the
-existing `system-prompt` seam — real and useful, but `tools.allow`/`tools.deny` and `skills` are
-**recorded and not yet enforced**. When M4 lands, the same config keys start being enforced by a
-plugin on `tools/pre-execute`, and nothing in this file needs to change.
+A persona is **its identity text**, injected through the existing `system-prompt` seam, plus its
+**tool policy**: `tools.allow`/`tools.deny`/`tools.approval` are **[enforced]** by
+`@finess/tool-policy` on `tools/pre-execute` (T-042). `sync` writes the active persona's policy into
+that row's config, and every per-run persona overlay (`--patch`) restates it, so a team task runs
+under its own persona's policy. `skills` are still **recorded and not yet enforced** (M5).
 
 Since M2, persona files (`personas/<id>.json`, JSONC) are **validated at load** against the
 `@finess/contracts` shape; a broken file is listed, not a crash. `/persona check` (or

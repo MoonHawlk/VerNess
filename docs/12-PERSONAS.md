@@ -42,7 +42,7 @@ fine (comments, trailing commas).
 | `id`, `name`, `description` | identity; shown by `/persona`, `/agents` |
 | `family` | **applied**: `data`, `engineering`, `business` or `research`; `/persona` and `/agents` group by it, and two-stage routing (T-396) will use it. Optional; a persona without one is listed under `other` |
 | `prompt.prefix` / `prompt.suffix` | **applied**: injected around the system prompt when the persona is active |
-| `tools.allow` / `deny` / `approval` | declared, validated (a tool cannot be both allowed and denied); enforced from M4 (T-042) |
+| `tools.allow` / `deny` / `approval` | **enforced** by `@finess/tool-policy` on `tools/pre-execute` (T-042): deny wins, a non-empty `allow` blocks everything else, `approval: ask` asks once (refused without an approval channel), empty = unrestricted; `bash` and `pwsh` count as one shell. A refused call returns `tool <name> is not allowed for persona <id> (...)`. `/permissions` prints the active policy, `/tools` marks each offered tool |
 | `skills`, `evaluators` | declared free strings; checked from M5/M7 |
 | `model`, `models.requirements` | optional model preferences (see T-361 for per-persona presets) |
 | `tips` | **applied**: appended to the prompt after the suffix, following the global `tips` from the config |

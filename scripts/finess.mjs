@@ -21,7 +21,7 @@ import { makeSuggester, readLineWithSuggestions } from './lib/prompt.mjs'
 import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
-import { activePersonaId, loadPersonas, personaPrompt, readState, writeState } from './lib/personas.mjs'
+import { activePersonaId, loadPersonas, personaPrompt, readState, toolPolicyLines, writeState } from './lib/personas.mjs'
 import { ACCESS_MODES, accessMode, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
@@ -445,6 +445,8 @@ export function renderPatch(cfg, { surface, repo, state = readState() }) {
   L.push(...yblock('personaPrefix', persona.prefix, '    '))
   L.push(...yblock('personaSuffix', `${persona.suffix}\nYour working directory is {{cwd}}.`, '    '))
   L.push('')
+  const policy = toolPolicyLines(persona.persona, cfg, row => pluginOnSurface(row, surface))
+  if (policy.length > 0) L.push(...policy, '')
   L.push('- id: tools')
   L.push('  config:')
   L.push(`    mode: ${cfg.settings.toolsMode ?? 'native'}`)

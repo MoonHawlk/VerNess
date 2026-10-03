@@ -36,6 +36,8 @@ importers:
 
   packages/tool-hints: {}
 
+  packages/tool-policy: {}
+
 packages:
 
   '@deepseek-ai/cordis@4.0.4':

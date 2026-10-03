@@ -7,6 +7,8 @@
       name: '@finess/spike'
     - id: finess-tool-hints
       name: '@finess/tool-hints'
+    - id: finess-tool-policy
+      name: '@finess/tool-policy'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared
     # OpenAI-compatible gateways given api + baseURL + a non-empty models list, and
     # catalog providers given only the variable their key is read from.
@@ -44,6 +46,14 @@
       - Prefer small, verifiable steps over long plans.
       - Report the query, the row count and the date range behind every number.
       Your working directory is {{cwd}}.
+
+# Persona "data-scientist" tool policy, enforced by finess-tool-policy on tools/pre-execute.
+- id: finess-tool-policy
+  config:
+    persona: "data-scientist"
+    allow: ["read","grep","glob","bash","python.execute","sql.query","data.profile","artifact.create"]
+    deny: ["production.write","sql.write"]
+    approval: {}
 
 - id: tools
   config:
