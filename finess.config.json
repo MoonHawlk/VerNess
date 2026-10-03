@@ -54,6 +54,11 @@
     "reasoning": false,
     "autoServe": true,
     "autoPull": true,
+    // Ordered fallbacks (T-453), used for a task when the default route is unavailable (local
+    // engine not answering, or a hosted route without its key). Empty = never. Never replaces a
+    // /model or /api use choice or a persona preset. Example:
+    //   "fallback": [{ "route": "openai", "id": "gpt-x" }, { "route": "ollama-local", "id": "qwen3:1.7b" }]
+    "fallback": [],
   },
 
   // Hosted models need nothing here: `/api use <provider> <model>` switches the
