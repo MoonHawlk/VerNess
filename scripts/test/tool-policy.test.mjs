@@ -151,3 +151,15 @@ test('activePolicy, /permissions and describePersona say [enforced] for tools', 
     assert.ok(activePolicy(cfgWith([ROW]), { state: { persona: 'nope' }, dir }).policy.broken !== undefined, 'a missing persona fails closed')
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('capability aliases match their substrate tools, and harness tools pass an allow list', () => {
+  const p = policyOf({ persona: 'ds', allow: ['read', 'artifact.create', 'web.fetch', 'shell.execute'], deny: ['web.search'] })
+  assert.equal(decide(p, 'write').kind, 'allow', 'artifact.create means write')
+  assert.equal(decide(p, 'web_fetch').kind, 'allow', 'web.fetch means web_fetch')
+  assert.equal(decide(p, 'pwsh').kind, 'allow', 'shell.execute means the shell')
+  assert.equal(decide(p, 'web_search').kind, 'deny', 'a denied alias still denies')
+  assert.equal(decide(p, 'edit').kind, 'deny', 'not allowed, not harness')
+  assert.equal(decide(p, 'todo_write').kind, 'allow', 'planning is a harness tool')
+  assert.equal(decide(p, 'subagent').kind, 'deny', 'delegation stays under the allow list')
+  assert.equal(decide(policyOf({ persona: 'x', allow: ['read'], deny: ['todo_write'] }), 'todo_write').kind, 'deny', 'deny by name still wins over harness')
+})

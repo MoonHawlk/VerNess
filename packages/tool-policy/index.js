@@ -6,7 +6,9 @@
  *
  * Semantics: deny wins; a non-empty allow list blocks everything not in it; `approval[tool]: 'ask'`
  * asks once through the substrate's approval seam (no approval channel = refused); an empty or absent
- * policy is unrestricted. A persona file that failed to load arrives as `broken` and fails closed:
+ * policy is unrestricted; harness tools (planning, goals, jobs) pass an allow list (`HARNESS`), and
+ * capability names such as `web.fetch` match their substrate tools (`ALIASES`). A persona file that
+ * failed to load arrives as `broken` and fails closed:
  * only read-only tools run. `bash` and `pwsh` are one shell, so a policy reads the same on macOS and
  * Windows.
  *
@@ -23,8 +25,35 @@ export const READ_ONLY = ['read', 'grep', 'glob']
 /** Platform aliases of one tool: the shell is `bash` on macOS/Linux and `pwsh` on Windows. */
 const SHELL = new Set(['bash', 'pwsh'])
 
-/** @param {string} a @param {string} b @returns {boolean} whether two tool names mean the same tool. */
-export const sameTool = (a, b) => a === b || (SHELL.has(a) && SHELL.has(b))
+/**
+ * Persona files name some tools by capability (`web.fetch`, `shell.execute`); these are the
+ * substrate tools each one means. A capability with no substrate tool yet (`sql.query`,
+ * `production.write`, ...) matches nothing until a plugin provides it.
+ */
+export const ALIASES = {
+  'web.fetch': ['web_fetch'],
+  'web.search': ['web_search'],
+  'shell.execute': ['bash', 'pwsh'],
+  'python.execute': ['bash', 'pwsh'],
+  'artifact.create': ['write'],
+}
+
+/**
+ * Harness tools an allow list never blocks: they plan, track or read, and change nothing outside
+ * the session. Naming one in `deny` still blocks it. Tools that hand work to another agent
+ * (`subagent`, `workflow`, ...) are not here: a subagent can write.
+ */
+export const HARNESS = ['todo_write', 'create_goal', 'get_goal', 'update_goal', 'exit_plan_mode', 'job_list', 'job_output', 'job_kill', 'read_image', 'skill', 'list_agents']
+
+/** @param {string} n @returns {string[]} the substrate tool names a policy entry stands for. */
+const expand = n => ALIASES[n] ?? [n]
+
+/**
+ * @param {string} entry - a name from a policy (substrate name or capability alias).
+ * @param {string} tool - the called substrate tool.
+ * @returns {boolean} whether the entry covers the tool.
+ */
+export const sameTool = (entry, tool) => expand(entry).some(a => a === tool || (SHELL.has(a) && SHELL.has(tool)))
 
 /** @param {string[]} list @param {string} tool @returns {boolean} whether the list names the tool. */
 const names = (list, tool) => list.some(t => sameTool(t, tool))
@@ -97,7 +126,7 @@ export function decide(policy, tool) {
   if (names(policy.deny, tool)) return no('denied by its tool policy')
   const mode = modeOf(policy.approval, tool)
   if (mode === 'deny') return no('its approval mode is deny')
-  if (policy.allow.length > 0 && !names(policy.allow, tool)) return no(`it allows only ${policy.allow.join(', ')}`)
+  if (policy.allow.length > 0 && !names(policy.allow, tool) && !HARNESS.includes(tool)) return no(`it allows only ${policy.allow.join(', ')}`)
   if (mode === 'ask') return { kind: 'ask', reason: `tool ${tool} needs approval for persona ${policy.persona}` }
   return { kind: 'allow' }
 }
