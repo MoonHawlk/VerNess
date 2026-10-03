@@ -51,7 +51,9 @@ export async function runLoopTask(ctx, objective, opts = {}) {
 async function loopTaskInner(ctx, objective, opts, job) {
   const maxRounds = opts.maxRounds ?? DEFAULT_MAX_ROUNDS
   const constraints = opts.constraints ?? []
-  const roundTimeout = opts.roundTimeout ?? DEFAULT_ROUND_TIMEOUT
+  // budget.taskSeconds caps a round (T-091): the tighter of it and the round timeout wins.
+  const taskCap = ctx.cfg?.budget?.taskSeconds > 0 ? ctx.cfg.budget.taskSeconds : Infinity
+  const roundTimeout = Math.min(opts.roundTimeout ?? DEFAULT_ROUND_TIMEOUT, taskCap)
   const profile = ctx.cfg.profile.name
   // Async when the context has it, so the round is a registered, killable child; stubs may stay sync.
   const run = ctx.dshAsync ?? ctx.dsh ?? ((a, o) => ctx.sh('dsh', a, o))
@@ -82,6 +84,8 @@ async function loopTaskInner(ctx, objective, opts, job) {
     const digest = renderDigest(state)
     const prompt = roundPrompt({ objective, digest, round, maxRounds, constraints: reminder === '' ? constraints : [...constraints, reminder] })
 
+    // Budget gate (T-091): warns near a limit, stops the loop before a round that would overspend.
+    if (ctx.budgetGate?.({ sessionId: identity }) === false) { outcome = 'budget'; detail = `stopped before round ${round}: a budget is used up`; break }
     step(`round ${round}/${maxRounds}`)
     const args = ['--profile', profile, '--json', ...(identity === undefined ? [] : ['--session-id', identity]), prompt]
     const t0 = Date.now()

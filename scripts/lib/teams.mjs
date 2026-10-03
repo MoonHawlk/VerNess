@@ -185,6 +185,14 @@ async function runTeamInner(team, ctx, opts, job) {
       .map(r => `### Result of ${r.id} (${r.persona})\n${r.output.slice(-4000)}`)
       .join('\n\n')
     const prompt = context === '' ? t.prompt : `${t.prompt}\n\n--- context from upstream tasks ---\n${context}`
+    // Budget gate (T-091): a task that would overspend is not started, and counts as failed.
+    if (ctx.budgetGate?.() === false) {
+      const rec = { id: t.id, persona: persona.id, code: 1, seconds: 0, attempts: 0, output: 'not started: a budget is used up', file: join(dir, `${t.id}.md`) }
+      done.set(t.id, rec)
+      results.push(rec)
+      if (policyOf(t) === 'stop') halted = true
+      return rec
+    }
     const t0 = Date.now()
     // ctx.dsh spawns the substrate's JS entry directly: a prompt carrying newlines or several
     // kilobytes of upstream context would be truncated by cmd.exe otherwise. The async variant is
@@ -196,7 +204,7 @@ async function runTeamInner(team, ctx, opts, job) {
     let attempts = 0
     do {
       attempts++
-      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, onSpawn: job?.track, task: true })
+      r = await run(['--profile', ctx.cfg.profile.name, '--patch', overlay, prompt], { capture: true, env, onSpawn: job?.track, task: true, timeoutMs: ctx.cfg.budget?.taskSeconds > 0 ? ctx.cfg.budget.taskSeconds * 1000 : undefined })
       if (r.code !== 0 && attempts < maxAttempts) warn(`${t.id} (${persona.id}) exit ${r.code}, retrying once`)
     } while (r.code !== 0 && attempts < maxAttempts)
     const seconds = (Date.now() - t0) / 1000

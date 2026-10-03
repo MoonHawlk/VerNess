@@ -27,6 +27,7 @@ import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
 import { notifyDone } from './lib/notify.mjs'
+import { budgetGate, taskTimeoutMs } from './lib/budget.mjs'
 import { CHECKOUT_STAMP, applyAllowBuilds, bundleName, enableBundle, hashPluginDir, isWorktree, pluginNeedsReinstall, profileBundles, readPluginHashes, syncWarnings, undecidedBuilds, writePluginHash } from './lib/profile-setup.mjs'
 import { gatherFacts, runChecks } from './lib/engine-checks.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
@@ -61,6 +62,8 @@ const DEFAULTS = {
   notes: { maxChars: 2000, briefMaxChars: 4000 },
   attach: { maxChars: 50000, maxTotal: 150000 },
   notify: { afterSeconds: 30, desktop: false },
+  // Unset = no limit. See `budget` in finess.config.json and /budget.
+  budget: { sessionTokens: undefined, dailyTokens: undefined, dailyCost: undefined, taskSeconds: undefined },
 }
 
 const C = {
@@ -640,6 +643,20 @@ function conversation() {
 }
 
 /**
+ * Budget check before a task (T-091): one warning line near a limit, a refusal when it is used up.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string|undefined} sessionId - the session whose tokens count against `sessionTokens`.
+ * @returns {boolean} true to run the task.
+ */
+function budgetOk(cfg, sessionId) {
+  return budgetGate(cfg, {
+    sessionId, say: warn,
+    allowOnce: readState().budgetAllowOnce === true,
+    consume: () => writeState({ budgetAllowOnce: undefined }),
+  }).ok
+}
+
+/**
  * Build the context every quick-tool receives. Commands run in this process: no model call and no
  * tokens, which is the whole reason they live outside the agent loop.
  * @param {typeof DEFAULTS} cfg - configuration.
@@ -660,6 +677,8 @@ function makeCtx(cfg, commands, convo) {
     dshAsync: (a, o = {}) => dshAsync(a, { cwd: activeWorkspace().dir, ...o }),
     // Running /delegate, /team run and /loop-task register here so /task can list and cancel them.
     jobsRoot: join(RUN_DIR_LOCAL, 'jobs'),
+    // Before each /loop-task round and team task: warns near a budget, false when it is used up.
+    budgetGate: (opts = {}) => budgetOk(loadConfig(), opts.sessionId ?? convo.id()),
     sync: () => syncPatch(cfg),
     routeEnv: env,
     activePersonaId: activePersonaId(cfg),
@@ -1078,7 +1097,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const prior = wants ? convo.id() : undefined
     if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
     const before = prior === undefined ? convo.snapshot() : undefined
-    dsh([...args, ...(first?.overlay === undefined ? [] : ['--patch', first.overlay]), ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, task: cfg.profile.template === 'headless' })
+    if (!budgetOk(cfg, prior)) { process.exitCode = 1; return }
+    dsh([...args, ...(first?.overlay === undefined ? [] : ['--patch', first.overlay]), ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(cfg.budget), task: cfg.profile.template === 'headless' })
     if (before !== undefined) convo.capture(before)
     return
   }
@@ -1259,8 +1279,10 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     for (const m of refs.missing) info(`${m} is not a file here - left as text`)
     const attachments = [...shellAttached, ...refs.attachments]
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)), attachments })
+    if (!budgetOk(loadConfig(), prior)) continue
     const t0 = Date.now()
-    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, task: true })
+    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(loadConfig().budget), task: true })
+    if (run.timedOut === true) warn(`the task hit budget.taskSeconds (${loadConfig().budget.taskSeconds}s) and was stopped`)
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.
     if (run.code === 0) { markSent(RUN_DIR_LOCAL, noteKey); briefAdded.length = 0; shellAttached.length = 0 }
