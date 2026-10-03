@@ -38,6 +38,7 @@ import { autoPercentOf, compactSettings, renderCompactRow } from './lib/compact.
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
 import { NODE_MIN, nodeOk } from './lib/node-version.mjs'
 import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, workspaceKey, workspaceLabel } from './lib/workspace.mjs'
+import { takeSnapshot } from './lib/snapshots.mjs'
 import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, loadTemperatures, logShadowDecision, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -1073,6 +1074,20 @@ async function prepareRoute(cfg, ready, { fallback = false } = {}) {
  * @param {{noModel?: boolean}} [opts] - `noModel` opens the REPL without booting a model or the
  *   substrate (T-381): quick-tools work, free-text tasks print a hint instead.
  */
+/**
+ * Snapshot the workspace before a task that may write, so /diff and /undo can show and revert it
+ * (T-454). Read-only access and non-git workspaces are skipped; a failure never blocks the task.
+ * @param {string} task - the task text, recorded with the snapshot.
+ */
+function snapshotBeforeTask(task) {
+  const mode = accessMode()
+  if ((ACCESS_MODES[mode] ?? mode) === 'read-only') return
+  try {
+    const r = takeSnapshot(activeWorkspace().dir, { task })
+    if (!r.ok && r.reason !== 'not a git repository') info(`no /undo snapshot: ${r.reason}`)
+  } catch (e) { info(`no /undo snapshot: ${e.message}`) }
+}
+
 async function cmdRun(cfg, task, { noModel = false } = {}) {
   const dshVersion = version('dsh', '--version')
   const ready = new Set()
@@ -1104,6 +1119,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     if (wants && prior === undefined) warn('no previous session recorded; starting a new one')
     const before = prior === undefined ? convo.snapshot() : undefined
     if (!budgetOk(cfg, prior)) { process.exitCode = 1; return }
+    snapshotBeforeTask(text)
     dsh([...args, ...(first?.overlay === undefined ? [] : ['--patch', first.overlay]), ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(cfg.budget), task: cfg.profile.template === 'headless' })
     if (before !== undefined) convo.capture(before)
     return
@@ -1286,6 +1302,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const attachments = [...shellAttached, ...refs.attachments]
     const outgoing = composeTask(taskText, { brief, notes: pendingNotes(readNotes(RUN_DIR_LOCAL, noteKey)), attachments })
     if (!budgetOk(loadConfig(), prior)) continue
+    snapshotBeforeTask(taskText)
     const t0 = Date.now()
     const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(loadConfig().budget), task: true })
     if (run.timedOut === true) warn(`the task hit budget.taskSeconds (${loadConfig().budget.taskSeconds}s) and was stopped`)
