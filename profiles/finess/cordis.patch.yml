@@ -48,3 +48,9 @@
 - id: tools
   config:
     mode: native
+
+# Automatic compaction at compact.autoPercent of the window (the default headroom is larger than a small window).
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.75
+    headroomTokens: 4096
