@@ -107,6 +107,29 @@ export function catalogProviders(cfg) {
   return out
 }
 
+/** Catalog model specs, per provider file, read once per process. */
+const specCache = new Map()
+
+/**
+ * One catalog model's spec as the installed adapter ships it (`contextWindow`, `input`, `reasoning`,
+ * `cost`, ...), for the capability router (T-253). Undefined before setup or for an unknown model.
+ * @param {object} cfg - the FiNess configuration.
+ * @param {string} provider - catalog provider id (a catalog route's name).
+ * @param {string} model - model id.
+ * @returns {object|undefined} the spec.
+ */
+export function catalogModelSpec(cfg, provider, model) {
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(String(provider))) return undefined
+  if (!specCache.has(provider)) {
+    let data
+    try { data = JSON.parse(readFileSync(join(adapterDist(cfg), 'providers', 'data', `${provider}.json`), 'utf8')) } catch { data = undefined }
+    specCache.set(provider, data)
+  }
+  const data = specCache.get(provider)
+  for (const byId of Object.values(data ?? {})) if (byId?.[model] !== undefined) return byId[model]
+  return undefined
+}
+
 /** Key-variable cache, per provider. */
 const keyCache = new Map()
 

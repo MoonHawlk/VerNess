@@ -69,6 +69,23 @@ the run loop, `/doctor`, `/model` and the prompt status line:
 3. `activeRoute` in the config;
 4. the local route.
 
+### Capability router — advisory (T-253, `scripts/lib/router.mjs`)
+
+The router never changes the answer above. On each REPL task it ranks the known models (local ones,
+each route's selected model, fallbacks, the persona preset) for the rule tier and the persona's
+`models.requirements`, and logs the pick next to what ran in `.finess/decisions/router/`.
+`/routing` shows the log; `/routing --router [tier]` explains a pick now.
+
+- **Tier is an input.** `local_small` needs `tool_calling: low`; `local_large` also needs
+  `reasoning: medium`; `frontier` needs both at `high`. You can override these with `models.tiers.<tier>`.
+- **Capabilities**, highest source first: `models.capabilities["route/model"]` or `["model"]` in the
+  config (capability levels, `context`, optional `latencyMs`), then the adapter catalog (context
+  window, image input, cost), then a size heuristic for local models (under 4B is `low`, under 30B is
+  `medium`). Catalog levels are also guesses. Each reason names its source.
+- **Ranking:** eligible models first; then cost (`pricing`, then catalog, local = 0); then
+  `latencyMs`; then smaller model; then what already runs. `models.deny` drops a route or a model.
+  `models.pin` is obeyed. `models.routerShadow: false` stops the log.
+
 ### The run loop re-resolves every turn
 
 `/api use` mid-session takes effect on the next task: each turn re-reads the route, checks the key

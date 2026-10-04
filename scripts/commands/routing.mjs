@@ -10,6 +10,9 @@
 
 import { LABEL_QUESTIONS, ROUTING_QUESTIONS, decisionsDir } from '../lib/decisions.mjs'
 import { latestGate, readShadow } from '../lib/labels.mjs'
+import { activePersonaId, loadPersonas, readState } from '../lib/personas.mjs'
+import { catalogModelSpec, effectiveRoute } from '../lib/routes.mjs'
+import { TIER_REQUIREMENTS, readRouterRecords, routeByCapability, routerAgreement, routerDir } from '../lib/router.mjs'
 import { head, info, table, warn } from '../lib/util.mjs'
 
 /** Records shown when no `--limit` is given. */
@@ -92,12 +95,47 @@ export function agreement(records, questions = Object.keys(ROUTING_QUESTIONS)) {
   return out
 }
 
+/**
+ * The router table rows for the last `limit` router records, newest first: when, task, tier, the
+ * pick and what actually ran.
+ * @param {object[]} records - router records, oldest first.
+ * @param {number} limit - how many to show.
+ * @returns {string[][]} the rows.
+ */
+export function routerRows(records, limit) {
+  return records.slice(-limit).reverse().map(r => [
+    String(r.at ?? '').slice(0, 16).replace('T', ' '),
+    truncate(r.task),
+    String(r.tier ?? '-'),
+    typeof r.pick === 'string' ? r.pick : 'none eligible',
+    `${String(r.actual ?? '-')}${r.agree === true ? '' : ' *'}`,
+  ])
+}
+
+/**
+ * Lines describing one live ranking: the requirement, each eligible model with its reasons, then why
+ * each other one was left out. Pure.
+ * @param {ReturnType<typeof routeByCapability>} r - the ranking.
+ * @param {string} actual - `route/model` the next task would actually run on.
+ * @returns {string[]} the lines.
+ */
+export function rankingLines(r, actual) {
+  const need = Object.entries(r.need).map(([k, v]) => `${k} ${v}`).join(', ')
+  const L = [`tier ${r.tier ?? '-'}; needs ${need === '' ? 'nothing' : need} (persona requirements are declared, advisory)`]
+  for (const w of r.warnings) L.push(`warning: ${w}`)
+  L.push(`pick: ${r.pick?.key ?? 'nothing eligible'}; actually runs: ${actual}`)
+  for (const [i, c] of r.ranked.entries()) L.push(`  ${i + 1}. ${c.key} - ${c.reasons.join('; ')}`)
+  for (const x of r.ineligible) L.push(`  -  ${x.key} - ${x.why.join('; ')}`)
+  return L
+}
+
 export default {
   name: 'routing',
   group: 'decisions',
   summary: 'recent shadow routing decisions: rules vs the decision model, and how often they agree',
-  usage: '/routing [--limit N]',
+  usage: '/routing [--limit N] | /routing --router [tier]',
   details: [
+    '--router ranks the models for the active persona now (tier local_large unless named): advisory, never applied',
     'reads .finess/decisions/ only: zero tokens, no call to the decision model',
     'each cell is rules / model (confidence); nothing the model says is applied yet',
     'agreement is model == rules over the whole log; accuracy needs labels (/decisions-data report)',
@@ -108,10 +146,26 @@ export default {
    * @returns {Promise<number>} exit code.
    */
   async run(ctx, args) {
+    const rAt = args.indexOf('--router')
+    if (rAt >= 0) {
+      const tier = args[rAt + 1] ?? 'local_large'
+      if (!Object.hasOwn(TIER_REQUIREMENTS, tier)) { warn(`--router takes a tier: ${Object.keys(TIER_REQUIREMENTS).join(', ')}`); return 1 }
+      const cfg = ctx.cfg
+      const state = readState()
+      const persona = loadPersonas(cfg).get(activePersonaId(cfg, state))
+      const eff = effectiveRoute(cfg, { state, persona })
+      const actual = `${eff.name}/${eff.model ?? '-'}`
+      const specFor = (route, model, spec) => (spec.kind === 'catalog' ? catalogModelSpec(cfg, route, model) : undefined)
+      const r = routeByCapability(cfg, { state, persona, tier, specFor, facts: { env: process.env }, actual })
+      head(`capability router for persona ${persona?.id ?? '-'} (advisory - the route below still decides)`)
+      for (const l of rankingLines(r, actual)) console.log(`  ${l}`)
+      return 0
+    }
     const lAt = args.indexOf('--limit')
     const limit = lAt >= 0 ? Number(args[lAt + 1]) : DEFAULT_LIMIT
     if (!Number.isInteger(limit) || limit <= 0) { warn('--limit takes a positive whole number'); return 1 }
     printRouting(decisionsDir(), limit)
+    printRouter(routerDir(), limit)
     return 0
   },
 }
@@ -145,4 +199,20 @@ export function printRouting(dir, limit) {
     console.log(`  ${q.padEnd(width)}  ${share.padEnd(22)}  gate: ${gate[q].pass ? 'PASS' : `HOLD — ${gate[q].why}`}`)
   }
   info('shadow mode: the rules decided every one of these; the gate only reports (/decisions-data gate)')
+}
+
+/**
+ * Print the capability router's shadow records (T-253) and how often its pick matched what ran.
+ * @param {string} dir - the router log directory.
+ * @param {number} limit - how many recent records to show.
+ */
+export function printRouter(dir, limit) {
+  const records = readRouterRecords(dir)
+  if (records.length === 0) { info('capability router: no shadow picks logged yet (every REPL task logs one)'); return }
+  const rows = routerRows(records, limit)
+  head(`capability router, last ${rows.length} of ${records.length} - advisory pick vs what ran (* = differs)`)
+  for (const l of table(['when', 'task', 'tier', 'pick', 'ran'], rows)) console.log(`  ${l}`)
+  const a = routerAgreement(records)
+  console.log(`  pick == ran  ${a.rate === null ? 'no picks yet' : `${Math.round(a.rate * 100)}% (${a.agree}/${a.n})`}${a.noPick > 0 ? `, ${a.noPick} with nothing eligible` : ''}`)
+  info('advisory: session choice > persona preset > config default (and fallback) decided every run; /routing --router explains a pick')
 }

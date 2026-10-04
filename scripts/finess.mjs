@@ -22,7 +22,7 @@ import { appendHistory, loadHistory } from './lib/history.mjs'
 import { modelDown, modelStats, modelUp, statsOpts } from './model.mjs'
 import { decisionDown } from './decision.mjs'
 import { activePersonaId, loadPersonas, personaPrompt, readState, toolPolicyLines, writeState } from './lib/personas.mjs'
-import { ACCESS_MODES, accessMode, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
+import { ACCESS_MODES, accessMode, catalogModelSpec, catalogProviders, chooseFallback, effectiveRoute, fallbackEnv, knownRoutes, loadDotEnv, localModels, routeEnvironment, smallModelNote, warnPreset } from './lib/routes.mjs'
 import { listSessions } from './lib/sessions.mjs'
 import { animatePet, gatherVitals, petEnabled } from './lib/pet.mjs'
 import { loadTeams } from './lib/teams.mjs'
@@ -42,6 +42,8 @@ import { takeSnapshot } from './lib/snapshots.mjs'
 import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, decisionsDir, loadTemperatures, logShadowDecision, mcpRowLines, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 import { latestGate } from './lib/labels.mjs'
 import { anyBand, compositeRecord, compositeRoute, escalations, llmFallback } from './lib/routing.mjs'
+import { executePipeline } from './lib/pipeline.mjs'
+import { logRouterShadow, routeByCapability, routerRecord } from './lib/router.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const RUN_DIR_LOCAL = join(REPO, '.finess', 'run')
@@ -535,6 +537,30 @@ async function shadowRoute(cfg, text) {
     + ` vs rules ${rules.level}/${rules.tier}/${rules.pipeline} (${agree.length}/3 agree, logged)`
     + `; composite ${pick('level')}/${pick('tier')}/${pick('pipeline')}${shadow ? ' (shadow)' : ''}`))
   return comp.applied
+}
+
+/**
+ * Capability-router shadow (T-253): rank models for this task's rule tier and the active persona's
+ * requirements, log the pick next to what actually runs, and change nothing. Never fails a task.
+ * Logs every task; prints only when the decision shadow (`decisions.enabled` + `shadow`) is on.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} text - the task text.
+ * @param {{route: string, model: string}} turn - what `prepareRoute` chose (fallback included).
+ * @returns {void}
+ */
+function routerShadow(cfg, text, turn) {
+  if (cfg.models?.routerShadow === false) return
+  try {
+    const state = readState()
+    const persona = loadPersonas(cfg).get(activePersonaId(cfg, state))
+    const actual = `${turn.route}/${turn.model}`
+    const specFor = (route, model, spec) => (spec.kind === 'catalog' ? catalogModelSpec(cfg, route, model) : undefined)
+    const r = routeByCapability(cfg, { state, persona, tier: ruleRoute(text).tier, specFor, facts: { env: process.env }, actual })
+    logRouterShadow(routerRecord(r, { task: text, actual, persona: persona?.id }))
+    // Silent by default; printed only beside the Laya shadow line, which the user opted into.
+    const dc = decisionConfig(cfg)
+    if (dc.enabled === true && dc.shadow === true && r.pick?.key !== actual) info(`router (advisory, tier ${r.tier}): would pick ${r.pick?.key ?? 'nothing eligible'}; running ${actual}`)
+  } catch (e) { info(`router shadow skipped: ${e.message}`) }
 }
 
 /**
@@ -1309,6 +1335,7 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     // so the route is re-resolved every turn rather than frozen at boot.
     const turn = await prepareRoute(loadConfig(), ready, { fallback: true })
     if (turn === undefined) continue
+    routerShadow(loadConfig(), taskText, turn)
     env = turn.env
     if (turn.overlay !== undefined) overlayArgs = [...overlayArgs, '--patch', turn.overlay]
     // Every turn after the first adopts the session the first one created, so the model keeps its
@@ -1332,7 +1359,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     if (!budgetOk(loadConfig(), prior)) continue
     snapshotBeforeTask(taskText)
     const t0 = Date.now()
-    const run = dsh([...args, ...overlayArgs, ...(prior === undefined ? [] : ['--session-id', prior]), outgoing], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(loadConfig().budget), task: true })
+    // T-254: every REPL task runs through the pipeline executor; only `standard` exists before M7.
+    const run = executePipeline('standard', { base: args, overlays: overlayArgs, sessionId: prior, task: outgoing, env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(loadConfig().budget) }, { run: dsh })
     if (run.timedOut === true) warn(`the task hit budget.taskSeconds (${loadConfig().budget.taskSeconds}s) and was stopped`)
     notifyDone({ what: taskText, ok: run.code === 0, elapsedMs: Date.now() - t0 }, loadConfig())
     // A failed run may never have reached the model, so its notes stay pending for the next task.

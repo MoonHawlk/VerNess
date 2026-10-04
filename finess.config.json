@@ -86,6 +86,13 @@
   //   taskSeconds    wall-clock limit per task / loop round / team task; the run is killed
   // Example:
   //   "budget": { "sessionTokens": 200000, "dailyTokens": 1000000, "dailyCost": 5, "taskSeconds": 300 }
+  // Capability router (T-253), advisory only: it logs which model it would pick and
+  // never changes the route. Optional "models" block; see docs/11-MODELS-AND-API.md:
+  //   "models": {
+  //     "capabilities": { "ollama-local/qwen3:8b": { "tool_calling": "medium", "context": 32768, "latencyMs": 400 } },
+  //     "tiers": { "frontier": { "reasoning": "high", "tool_calling": "high" } },
+  //     "pin": "route/model", "deny": ["route" or "route/model"], "routerShadow": true
+  //   }
 
   // Route the agent actually uses. Empty string = the `model` route above.
   "activeRoute": "",
