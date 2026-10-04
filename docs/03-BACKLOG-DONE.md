@@ -290,3 +290,4 @@ environment, is one command — no config edit, no guessing quants, no frozen ro
 - [x] Git Bash rewrote `finess /word` into `C:/Program Files/Git/word`, which the launcher sent to the model as a task (twice with destructive text: a `/models add` and six `/guard check` lines; the sandbox, the tool policy and a malformed call stopped them, nothing was deleted). The CLI now reads such a path back as `/word` (`unmangleSlash`)
 ## Live checks (2026-10-04)
 - [x] T-436 Live REPL check from the main checkout (2026-10-04): piped `/new`, `/btw use metric units`, `/btw`, `# amounts are in EUR`, `#`, then a real task on the local model; the composed task carried both the note and the brief line, and the answer used both ("Use Euros with metric units"). The brief was restored afterwards
+- [x] T-471 The FiNess brand shows in the browser (owner confirmed, 2026-10-04) after the registration moved below the official brand's priority (single slots threw on a tie)
