@@ -70,7 +70,8 @@ async function repoQuants(repo) {
     const name = String(f.rfilename ?? '')
     // Projector files carry vision weights, not the model; they are not pullable tags on their own.
     if (!name.toLowerCase().endsWith('.gguf') || /mmproj/i.test(name)) continue
-    const m = /[-_.]((?:I?Q\d[A-Z0-9_]*)|BF16|F16|F32)(?:-\d{5}-of-\d{5})?\.gguf$/i.exec(name)
+    // Unsloth's dynamic quants are files named `...-UD-Q4_K_XL.gguf`; the engine's tag keeps `UD-`.
+    const m = /[-_.]((?:UD-)?(?:I?Q\d[A-Z0-9_]*)|BF16|F16|F32)(?:-\d{5}-of-\d{5})?\.gguf$/i.exec(name)
     if (m === null) continue
     const q = m[1].toUpperCase()
     out.set(q, (out.get(q) ?? 0) + (f.size ?? f.lfs?.size ?? 0) || undefined)
@@ -91,9 +92,9 @@ async function resolveRef(input) {
   if (quants.size === 0) return { error: `${p.repo} publishes no GGUF files`, hint: `find a GGUF conversion: /models search ${p.repo.split('/')[1]}` }
   const available = [...quants.keys()]
   if (p.quant !== undefined) {
-    // Unsloth names its dynamic quants `UD-Q4_K_XL` in the file list; the repo's quant is `Q4_K_XL`.
-    const want = p.quant.toUpperCase().replace(/^UD-/, '')
-    const hit = available.find(q => q === want)
+    // `Q4_K_XL` and `UD-Q4_K_XL` name the same unsloth file; answer with the tag the repo publishes.
+    const want = p.quant.toUpperCase()
+    const hit = available.find(q => q === want) ?? available.find(q => q.replace(/^UD-/, '') === want.replace(/^UD-/, ''))
     if (hit === undefined) return { error: `${p.repo} has no ${p.quant} quant`, hint: `available: ${available.join(', ')}` }
     return { ref: `hf.co/${p.repo}:${hit}`, note: `${hit}, ${size(quants.get(hit))}`, quant: hit, quants }
   }
