@@ -10,6 +10,14 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 tool-failure hints for small models, and an animated Ness.**
 
 ### Added
+- **Thought graph** (`@finess/thoughts`, `/think`): the model records findings, decisions and
+  constraints with `think_add`; a capped per-project memory with provenance, contradictions held
+  for you to resolve, demotion instead of deletion, constraints injected at session start and kept
+  through compaction; a dashboard panel (T-280..T-290, T-295..T-297).
+- **`finess dashboard serve`**: a live dashboard on 127.0.0.1:4180 (token for any other address);
+  `finess dashboard --watch` (T-273..T-278).
+- **Context window reaches the engine**: `model.contextWindow` now sets the local engine's context;
+  `model.kvCache` (`q8_0`) saves VRAM for long contexts.
 - **Persona tool policy enforced**: a persona's `tools.allow`/`deny` now blocks calls, with a reason
   the model reads; `/permissions` shows it and `/tools` marks each tool (T-042, T-116, T-154, T-155).
 - **`/diff`** and **`/undo --yes`**: see and revert what the last task changed (git workspaces) (T-454).
@@ -79,6 +87,7 @@ tool-failure hints for small models, and an animated Ness.**
   the last tag, for you to edit (T-431).
 
 ### Changed
+- Tools a persona may not use are no longer offered to the model, so requests are smaller (T-234).
 - **Renamed to FiNess** everywhere: the `finess` command, `@finess/*` packages,
   `scripts/finess.mjs`, `finess.config.json`, `.finess/`, `profiles/finess`, `FINESS_*` variables.
 - `/loop-task` repeat guard follows the substrate's repeat-tool-reminder: reminders at 3 and 5

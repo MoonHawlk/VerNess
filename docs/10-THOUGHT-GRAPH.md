@@ -1,7 +1,7 @@
 # 10 — The thought graph: ephemeral and persistent working memory
 
-> Task block **T-280..T-297**. Status: **foundation built (T-280..T-284, `packages/thoughts`); T-285..T-297
-> not implemented.** See "As built" at the end. Grounded in two research
+> Task block **T-280..T-297**. Status: **built (T-280..T-290, T-295..T-297, `packages/thoughts`).**
+> See "As built" at the end. Grounded in two research
 > digests: `docs/research/dsh-state-and-memory-seams.md` (what the substrate forces) and
 > `docs/research/context-retention-patterns.md` (what Hermes and Anthropic learned the hard way).
 
@@ -130,7 +130,7 @@ persistence is explicit, capped, evidence-gated, attributed to its producer, and
 a contradiction surfaces rather than silently overwriting. An unbounded, self-written memory is not
 a feature; it is a slow corruption with a good user interface.
 
-## As built (T-280..T-284)
+## As built (T-280..T-289)
 
 `packages/thoughts` (`@finess/thoughts`, plugin row `finess-thoughts`), the contract in
 `packages/contracts/src/thought.ts`, and the operator command `scripts/commands/think.mjs`.
@@ -147,16 +147,136 @@ a feature; it is a slow corruption with a good user interface.
 - **Task boundary**: a direct human prompt (`user/message` with `source.kind === 'user'`) folds the
   graph to empty. In FiNess one REPL line is one dsh run is one human prompt; goal rounds and
   injected context do not reset it. A human follow-up in the web UI does.
-- **Projection** `thoughts`, `stateVersion: 1`, state `{v, task, turn, nextId, nodes}`, with a wire
-  view (for T-290). Ephemeral ids are `n-<k>`, per task; at most 200 nodes per task, then
-  `think_add` errors.
+- **Projection** `thoughts`, `stateVersion: 2` (2 since T-289: a fork cut folds to empty), state
+  `{v, task, turn, nextId, nodes}`, with a wire view (for T-290). Ephemeral ids are `n-<k>`, per
+  task; at most 200 nodes per task, then `think_add` errors.
 - **Persistent tier**: storage domain `finess_thoughts` (table `projects`, one record per project,
   keyed by its normalised working directory), at `$DSH_HOME/storages/finess_thoughts.json`. 16 KB cap
-  per project; a write past it throws `ThoughtStoreFullError` and changes nothing. Ids are `p-<k>`,
-  never reused. Each stored node carries `origin {by, session?, from?}` (room for T-297). Writes are
+  per project; a write past it demotes older nodes (T-288, below), and only one that cannot make room
+  that way throws `ThoughtStoreFullError` and changes nothing. Ids are `p-<k>`,
+  never reused. Each stored node carries `origin {by, session?, model?, from?}` (T-297, below). Writes are
   re-read and verified. The plugin opens the domain per operation, because the json backend holds
   the file in memory while open and would overwrite `/think`'s edits; `/think` writes the same file
   directly and atomically.
 - **Tools**: `think_add` (ephemeral only; promotion is the operator's `/think promote`),
   `think_search`, `think_open`. `think_add` refuses nested (programmatic) calls, because
   `presentationMeta` only runs for top-level ones.
+
+### What reaches the prompt (T-285, T-286, T-289)
+
+One mechanism carries all three: a durable user-role context message with the plugin's own
+source `{kind: 'finess-thoughts', form, part}`, entered through the `agent/pre-step` waterfall
+(upstream `packages/core/agent-loop/src/agent.ts:277`, typed `packages/core/agent/src/runtime-types.ts:320`)
+right after the step's claimed messages, as `agent-instructions` does
+(`packages/context/agent-instructions/src/index.ts:315-341`). A plugin source kind is legal: the
+source map is merge-extensible (`packages/llm/llm/src/message.ts:103-115`) and the session checks a
+user message's source only for a non-empty `kind` (`packages/core/session/src/index.ts:354-359`), so
+resume is unaffected. Logged, each message is frozen by construction; a second projection,
+`thoughtsContext` (`stateVersion: 1`, `src/context.js`), folds them back so nothing enters twice.
+A system-prompt section was rejected: its text is re-evaluated on every assembly and its
+`AssembleContext` carries only a scope, no session (`packages/core/system-prompt/src/index.ts:42-49, :66`).
+
+- **T-285, frozen constraints** (`src/inject.js`): on a top-level session's first step only (no
+  `step/start` in the log yet), the project's persistent `constraint` nodes, oldest first, stubs
+  excluded, capped at 12 nodes and 1536 bytes (the "N more" line inside the cap), as part
+  `constraints`. Computed once; later store changes reach only later sessions. A session that starts
+  with none gets none later. Children get none.
+- **T-286, compaction digest** (`src/compact.js`): when a `compaction/summary`
+  (`packages/compaction/compaction/src/types.ts:34`) is newer than the last digest, the next step
+  enters part `digest`: the session's frozen block verbatim from the log (the compacted range may have
+  swallowed it), then this task's `finding` and `decision` nodes, newest first, capped at 24 nodes and
+  3 KB. compaction-basic compacts inside the same waterfall (`compaction-basic/src/index.ts:158-176`),
+  so the listener checks after `await next()` and sees it in either listener order. A `compaction/prune`
+  does not count. An overflow compaction (`compaction-basic/src/index.ts:190-218`) retries without a
+  pre-step, so its digest enters with the following step.
+- **T-289, explicit subagent seeding** (`src/subagent.js`): the subagent tool's parameters are fixed
+  (`packages/subagent/tool-subagent/src/index.ts:389-399`) and `tools/pre-execute`
+  (`packages/core/tools/src/index.ts:153`) can allow or deny but not rewrite arguments (`:607`), so the
+  parent names nodes in the prompt: `[thoughts: n-2 p-1]` (`think_open`'s description says so). The
+  pre-execute listener resolves them against what the parent sees and denies the call, with the known
+  ids, when one is unknown or malformed or the set exceeds 12 nodes / 4 KB; once the rest of the
+  waterfall allows the call (or asks, since the user may approve), it stashes the nodes under the
+  prompt text (bounded, consume-once). The child's first pre-step finds its prompt among the claimed
+  messages (the prompt enters as its own text block, `tool-subagent/src/index.ts:517`; the plugin's
+  untagged listener sees every agent's events, `packages/core/scope/src/index.ts:158-181`) and enters part `seed`, which
+  the context projection folds into the child's `seeds`. A child (header `origin: 'subagent'` or
+  `delegationDepth > 0`, `packages/core/session/src/types.ts:117,123`, set for every in-process child
+  at `packages/subagent/subagent/src/child-agent.ts:153,155`) gets no baseline, its
+  `think_search` / `think_open` see its own nodes plus its seeds and never the project store, and its
+  own ids start above the seeded `n-` ids. A fork's inherited thought records fold away at the tagged
+  `session/end-seed` cut (`types.ts:427`); the inherited conversation itself is model-visible
+  history, which no plugin can retract. Only in-process children run the plugin: an out-of-process
+  provider (Claude Code, Codex, ACP) gets the marker as plain text and no nodes.
+
+### Evidence and eviction (T-287, T-288)
+
+- **T-287, "verified" needs evidence read this turn** (`src/evidence.js`): `think_add` pairs this
+  turn's `tool/call`s of `read`, `grep` and `web_fetch` with their non-error `tool/result`s by
+  `message.toolCallId` (`packages/core/session/src/types.ts:361,375`), within the current task segment.
+  An evidence token names a read when it is the file read (absolute, cwd-relative or a trailing path;
+  drive-letter paths case-insensitive; `:42` / `#L3` suffixes dropped), appears in a grep's output, or
+  is the fetched URL. Unproven `verified` is recorded as `asserted` with a `note` in the result, and
+  the logged record carries the downgrade. A call whose result is not logged yet (a parallel call in
+  the same step) did not happen yet. `/think promote` re-checks the node against its own turn's log
+  and downgrades it the same way. The operator's own `/think add --verified` is taken at the
+  operator's word.
+- **T-288, eviction by demotion** (`src/evict.js`): a node write (add, promote) that would pass the
+  cap demotes older nodes to stubs until it fits: attempts, artifacts, findings, decisions, then
+  constraints, oldest first; never the node being written. A stub keeps id, kind, turn, `at` and
+  edges, and is encoded in the existing fields - claim `[demoted] <60-char head>…`, evidence
+  `[recover: <session>#<n-id>]`, confidence `asserted` - so the stored shape and `DOMAIN_VERSION` are
+  unchanged (a version bump would make storage-domain refuse existing files). Only a node whose
+  origin names the session and the ephemeral id it was promoted from is demotable; with nothing
+  demotable the write still throws `ThoughtStoreFullError` and changes nothing. `link` does not
+  demote. A node a pending conflict (`c-<k>`, T-296) is held against is never demoted, and a stub
+  keeps its whole provenance envelope (T-297), so `revoke` still finds it. A write that the
+  contradiction guard holds back discards any demotion it would have caused. Promotion recognises a node already promoted by session, source id and `at` (not the
+  claim, which demotion rewrites). `/think` prints what it demoted, and `/think restore <p-id>` finds the original record in
+  that session's log (matching id, `at` and kind, since ephemeral ids repeat across tasks) and puts it
+  back under the same id, demoting others if it must.
+
+## As built (T-290, T-295..T-297)
+
+New modules beside the foundation: `packages/thoughts/src/envelope.js` (boundary parsing of `origin`
+and `conflicts`, called from `parseProject`), `src/provenance.js`, `src/conflicts.js`, `src/assist.js`;
+launcher side `scripts/lib/thought-assist.mjs` and `scripts/lib/thoughts-panel.mjs`. The stored record
+gained only optional fields (`origin.model`, `conflicts`, `nextConflict`), so `DOMAIN_VERSION` stays 1
+and the node contract (`packages/contracts/src/thought.ts`) is unchanged.
+
+- **T-297 provenance and revocation.** `/think promote` records `origin {by: 'model', session, model,
+  from}`: the claim is the model's, not the operator's. The model is the last `request/header`
+  (`data.header.config` provider/model) before the `tool/result` carrying the node, else `'unknown'`.
+  `/think add` stays `by: 'operator'`, with no model. `/think show` prints the provenance line.
+  `/think revoke <token>` matches, in order: an exact `p-<k>` id; else, among model-written nodes only,
+  a session prefix (at least 4 characters, `session-` ignored) or a model (`provider/model` or the bare
+  name). A token matching both a session and a model is refused. Matching nodes are removed with the
+  edges to them, plus every pending conflict they wrote or pointed at; the full removed entries are
+  appended to `$DSH_HOME/finess/thoughts-audit.jsonl` (outside `storages/`, which storage-json owns),
+  so a revoke is recoverable by hand. `resolve ... replace` is audited the same way.
+- **T-296 contradictions.** Rule (structural, no model): a claim is read as `subject predicate [not]
+  value` over a closed predicate list (is/are/was, equals, defaults to, must be, runs on, lives in,
+  returns, points to, belongs to: single-valued; uses, requires/needs, includes/contains, has:
+  multi-valued), with articles, quotes and end punctuation dropped and contractions expanded. Two
+  claims contradict when subject and predicate match and either the value is the same with one side
+  negated, or both are positive with different values on a single-valued predicate. `--contradicts
+  <p-id>` on `add`/`promote` marks one the rule cannot see. A contradicting write is not stored: it is
+  held in the project record as `c-<k>` (its reserved `p-` id is never reused; it counts against the
+  byte cap) and the command exits 2. `/think conflicts` lists them with both claims and provenance;
+  `/think resolve <c-id> keep|replace|both` drops the incoming node, forgets the stored one and stores
+  the incoming, or stores both. Only persistent writes are guarded; ephemeral `think_add` nodes never
+  overwrite anything.
+- **T-295 decision-model assist, shadow only.** One deviation: it runs **post-run in the launcher**,
+  not inside `think_add`. The plugin is a copy under the dsh profile and cannot reach the decision
+  client or the shadow log, and a call from inside the tool would race the dsh process exit. After
+  each REPL task, `shadowThoughts` takes this task's nodes stamped at or after the run's start (at
+  most 5) and per node asks, in one call, `persist` (yes/no) and `contradicts` (`none` plus up to 7
+  persistent candidates from `searchNodes`, so at most 8 options; omitted when there is no candidate,
+  since a choice needs two). Each answer is logged as a shadow record (`source: 'thoughts'`, `node`,
+  `session`, `candidates`) beside the rules (`persist: 'no'`; `contradicts`: the structural rule).
+  Nothing acts on them; decisions off means no call; failures are silent.
+- **T-290 dashboard panel** (static export and `serve`): the current session's task graph (the
+  `state.json` session, found in any workspace) as a tree, each node under its first parent, with
+  `← derives from` / `→ used by` links and evidence; the persistent inventory per project with byte
+  size, provenance and pending contradictions; and the latest `thoughts` shadow answers (model /
+  rules). Those records are left out of the routing decisions table and its agreement rate. `serve`
+  and `--watch` also watch `$DSH_HOME/storages`, so a `/think` write refreshes the page.

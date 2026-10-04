@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -26,7 +26,7 @@ function withStore(fn) {
   try {
     const store = fileStore(storeFile(dir))
     const deps = extra => ({ store, project: 'c:/proj', session: 'session-1', events: () => EVENTS, now: () => new Date(AT), ...extra })
-    return fn({ store, deps, run: (args, extra = {}) => runThink(args, deps(extra)) })
+    return fn({ store, deps, dir, run: (args, extra = {}) => runThink(args, deps(extra)) })
   } finally {
     console.log = log
     rmSync(dir, { recursive: true, force: true })
@@ -74,6 +74,54 @@ test('a full store refuses the write and keeps what it had', () => withStore(({ 
   const cap = recordBytes(store.read('c:/proj')) + 20
   assert.equal(run(['add', 'finding', 'A', 'second', 'fact', 'that', 'will', 'not', 'fit.'], { cap }), 1)
   assert.equal(store.read('c:/proj').nodes.length, 1)
+}))
+
+test('promote records the model as the writer, with session and model (T-297)', () => withStore(({ store, run }) => {
+  const events = [{ type: 'request/header', data: { header: { config: { provider: 'deepseek', model: 'v3' } } } }, ...EVENTS]
+  assert.equal(run(['promote', 'n-1'], { events: () => events }), 0)
+  assert.deepEqual(store.read('c:/proj').nodes[0].origin, { by: 'model', session: 'session-1', model: 'deepseek/v3', from: 'n-1' })
+  assert.equal(run(['promote', 'n-2']), 0)
+  assert.equal(store.read('c:/proj').nodes[1].origin.model, 'unknown', 'no request header: still revocable as unknown')
+  assert.equal(run(['show', 'p-1']), 0)
+}))
+
+test('a contradicting add or promote is held; conflicts lists it; resolve settles it (T-296)', () => withStore(({ store, run }) => {
+  assert.equal(run(['add', 'finding', 'The', 'cache', 'is', 'fresh.']), 0)
+  assert.equal(run(['add', 'finding', 'The', 'cache', 'is', 'warm.']), 2, 'held, not stored')
+  assert.equal(run(['promote', 'n-2']), 2, '"is stale" contradicts "is fresh"')
+  let r = store.read('c:/proj')
+  assert.deepEqual(r.nodes.map(s => s.node.claim), ['The cache is fresh.'])
+  assert.deepEqual(r.conflicts.map(c => [c.id, c.against, c.entry.node.claim]), [['c-1', 'p-1', 'The cache is warm.'], ['c-2', 'p-1', 'The cache is stale.']])
+  assert.equal(run(['list']), 0)
+  assert.equal(run(['conflicts']), 0)
+  assert.equal(run(['resolve', 'c-1', 'keep']), 0)
+  assert.equal(run(['resolve', 'c-2', 'replace']), 0)
+  r = store.read('c:/proj')
+  assert.deepEqual(r.nodes.map(s => [s.node.id, s.node.claim]), [['p-3', 'The cache is stale.']])
+  assert.deepEqual(r.conflicts, [])
+  assert.equal(run(['resolve', 'c-2', 'keep']), 1, 'already settled')
+  assert.equal(run(['add', 'finding', 'Builds', 'are', 'quick.', '--contradicts', 'p-3']), 2, 'explicit link')
+  assert.equal(run(['add', 'finding', 'X.', '--contradicts']), 1)
+  assert.equal(run(['promote', 'n-1', '--contradicts', 'p-3']), 2)
+}))
+
+test('revoke removes a bad run and writes an audit line with the full entries (T-297)', () => withStore(({ store, run, dir }) => {
+  const audit = join(dir, 'finess', 'thoughts-audit.jsonl')
+  assert.equal(run(['add', 'constraint', 'Never', 'edit', 'upstream.']), 0)
+  assert.equal(run(['promote', 'n-1']), 0)
+  assert.equal(run(['promote', 'n-2']), 0)
+  assert.equal(run(['revoke', 'sess'], { audit }), 1, 'too short')
+  assert.equal(run(['revoke', 'session-1'], { audit }), 1, 'a session prefix needs 4 characters after session-')
+  assert.equal(run(['revoke', 'unknown'], { audit }), 0, 'by model: both promoted nodes')
+  assert.deepEqual(store.read('c:/proj').nodes.map(s => s.node.id), ['p-1'], 'the operator note stays')
+  const lines = readFileSync(audit, 'utf8').trim().split('\n').map(l => JSON.parse(l))
+  assert.equal(lines.length, 1)
+  assert.equal(lines[0].action, 'revoke')
+  assert.equal(lines[0].match, 'model')
+  assert.equal(lines[0].project, 'c:/proj')
+  assert.deepEqual(lines[0].removed.map(s => [s.node.id, s.origin.from]), [['p-2', 'n-1'], ['p-3', 'n-2']])
+  assert.equal(run(['revoke', 'p-1'], { audit }), 0)
+  assert.equal(store.read('c:/proj').nodes.length, 0)
 }))
 
 test('unknown subcommands print usage and fail', () => withStore(({ run }) => {

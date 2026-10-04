@@ -721,3 +721,17 @@
   WS-P T-455..T-466 opened.
 - WS-H base agent stopped on an API rate limit and was resumed; its foundation lands next.
 - `npm test` 683/683, typecheck clean.
+
+## 2026-10-04 — WS-H done, dashboard service, a real model
+- WS-H complete in three agents (foundation, then two fronts in parallel). The second front's
+  branch conflicted in 15 hunks with the first (store writes, /think, docs/10); the merge was
+  aborted and its author merged epic in its own worktree and reconciled both feature sets (a node
+  held by a conflict is never demoted, stubs keep provenance), then it merged cleanly.
+- Merged: T-234 (tool filtering), WS-D service (T-273..T-275, T-277, T-278), T-469, T-472.
+- The `E:` drive is back: the engine runs on an RTX 3090 (24 GB). Downloading Qwen3.8-27B
+  UD-Q4_K_XL (16.4 GB; hybrid attention, ~64 KB of KV per token) for a 64k context. Found on the
+  way: the context window never reached the engine; fixed. A mistyped `/models` from Git Bash was
+  path-converted into a model task; the sandbox and the persona tool policy both refused its
+  writes (live evidence for T-467).
+- P0 T-473 (block irreversible commands, confirmed twice) opened and in progress.
+- `npm test` 786/786, typecheck clean.
