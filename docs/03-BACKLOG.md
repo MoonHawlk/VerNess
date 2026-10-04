@@ -182,7 +182,7 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-467 `@finess/tool-policy` live check: boot a session per persona and confirm denied calls come back with the policy reason; check whether `ask` should reach an approval channel in the REPL
 - [ ] T-468 Enforce budgets inside the substrate (`llm/stream`), so one long task or a `--parallel` team batch cannot overshoot between checks (T-091 checks only before a task)
 - [ ] T-470 Install `laya[mcp]` in the decision venv and confirm the `decisions.mcp` row exposes the tools in `/tools` (T-240; the entry point `python -m laya.mcp.server` is confirmed in the installed package)
-- [ ] T-471 Web UI brand plugin (T-398) seen in a browser: sidebar mark and name, hero mark, tab title; remove the `ui-brand-official` row if the substrate mark still shows
+- [ ] T-471 *(remaining part, owner)* See the FiNess brand in a browser after a reload. Fixed 2026-10-04: the registration clashed with the official brand in single slots and threw, so nothing showed; it now registers at priority -10 and the server includes `@finess/client-ui-brand` in the page's boot graph
 
 ## WS-P — Performance between chats (plan `14-PERFORMANCE-PLAN.md`)
 Measured 2026-10-03: ~3 s to boot a new dsh per message, 91% of generated text is reasoning, a 2.3 s title LLM call per new session, ~20 KB request per step, ~1 s awaited decision call. Target: < 1.5 s to first token on the next message.

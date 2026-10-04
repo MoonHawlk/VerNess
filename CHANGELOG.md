@@ -109,6 +109,12 @@ persona tool policies, `/workspace` for any project, `@`/`!` context, recipes, a
   rendering and `.env` parsing are covered (T-365).
 
 ### Fixed
+- The persona tool policy never activated in a real run (`@finess/tool-policy` read the `tools` service
+  without declaring it); it now does, and a persona sees only its permitted tools (data-scientist: 16).
+- The FiNess brand did not show in the web UI: its registration clashed with the official brand and
+  threw; it now shadows it (T-398).
+- Large local models no longer fail to "warm up": the load may take `model.loadTimeoutSeconds` (900).
+- `/models add` keeps unsloth's `UD-` quant tag, which the engine registers.
 - From Git Bash, `finess /command` no longer becomes a task for the model (MSYS rewrote it into a
   `C:/Program Files/Git/...` path); it runs the command.
 - Long tasks no longer hit the Windows command-line limit: they reach dsh through stdin, and

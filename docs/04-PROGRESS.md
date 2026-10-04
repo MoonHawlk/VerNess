@@ -754,3 +754,15 @@
   survived; the launcher now refuses to start a task while a safety plugin is missing.
 - Per-machine context window and KV cache from `.env` (`FINESS_CONTEXT_WINDOW`, `FINESS_KV_CACHE`).
 - `npm test` 821/821, typecheck clean.
+
+## 2026-10-04 (evening) — the big model runs; two plugins that never worked live
+- Qwen3.8-27B UD-Q4_K_XL runs on the RTX 3090 at 30 tok/s, 64k context (`.env`: FINESS_CONTEXT_WINDOW,
+  FINESS_KV_CACHE=q8_0), 19.6 GB VRAM. The third pull registered it; the FiNess warm-up gave up after
+  180 s while the 16 GB load from the E: disk took ~4 min (now `model.loadTimeoutSeconds`, 900).
+- First real task on it: glob -> grep -> read of docs/14 and a correct three-bullet answer, zero tool
+  errors (the 0.6B failed 20 of 33 calls), 88 s with thinking on (T-457).
+- `@finess/tool-policy` had never activated in a real run ("cannot get property tools without inject");
+  unit tests used a plain fake ctx. Fixed; data-scientist now gets 16 tools instead of 28, and the
+  thought-graph tools pass any allow list. Lesson: every plugin needs one live boot check.
+- The web brand threw on registration (single slots, same priority as the official build). Fixed;
+  the server now includes it in the boot graph. Visual check left to the owner (T-471).
