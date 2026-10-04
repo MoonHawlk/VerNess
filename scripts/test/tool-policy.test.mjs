@@ -266,3 +266,9 @@ test('apply: pre-execute stays the backstop alongside hiding; an open policy hid
   assert.equal(open.offered().length, 25)
   assert.equal(open.on.size, 0)
 })
+
+test('the plugin declares the services it reads, or Cordis refuses to activate it', async () => {
+  const mod = await import('../../packages/tool-policy/index.js')
+  assert.equal(mod.inject?.tools?.required, true)
+  assert.equal(mod.inject?.agents?.required, false)
+})

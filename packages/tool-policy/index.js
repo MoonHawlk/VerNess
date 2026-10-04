@@ -20,6 +20,12 @@
 
 export const name = 'finess-tool-policy'
 
+/**
+ * Services this plugin reads. Cordis refuses an undeclared service at runtime ("cannot get property
+ * tools without inject"), which failed the whole entry: no tool was hidden and no call was refused.
+ */
+export const inject = { tools: { required: true }, agents: { required: false } }
+
 /** Tools that run even for a broken persona: they only read. */
 export const READ_ONLY = ['read', 'grep', 'glob']
 
