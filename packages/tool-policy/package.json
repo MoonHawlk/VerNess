@@ -2,7 +2,7 @@
   "name": "@finess/tool-policy",
   "version": "0.0.1",
   "private": true,
-  "description": "Enforces the active persona's tool policy (allow/deny/approval) on tools/pre-execute.",
+  "description": "Enforces the active persona's tool policy (allow/deny/approval): denied tools are hidden via tools.restrict and refused on tools/pre-execute.",
   "type": "module",
   "main": "./index.js",
   "exports": { ".": "./index.js" }

@@ -1,8 +1,9 @@
 /**
  * Persona tool policy, enforced (T-042). The active persona's `tools: {allow, deny, approval}` reaches
  * this plugin as its row config (the launcher writes it into the profile patch and every per-run
- * persona overlay), and a `tools/pre-execute` listener refuses what the policy forbids with a reason
- * the model reads in the tool result.
+ * persona overlay). Each agent's scoped `ctx.tools.restrict()` hides what the policy denies, so the
+ * request never carries those schemas (T-234), and a `tools/pre-execute` listener refuses a forbidden
+ * call with a reason the model reads in the tool result (the backstop).
  *
  * Semantics: deny wins; a non-empty allow list blocks everything not in it; `approval[tool]: 'ask'`
  * asks once through the substrate's approval seam (no approval channel = refused); an empty or absent
@@ -146,10 +147,48 @@ export function verdict(policy, tool) {
 export const restricts = policy => policy.broken !== undefined || policy.allow.length > 0 || policy.deny.length > 0
   || Object.values(policy.approval).some(m => m !== 'allow')
 
+/** The substrate's PTC transport: `tools.restrict()` refuses to name it. */
+const RUN_CODE = 'run_code'
+
 /**
- * Mount: refuse forbidden calls before dispatch. An allowed call goes on to the next gate (`next()`),
- * so other policies still run; a refused one never reaches them or the tool.
- * @param {{on: Function}} ctx - registrant context.
+ * The `ctx.tools.restrict()` filter that hides what `decide` would deny (T-234). Always a concrete
+ * `deny` list, never `allow`: the substrate's allow hides everything unlisted (harness and `ask`
+ * tools too) and knows neither ALIASES nor that bash and pwsh are one shell. `ask` tools stay offered.
+ * Also the MCP filtering primitive: pass `{allow, deny}` over `mcp__<server>__<tool>` names.
+ * @param {Policy|{allow?: string[], deny?: string[]}} policy - a policy, or a bare allow/deny filter.
+ * @param {Iterable<string>} names - the tool names offered now (e.g. `ctx.tools.schemas(agent)`).
+ * @returns {{deny: string[]}|undefined} the filter, or undefined when nothing is hidden
+ *   (`restrict({})` throws).
+ */
+export function restrictionFor(policy, names) {
+  const p = 'persona' in policy && 'approval' in policy ? /** @type {Policy} */ (policy) : policyOf(policy)
+  const deny = [...new Set(names)].filter(n => n !== RUN_CODE && decide(p, n).kind === 'deny')
+  return deny.length > 0 ? { deny } : undefined
+}
+
+/**
+ * Hide denied tools from one agent's requests. Masks are per name, so one name the substrate refuses
+ * (own-scope or unknown) costs only that name; reruns add only new names.
+ * @param {object} ctx - the plugin context (`tools.schemas`, `logger`).
+ * @param {Policy} policy - from `policyOf`.
+ * @param {{ctx: {tools: {restrict: Function}}}} agent - the agent; its `ctx` is the scoped context.
+ * @param {Set<string>} masked - names already hidden (or refused) for this agent.
+ */
+function mask(ctx, policy, agent, masked) {
+  const offered = ctx.tools.schemas(agent).map(s => String(s.name))
+  const filter = restrictionFor(policy, offered.filter(n => !masked.has(n)))
+  for (const name of filter?.deny ?? []) {
+    masked.add(name)
+    try { agent.ctx.tools.restrict({ deny: [name] }) }
+    catch (e) { ctx.logger?.warn?.(`tool-policy: cannot hide ${name} (still refused when called): ${e?.message ?? e}`) }
+  }
+}
+
+/**
+ * Mount: hide forbidden tools from every agent's requests (`tools.restrict`), and refuse forbidden
+ * calls before dispatch as the backstop. An allowed call goes on to the next gate (`next()`), so other
+ * policies still run; a refused one never reaches them or the tool.
+ * @param {{on: Function, tools?: object, agents?: object, logger?: object}} ctx - registrant context.
  * @param {unknown} config - the row config (see `policyOf`).
  */
 export function apply(ctx, config) {
@@ -159,4 +198,24 @@ export function apply(ctx, config) {
     const d = decide(policy, String(exec?.name ?? ''))
     return d.kind === 'allow' ? next() : d
   })
+  if (typeof ctx.tools?.schemas !== 'function') return
+  /** @type {Map<object, Set<string>>} */
+  const agents = new Map()
+  let busy = false
+  // restrict() emits tools/change itself; the flag stops that rerun from recursing.
+  const run = list => {
+    if (busy) return
+    busy = true
+    try {
+      for (const agent of list) {
+        if (typeof agent?.ctx?.tools?.restrict !== 'function') continue
+        if (!agents.has(agent)) agents.set(agent, new Set())
+        mask(ctx, policy, agent, agents.get(agent))
+      }
+    } finally { busy = false }
+  }
+  run(ctx.agents?.list?.() ?? [])
+  ctx.on('agent/created', ({ agent }) => run([agent]))
+  ctx.on('agent/disposed', ({ agent }) => { agents.delete(agent) })
+  ctx.on('tools/change', () => run([...agents.keys()]))
 }
