@@ -43,6 +43,7 @@ import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisio
 import { latestGate } from './lib/labels.mjs'
 import { anyBand, compositeRecord, compositeRoute, escalations, llmFallback } from './lib/routing.mjs'
 import { executePipeline } from './lib/pipeline.mjs'
+import { runSyncTree } from './lib/treerun.mjs'
 import { logRouterShadow, routeByCapability, routerRecord } from './lib/router.mjs'
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -246,17 +247,22 @@ function dsh(args, opts = {}) {
     // Fall back to the shim only if the entry point could not be resolved; the caveats above apply.
     if (dshEntry === null) return sh('dsh', staged.args, { ...opts, stdin: staged.stdin })
     const io = opts.capture === true ? 'pipe' : 'inherit'
+    // A timeout takes the whole process tree down, not just the direct child (T-472).
+    if (opts.timeoutMs > 0) {
+      const t = runSyncTree(process.execPath, [dshEntry, ...staged.args], { cwd: opts.cwd ?? REPO, env: opts.env, capture: opts.capture === true, timeoutMs: opts.timeoutMs, stdin: staged.stdin })
+      if (t.error !== undefined) warn(`the substrate did not start: ${t.error.message}`)
+      return { code: t.code, out: t.out, timedOut: t.timedOut }
+    }
     const r = spawnSync(process.execPath, [dshEntry, ...staged.args], {
       cwd: opts.cwd ?? REPO,
       env: { ...process.env, ...opts.env },
       stdio: staged.stdin === undefined ? io : [staged.stdin, io, io],
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
-      ...(opts.timeoutMs > 0 ? { timeout: opts.timeoutMs, killSignal: 'SIGKILL' } : {}),
     })
     // A spawn that never started (ENAMETOOLONG on an oversized Windows command line) has no output of its own.
-    if (r.error !== undefined && r.error.code !== 'ETIMEDOUT') warn(`the substrate did not start: ${r.error.message}`)
-    return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), timedOut: r.error?.code === 'ETIMEDOUT' }
+    if (r.error !== undefined) warn(`the substrate did not start: ${r.error.message}`)
+    return { code: r.status ?? 1, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim(), timedOut: false }
   } finally { staged.cleanup() }
 }
 
@@ -1173,7 +1179,10 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
     const before = prior === undefined ? convo.snapshot() : undefined
     if (!budgetOk(cfg, prior)) { process.exitCode = 1; return }
     snapshotBeforeTask(text)
-    dsh([...args, ...(first?.overlay === undefined ? [] : ['--patch', first.overlay]), ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(cfg.budget), task: cfg.profile.template === 'headless' })
+    const overlays = first?.overlay === undefined ? [] : ['--patch', first.overlay]
+    // T-469: a headless one-shot runs through the pipeline executor like a REPL turn; other surfaces keep the direct call.
+    if (cfg.profile.template === 'headless') executePipeline('standard', { base: args, overlays, sessionId: prior, task: text, env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(cfg.budget) }, { run: dsh })
+    else dsh([...args, ...overlays, ...(prior === undefined ? [] : ['--session-id', prior]), text], { env, cwd: activeWorkspace().dir, timeoutMs: taskTimeoutMs(cfg.budget), task: false })
     if (before !== undefined) convo.capture(before)
     return
   }
