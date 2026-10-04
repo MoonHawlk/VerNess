@@ -53,6 +53,9 @@ finess> /exit
 | See what the next task will carry and how full the context is | `/context` |
 | Limit how far the model's shell and file tools reach | `/access read-only` · `/access workspace` (default) · `/access full --yes` |
 | See the tools the model was offered | `/tools` |
+| See what the last task changed in your files (git workspaces) | `/diff` · `/diff --all` |
+| Undo the last task's file changes (shows the plan first) | `/undo` then `/undo --yes` |
+| The model's own plan for the current task | `/todos` |
 
 ## Context: files, pages, shell output, notes
 
@@ -67,7 +70,7 @@ finess> /exit
 | Add a side note to the next task only | `/btw use metric units` · `/btw` shows · `/btw drop 1` · `/btw clear` |
 | Add a line to the project brief every new session gets | `# amounts are in EUR` · `#` shows the brief · `##` sends a line starting with `#` as a task |
 
-Attachments are capped (12,000 characters per item, 20,000 in total) and binary files are refused.
+Attachments are capped (50,000 characters per item, 150,000 in total; `attach.maxChars` and `attach.maxTotal`) and binary files are refused.
 `!` commands are refused under `/access read-only`.
 
 ## Working on another project
@@ -91,6 +94,8 @@ conversation. The brief, `/btw` notes and the dashboard stay with FiNess.
 | Start a fresh conversation | `/new` |
 | List past conversations | `/sessions` · `/sessions --all` |
 | Continue an earlier one | `/resume` (pick) · `/resume 3f9a` (id prefix) |
+| Shrink a long conversation into a fresh one (costs one model turn) | `/compact` then `/compact --yes` |
+| Save a conversation as Markdown | `/export` · `/export 3f9a --out notes/chat.md` |
 
 ## Models: local and hosted
 
@@ -99,6 +104,7 @@ conversation. The brief, `/btw` notes and the dashboard stay with FiNess.
 | Start the local engine and warm the model | `/up` |
 | Free the model's memory | `/down` |
 | Show the model, or switch | `/model` · `/model qwen3:4b` |
+| Fall back to another route when the default is down | `"model": { "fallback": [{ "route": "anthropic", "id": "<model>" }] }` in `finess.config.json`; `/model` shows which would run |
 | List, search, install, remove local models | `/models` · `/models search qwen coder` · `/models add Qwen/Qwen3-4B-GGUF:Q4_K_M --use` · `/models rm <ref>` |
 | Use a hosted API instead | `/api` · `/api models openai` · `/api use anthropic <model>` · `/api local` (back to local) |
 | Which key variable a provider needs, and whether it is set (keys go in `.env`) | `/api key anthropic` |
@@ -118,6 +124,7 @@ A persona is a hat: a role prompt, a tool policy, its own commands and, optional
 | Describe one | `/persona show reviewer` |
 | Validate every persona file | `/persona check` |
 | Every persona and team at a glance | `/agents` |
+| The tool policy enforced for the active persona | `/permissions` · `/tools` marks each tool allowed, denied or ask |
 
 Give a persona its own model in its JSON file (for example a reviewer on a stronger model than the
 worker): `"model": { "route": "anthropic", "id": "<model>" }`. A `/model` or `/api use` choice in
@@ -149,6 +156,7 @@ optional `persona`, `args`) and a body with `{{arg}}` placeholders.
 |---|---|
 | Run one task with a chosen persona | `/delegate reviewer check docs/COMMANDS.md for broken examples` |
 | Recent delegated and team runs | `/task list` |
+| Stop a running delegated, team or loop run (and every process it started) | `/task cancel 3f9a` |
 | Teams: list, inspect, run, results | `/team list` · `/team show feature-delivery` · `/team run feature-delivery --dry-run` · `/team status` |
 | Work on one goal over several rounds | `/loop-task make every test in scripts/test pass` · `/loop-task --rounds 5 --round-timeout 300 <goal>` |
 
@@ -163,13 +171,15 @@ notice.
 | Do this | Type |
 |---|---|
 | Money per route (needs a `pricing` entry; tokens only otherwise) | `/cost` · `/cost --all` |
+| Spending limits: tokens per session or day, cost per day, seconds per task | `/budget` · `/budget allow once` · set `budget` in `finess.config.json` |
 | Tokens per route, or per day | `/usage` · `/usage --by day` |
 | The HTML dashboard: sessions, tool failures, latency, loops, backlog | `/dashboard` (alias `/dash`) |
 | Rebuild the code map (no model calls) | `/graph` |
 
 ## Decision model (Laya)
 
-Laya is a small local classifier that guesses how to route a task. It runs in shadow mode: its
+Laya is a small local classifier that guesses how to route a task, whether a loop round is done
+and whether a task needs review. It runs in shadow mode: its
 guesses are logged and compared, never acted on.
 
 | Do this | Type |
@@ -177,6 +187,7 @@ guesses are logged and compared, never acted on.
 | Start, check or stop it | `/decision up` · `/decision stats` · `/decision down` |
 | Laya vs the rules on one task | `/decide add a login page with tests` |
 | Recent routing guesses and agreement | `/routing` |
+| Which model the capability router would pick, with reasons (advisory only) | `/routing --router` |
 | Grade, score and tune Laya | `/dd` · `/dd label` · `/dd report` · `/dd refit` |
 
 ## Ness, the pet
@@ -192,6 +203,7 @@ guesses are logged and compared, never acted on.
 | Do this | Type |
 |---|---|
 | What is installed and what is missing | `/doctor` |
+| Why the local engine will not start (missing models drive, port taken, ...) | `/doctor` (with a fix line) · `.finess/run/engine.log` |
 | The resolved configuration and which file owns each value | `/config` · `/config pet` |
 | Apply edits to `finess.config.json` | `/sync` |
 
