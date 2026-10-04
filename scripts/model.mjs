@@ -147,6 +147,22 @@ async function explainStartFailure(base, ref, startedByUs) {
 }
 
 /**
+ * Environment for an engine FiNess starts: the route's context window as the default for every
+ * request (the OpenAI-compatible endpoint the substrate uses cannot send `num_ctx`), flash attention
+ * (needed for a quantized KV cache) unless `model.flashAttention` is false, and `model.kvCache`
+ * (`f16`, `q8_0`, `q4_0`) when set. An engine started elsewhere keeps its own settings.
+ * @param {{contextWindow?: number, flashAttention?: boolean, kvCache?: string}} m - the model config.
+ * @returns {Record<string, string>} variables for `ollama serve`.
+ */
+export function engineEnv(m) {
+  const env = {}
+  if (Number(m.contextWindow) > 0) env.OLLAMA_CONTEXT_LENGTH = String(Math.floor(Number(m.contextWindow)))
+  if (m.flashAttention !== false) env.OLLAMA_FLASH_ATTENTION = '1'
+  if (typeof m.kvCache === 'string' && /^(f16|q8_0|q4_0)$/.test(m.kvCache)) env.OLLAMA_KV_CACHE_TYPE = m.kvCache
+  return env
+}
+
+/**
  * Bring the model up: engine present, server running, weights fetched, weights warm.
  * @param {object} cfg - the FiNess configuration.
  * @param {string} [model] - the model to bring up; defaults to the configured one.
@@ -169,7 +185,7 @@ export async function modelUp(cfg, model) {
   if ((await engineVersion(base)) === undefined) {
     step(`starting the engine server on ${apiRoot(base)}`)
     // Hidden console on Windows: a detached start makes each Ollama helper flash a terminal window.
-    const started = startBackground(WIN ? 'ollama.exe' : 'ollama', ['serve'], { errFile: ENGINE_LOG })
+    const started = startBackground(WIN ? 'ollama.exe' : 'ollama', ['serve'], { errFile: ENGINE_LOG, env: engineEnv(m) })
     if (started.error !== undefined) info(started.error.split(/\r?\n/)[0])
     pid = started.pid
     startedByUs = true
@@ -202,7 +218,8 @@ export async function modelUp(cfg, model) {
         body: JSON.stringify({
           model: ref, prompt: 'ok', stream: false,
           keep_alive: `${m.keepAliveMinutes ?? 10}m`,
-          options: { num_predict: 1 },
+          // Load with the route's window, or the engine loads its own default and reloads later.
+          options: { num_predict: 1, ...(m.contextWindow > 0 ? { num_ctx: m.contextWindow } : {}) },
         }),
         signal: AbortSignal.timeout(180000),
       })
