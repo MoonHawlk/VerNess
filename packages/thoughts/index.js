@@ -25,6 +25,19 @@
  *            verifyStored(r, node), storedNodes(r)
  *   adapters domainStore(ctx.storageDomain), fileStore(file), storeFile(dshHome), readUnit(file), writeUnit(file, map)
  *   plugin   mount(ctx, {defineTool}), toolSpecs(deps), sessionState(projections, session)
+ *   (T-285..T-289)
+ *   context  CONTEXT_KEY, CONTEXT_STATE_VERSION, SOURCE_KIND, initContext(), foldContext(s, e), contextSchema,
+ *            contextState(projections, session), visibleNodes(deps), contextMessage(part, text, extra),
+ *            messagesFor(session, claimed, deps), mountContext(ctx, {store}), projectOf(session)
+ *   inject   BASELINE_MAX_NODES, BASELINE_MAX_BYTES, cappedLines(head, items, caps), constraintNodes(stored), renderBaseline(stored)
+ *   compact  DIGEST_KINDS, DIGEST_MAX_NODES, DIGEST_MAX_BYTES, renderDigest(nodes, frozen)
+ *   evidence READ_TOOLS, taskSegment(events), turnReads(events, turn), normPath(p), pointerOf(token),
+ *            namesRead(entry, read, cwd), gateVerified(node, reads, cwd), gatePromotion(eph, events, cwd)
+ *   evict    STUB_PREFIX, RECOVER_PREFIX, STUB_CLAIM_CHARS, DEMOTE_ORDER, isStubNode(n), demotable(s), recoveryOf(n),
+ *            stubOf(s), demoteToFit(r, cap, protect), findOriginal(stub, events), restoreStub(r, id, original)
+ *   subagent SUBAGENT_TOOLS, MAX_SEED_NODES, MAX_SEED_BYTES, MAX_STASH, parseSeedIds(prompt), resolveSeed(pool, prompt),
+ *            seedStash(max), isChildSession(header), seedFloor(seeds)
+ *   fold     also isForkCut(event); STATE_VERSION is 2 (a fork cut folds the graph to empty)
  *
  * Only this file imports the substrate (`defineTool`); everything under src/ is plain Node.
  * @module @finess/thoughts
@@ -39,6 +52,12 @@ export * from './src/fold.js'
 export * from './src/search.js'
 export * from './src/store.js'
 export * from './src/adapters.js'
+export * from './src/context.js'
+export * from './src/inject.js'
+export * from './src/compact.js'
+export * from './src/evidence.js'
+export * from './src/evict.js'
+export * from './src/subagent.js'
 export { mount, sessionState, toolSpecs } from './src/plugin.js'
 
 export const name = 'finess-thoughts'

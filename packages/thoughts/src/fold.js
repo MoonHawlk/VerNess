@@ -28,7 +28,7 @@ import { idNumber, isPlainObject, validateThoughtNode } from './schema.js'
 /** Projection key (one registrant; ctx.sessionProjections refuses a second at another version). */
 export const PROJECTION_KEY = 'thoughts'
 /** Bump on ANY change to the state shape or the fold's semantics (session-projection/src/index.ts:86-92). */
-export const STATE_VERSION = 1
+export const STATE_VERSION = 2
 /** The record tag inside `tool/result.meta`. */
 export const RECORD_KIND = 'thought/node'
 /** Record payload version. */
@@ -39,7 +39,7 @@ export const MAX_EPHEMERAL_NODES = 200
 /**
  * @typedef {import('./schema.js').ThoughtNode} ThoughtNode
  * @typedef {object} ThoughtsState
- * @property {1} v - STATE_VERSION.
+ * @property {2} v - STATE_VERSION (2: a fork cut folds to empty, T-289).
  * @property {number} task - human prompts seen in this session (0 before the first).
  * @property {number|null} turn - the open or last turn, null before the first `turn/start`.
  * @property {number} nextId - the next ephemeral id number.
@@ -75,6 +75,13 @@ export function recordOf(event) {
 export const isTaskStart = event => event?.type === 'user/message' && event.data?.source?.kind === 'user'
 
 /**
+ * A fork child's cut: the tagged `session/end-seed` (upstream core/session/src/types.ts:427).
+ * Untagged markers are ordinary restore boundaries and keep the graph.
+ * @param {unknown} event @returns {boolean} whether it ends an inherited prefix.
+ */
+export const isForkCut = event => event?.type === 'session/end-seed' && event.data?.inherited === true
+
+/**
  * The pure projection fold. Returns the SAME reference for every event it does not care about
  * (the registry gates all downstream work on `Object.is`).
  * @param {ThoughtsState} state - current state.
@@ -83,6 +90,8 @@ export const isTaskStart = event => event?.type === 'user/message' && event.data
  */
 export function foldThought(state, event) {
   if (isTaskStart(event)) return { v: STATE_VERSION, task: state.task + 1, turn: state.turn, nextId: 1, nodes: [] }
+  // A fork child's inherited prefix ends here: nothing of the parent's graph comes along (T-289).
+  if (isForkCut(event)) return state.nodes.length === 0 && state.nextId === 1 ? state : { ...state, nextId: 1, nodes: [] }
   if (event?.type === 'turn/start') {
     const turn = event.data?.turn
     return Number.isSafeInteger(turn) && turn !== state.turn ? { ...state, turn } : state
@@ -111,7 +120,7 @@ export function foldEvents(events, from = initState()) {
 export const stateSchema = {
   /** @param {unknown} v @returns {ThoughtsState} the state, or throws. */
   parse(v) {
-    if (!isPlainObject(v) || v.v !== STATE_VERSION) throw new Error('thoughts: not a v1 state')
+    if (!isPlainObject(v) || v.v !== STATE_VERSION) throw new Error(`thoughts: not a v${STATE_VERSION} state`)
     const { task, turn, nextId, nodes } = v
     if (!Number.isSafeInteger(task) || task < 0) throw new Error('thoughts: bad task counter')
     if (turn !== null && (!Number.isSafeInteger(turn) || turn < 0)) throw new Error('thoughts: bad turn')

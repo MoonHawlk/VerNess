@@ -18,6 +18,12 @@
  *   /think conflicts                   writes held back because they contradict a stored node (T-296)
  *   /think resolve <c-id> keep|replace|both
  *                                      settle one: drop the incoming, replace the stored, or keep both
+ *   /think restore <p-id>              re-inflate a demoted stub from the session log it points at
+ *
+ * A full store demotes older recoverable nodes to stubs on add/promote (T-288), never one a pending
+ * conflict is held against. Promoting a "verified" node re-checks its turn's reads in the log and
+ * downgrades it when unproven (T-287); the operator's own `add --verified` is taken at the
+ * operator's word.
  * @module scripts/commands/think
  */
 
@@ -26,16 +32,18 @@ import { join } from 'node:path'
 
 import { fileStore, storeFile } from '../../packages/thoughts/src/adapters.js'
 import { guardedWrite, pendingConflicts, resolveConflict } from '../../packages/thoughts/src/conflicts.js'
+import { gatePromotion } from '../../packages/thoughts/src/evidence.js'
+import { demoteToFit, findOriginal, isStubNode, recoveryOf, restoreStub } from '../../packages/thoughts/src/evict.js'
 import { foldEvents } from '../../packages/thoughts/src/fold.js'
 import { UNKNOWN_MODEL, appendAudit, auditFile, nodeModels, originLine, revoke } from '../../packages/thoughts/src/provenance.js'
 import { THOUGHT_KINDS } from '../../packages/thoughts/src/schema.js'
 import { nodeDetail, nodeLine, subgraph } from '../../packages/thoughts/src/search.js'
-import { DEFAULT_CAP_BYTES, addPersistent, findStored, forget, link, projectKey, promote, recordBytes, storedNodes } from '../../packages/thoughts/src/store.js'
+import { DEFAULT_CAP_BYTES, ThoughtStoreFullError, addPersistent, findStored, forget, link, projectKey, promote, recordBytes, storedNodes } from '../../packages/thoughts/src/store.js'
 import { listSessions, readSessionEvents } from '../lib/sessions.mjs'
 import { head, info, ok, warn } from '../lib/util.mjs'
 import { activeWorkspace } from '../lib/workspace.mjs'
 
-const USAGE = '/think [list | show <id> | add <kind> <claim> [:: <evidence>; ...] [--verified] [--contradicts <p-id>] | link <a> <b> | promote <n-id> [--contradicts <p-id>] | forget <p-id> | revoke <p-id|session-prefix|model> | conflicts | resolve <c-id> keep|replace|both]'
+const USAGE = '/think [list | show <id> | add <kind> <claim> [:: <evidence>; ...] [--verified] [--contradicts <p-id>] | link <a> <b> | promote <n-id> [--contradicts <p-id>] | forget <p-id> | revoke <p-id|session-prefix|model> | conflicts | resolve <c-id> keep|replace|both | restore <p-id>]'
 
 /**
  * Parse `/think add` arguments.
@@ -82,19 +90,26 @@ function reportWrite(res, what) {
     return 2
   }
   ok(`${what} ${nodeLine(res.node)} (verified on re-read)`)
+  demotedNote(res.demoted)
   return 0
+}
+
+/** @param {string[]|undefined} ids - ids a write demoted to make room (T-288). */
+function demotedNote(ids) {
+  if (ids !== undefined && ids.length > 0) info(`store was full: demoted ${ids.join(', ')} to stubs (/think restore <id> brings one back)`)
 }
 
 /**
  * The command body, with every effect injected so tests run against temp files.
  * @param {string[]} args - the words after `/think`.
  * @param {{store: {read: Function, mutate: Function}, project: string, session?: string,
- *   events: () => object[]|undefined, now?: () => Date, cap?: number, audit?: string}} deps - the store
- *   adapter, the project key, the current session id, its decoded log (undefined when there is
- *   none), and the audit file for revokes and replacements (absent: no audit file is written).
+ *   events: () => object[]|undefined, eventsOf?: (id: string) => object[]|undefined, now?: () => Date,
+ *   cap?: number, audit?: string}} deps - the store adapter, the project key, the current session id,
+ *   its decoded log (undefined when there is none), any session's log by id (for restore), and the
+ *   audit file for revokes and replacements (absent: no audit file is written).
  * @returns {number} exit code (2: the write was held back as a contradiction).
  */
-export function runThink(args, { store, project, session, events, now = () => new Date(), cap = DEFAULT_CAP_BYTES, audit }) {
+export function runThink(args, { store, project, session, events, eventsOf = () => undefined, now = () => new Date(), cap = DEFAULT_CAP_BYTES, audit }) {
   const [sub = 'list', ...rest] = args
   const log = () => events() ?? []
   const eph = () => foldEvents(log()).nodes
@@ -149,7 +164,10 @@ export function runThink(args, { store, project, session, events, now = () => ne
       if (n === undefined) { warn(`no ephemeral node ${c.rest[0]} in this task - /think lists them`); return 1 }
       // The claim is the model's, so the origin says so: which session, which model (T-297).
       const origin = { by: 'model', ...(session === undefined ? {} : { session }), model: nodeModels(ev).get(n.id) ?? UNKNOWN_MODEL }
-      const res = store.mutate(project, r => guardedWrite(r, x => promote(x, n, { at: at(), origin, cap }), { at: at(), contradicts: c.contradicts, cap }))
+      // T-287: a "verified" node is promoted as such only if its own turn's log shows the read.
+      const gated = gatePromotion(n, ev, project)
+      if (gated.note !== undefined) warn(`${n.id}: ${gated.note}`)
+      const res = store.mutate(project, r => guardedWrite(r, x => promote(x, gated.node, { at: at(), origin, cap }), { at: at(), contradicts: c.contradicts, cap }))
       return reportWrite(res, `promoted ${n.id} as`)
     }
     if (sub === 'forget' && rest.length === 1) {
@@ -186,6 +204,21 @@ export function runThink(args, { store, project, session, events, now = () => ne
       ok(`${res.conflict.id} resolved: ${rest[1]}${res.node === undefined ? '' : ` - stored ${res.node.id} (verified on re-read)`}`)
       return 0
     }
+    if (sub === 'restore' && rest.length === 1) {
+      const s = store.read(project).nodes.find(x => x.node.id === rest[0])
+      if (s === undefined || !isStubNode(s.node)) { warn(`${rest[0]} is not a demoted stub - /think list shows them as [demoted]`); return 1 }
+      const ptr = recoveryOf(s.node)
+      const original = ptr === undefined ? undefined : findOriginal(s.node, eventsOf(ptr.session) ?? [])
+      if (original === undefined) { warn(`the full node is not in session ${ptr?.session ?? '?'} any more (log missing or pruned); the stub stays`); return 1 }
+      const { demoted } = store.mutate(project, r => {
+        const fit = demoteToFit(restoreStub(r, rest[0], original), cap, [rest[0]])
+        if (recordBytes(fit.record) > cap) throw new ThoughtStoreFullError(recordBytes(fit.record), cap)
+        return { record: fit.record, demoted: fit.demoted }
+      })
+      ok(`restored ${rest[0]} from ${ptr.session}#${ptr.from}`)
+      demotedNote(demoted)
+      return 0
+    }
   } catch (e) {
     warn(e.message)
     return 1
@@ -197,11 +230,12 @@ export function runThink(args, { store, project, session, events, now = () => ne
 export default {
   name: 'think',
   group: 'core',
-  summary: 'the thought graph: list | show <id> | add | link | promote <n-id> | forget | revoke | conflicts | resolve',
+  summary: 'the thought graph: list | show <id> | add | link | promote <n-id> | forget | revoke | conflicts | resolve | restore',
   usage: USAGE,
   details: [
     'ephemeral nodes are what the model recorded this task (think_add); they reset on the next task',
-    'persistent nodes outlive sessions, per project, capped in bytes; a full store refuses writes',
+    'persistent nodes outlive sessions, per project, capped in bytes; when full, older promoted nodes are demoted to stubs, and only a write that cannot make room that way is refused',
+    'restore <p-id> brings a demoted stub back from the session log it points at',
     'promote and add re-read the store to verify; link <a> <b> means a was derived from b',
     'a write that contradicts a stored node is held as a conflict, never written over it: /think conflicts, /think resolve',
     'every persistent node records its session and model; /think revoke <id|session-prefix|model> removes a bad run, with an audit line',
@@ -214,16 +248,17 @@ export default {
   run(ctx, args) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
     const cur = ctx.conversation?.id()
-    const events = () => {
-      if (cur === undefined) return undefined
-      const s = listSessions({ workspace: ctx.workspaceKey, limit: 50 }).find(x => x.id === String(cur).replace(/^session-/, ''))
+    const logOf = (id, limit) => {
+      const s = listSessions({ workspace: ctx.workspaceKey, ...(limit === undefined ? {} : { limit }) }).find(x => x.id === String(id).replace(/^session-/, ''))
       return s === undefined ? undefined : readSessionEvents(join(s.dir, 'session.v4.jsonl.zstd'))
     }
+    const events = () => (cur === undefined ? undefined : logOf(cur, 50))
     return runThink(args, {
       store: fileStore(storeFile(home)),
       project: projectKey(activeWorkspace().dir),
       ...(cur === undefined ? {} : { session: String(cur) }),
       events,
+      eventsOf: id => logOf(id),
       audit: auditFile(home),
     })
   },
