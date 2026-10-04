@@ -1485,8 +1485,25 @@ everything is configured in finess.config.json (personas, tips, model, plugins)`
 export async function main(argv) {
   const { argv: words, workspace } = takeWorkspaceFlag(argv)
   if (workspace !== undefined) applyWorkspaceFlag(workspace)
-  const [first, ...rest] = words
+  const [raw, ...rest] = words
+  const first = unmangleSlash(raw)
+  if (first !== raw) info(`read ${raw} as ${first} (Git Bash rewrote the leading /; set MSYS_NO_PATHCONV=1 to stop it)`)
   await dispatch(first, rest, loadConfig())
+}
+
+/**
+ * Git Bash (MSYS) rewrites an argument that starts with `/` into a Windows path under its install
+ * root, so `finess /guard check ...` arrives as `C:/Program Files/Git/guard`. Unrecovered, that
+ * became a model task; twice it reached the model with destructive text. A path under a `Git`
+ * folder that does not exist and whose last segment is a command-shaped word is read back as `/word`.
+ * @param {string|undefined} arg - the first CLI word.
+ * @returns {string|undefined} the word, or `/word` when it was a rewritten slash command.
+ */
+export function unmangleSlash(arg) {
+  if (typeof arg !== 'string') return arg
+  const m = /^[A-Za-z]:[\\/](?:[^\\/]+[\\/])*Git[\\/](?:usr[\\/])?([a-z][a-z0-9-]*)$/i.exec(arg)
+  if (m === null || existsSync(arg)) return arg
+  return `/${m[1].toLowerCase()}`
 }
 
 /**
