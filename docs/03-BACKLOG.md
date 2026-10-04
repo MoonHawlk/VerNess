@@ -27,7 +27,6 @@ TUI
 
 Launcher lifecycle
 - [ ] T-124 Verify `up`/`down` on macOS and Linux (only Windows has been measured)
-- [ ] T-436 Live REPL check of `/btw` and `#` from the main checkout (only unit-tested so far): pipe the lines `/btw use metric units`, `/btw`, `# amounts in EUR`, `#` into `node scripts/finess.mjs`, then send one real task and confirm both blocks reach the model
 - [ ] T-437 Exercise the `pre-push` hook through a real `git push` with `core.hooksPath scripts/hooks`, on Windows (Git for Windows `sh`) and macOS
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
