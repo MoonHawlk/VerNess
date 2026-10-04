@@ -13,9 +13,11 @@ full design of each is in [07-COMMAND-LAYER.md](07-COMMAND-LAYER.md).
 
 - [Start and stop](#start-and-stop)
 - [Talking to the model](#talking-to-the-model)
+- [Safety: irreversible commands](#safety-irreversible-commands)
 - [Context: files, pages, shell output, notes](#context-files-pages-shell-output-notes)
 - [Working on another project](#working-on-another-project)
 - [Conversations](#conversations)
+- [Memory: the thought graph](#memory-the-thought-graph)
 - [Models: local and hosted](#models-local-and-hosted)
 - [Personas](#personas)
 - [Recipes: one-line task templates](#recipes-one-line-task-templates)
@@ -57,6 +59,22 @@ finess> /exit
 | Undo the last task's file changes (shows the plan first) | `/undo` then `/undo --yes` |
 | The model's own plan for the current task | `/todos` |
 
+## Safety: irreversible commands
+
+Commands that cannot be undone are shown to you and must be confirmed **twice** before they run: once
+with `yes`, then with `DELETE` (or the command's first word). This covers the model's shell calls and
+your own `!cmd`. Examples: `rm -rf`, `del /s`, `Remove-Item -Recurse`, `format`, `dd of=`,
+`git reset --hard`, `git push --force`, `git clean -f`, SQL `DROP`/`TRUNCATE`, `curl ... | sh`.
+With no terminal to ask (a pipe, CI, a team run), the command is refused, never run.
+
+| Do this | Type |
+|---|---|
+| See the guard's mode | `/guard` |
+| Check a command without running it | `/guard check rm -rf build` |
+| Refuse irreversible commands without asking | set `"irreversible": "deny"` in the `finess-guard` plugin row of `finess.config.json` |
+
+Details: [15-COMMAND-GUARD.md](15-COMMAND-GUARD.md).
+
 ## Context: files, pages, shell output, notes
 
 | Do this | Type |
@@ -97,6 +115,20 @@ conversation. The brief, `/btw` notes and the dashboard stay with FiNess.
 | Shrink a long conversation into a fresh one (costs one model turn) | `/compact` then `/compact --yes` |
 | Save a conversation as Markdown | `/export` · `/export 3f9a --out notes/chat.md` |
 
+## Memory: the thought graph
+
+The model records findings, decisions and constraints as it works (`think_add`); constraints are
+given to every new session of the project. Design: [10-THOUGHT-GRAPH.md](10-THOUGHT-GRAPH.md).
+
+| Do this | Type |
+|---|---|
+| What this task and this project remember | `/think` · `/think list` · `/think show p-3` |
+| Add a constraint every session should know | `/think add constraint Amounts are in EUR` |
+| Keep a finding from this task | `/think promote n-2` |
+| Remove one, or everything a session or model wrote | `/think forget p-3` · `/think revoke 3f9a` |
+| Contradictions held for you to decide | `/think conflicts` · `/think resolve c-1 keep` |
+| Bring back a node demoted when the store was full | `/think restore p-7` |
+
 ## Models: local and hosted
 
 | Do this | Type |
@@ -113,6 +145,9 @@ conversation. The brief, `/btw` notes and the dashboard stay with FiNess.
 
 `/models add` warns when a model will not fit your free RAM/VRAM and suggests a smaller quant.
 `/doctor` and `/model` warn when a model is under 4B parameters (too small for reliable tool calls).
+Long contexts on a local model: set `"contextWindow": 65536` (and `"kvCache": "q8_0"` to halve its
+memory) in the `model` block; FiNess starts the engine with that window. Restart the engine after a
+change (`/down`, then `/up`).
 
 ## Personas
 
@@ -175,6 +210,7 @@ notice.
 | Spending limits: tokens per session or day, cost per day, seconds per task | `/budget` · `/budget allow once` · set `budget` in `finess.config.json` |
 | Tokens per route, or per day | `/usage` · `/usage --by day` |
 | The HTML dashboard: sessions, tool failures, latency, loops, backlog | `/dashboard` (alias `/dash`) |
+| The dashboard live in a browser, updating as you work (own terminal) | `finess dashboard serve` · `finess dashboard --watch` |
 | Rebuild the code map (no model calls) | `/graph` |
 
 ## Decision model (Laya)

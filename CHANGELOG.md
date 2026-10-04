@@ -6,10 +6,15 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 
 ## Unreleased
 
-**The project is now FiNess; side notes and a project brief in the prompt, one `finess` command,
-tool-failure hints for small models, and an animated Ness.**
+**The project is now FiNess: irreversible commands confirmed twice, a thought-graph memory, enforced
+persona tool policies, `/workspace` for any project, `@`/`!` context, recipes, and a live dashboard.**
 
 ### Added
+- **Irreversible commands are confirmed twice** (`@finess/guard`): `rm -rf`, recursive deletes,
+  disk formatting, `git reset --hard`/`push --force`/`clean -f`, SQL `DROP`/`TRUNCATE`, remote code
+  piped to a shell and the like are shown before they run and need `yes`, then `DELETE`; without a
+  terminal or approval channel they are refused. Covers the model's shell calls and your `!cmd`;
+  `/guard check <cmd>` tests a line (T-473).
 - **Thought graph** (`@finess/thoughts`, `/think`): the model records findings, decisions and
   constraints with `think_add`; a capped per-project memory with provenance, contradictions held
   for you to resolve, demotion instead of deletion, constraints injected at session start and kept
@@ -104,6 +109,8 @@ tool-failure hints for small models, and an animated Ness.**
   rendering and `.env` parsing are covered (T-365).
 
 ### Fixed
+- From Git Bash, `finess /command` no longer becomes a task for the model (MSYS rewrote it into a
+  `C:/Program Files/Git/...` path); it runs the command.
 - Long tasks no longer hit the Windows command-line limit: they reach dsh through stdin, and
   attachments may be up to 50k per item, 150k in total (T-448).
 - `/doctor` and `up` say why the local engine cannot start (e.g. `OLLAMA_MODELS` on a missing drive),
@@ -121,6 +128,9 @@ tool-failure hints for small models, and an animated Ness.**
   contracts (T-383).
 
 ### Upgrade
+- Run `setup` (or `sync`) once so the new plugins (`@finess/guard`, `@finess/thoughts`,
+  `@finess/tool-policy`) reach your profiles. The tool policy now restricts personas such as
+  `reviewer` and `data-scientist` for real; widen a persona's `tools.allow` if it needs more.
 - **Rename:** run `setup` once (creates `~/.dsh/profiles/finess` and `finess-web`), then `npm link`
   again for the `finess` command. Move the old state directory to `.finess/` and carry config edits over to
   `finess.config.json`; rename environment variables to the `FINESS_*` prefix. The profiles under

@@ -70,6 +70,11 @@ nothing because the AI is not involved. **Every command with an example, by feat
   a command locally (no AI) · `!!cmd` also attaches its output · `/btw <note>` a note for the next
   task · `# <line>` a line in the project brief · `/context` how full the context window is
 - **any project**: `/workspace <dir>` point FiNess at another folder · `/workspace reset` come back
+- **safety**: commands that cannot be undone (`rm -rf`, `git push --force`, `DROP TABLE`, ...) are
+  shown to you and confirmed twice before they run · `/guard check <cmd>` tests one · `/diff` and
+  `/undo --yes` see and revert what the last task changed · `/permissions` what the hat may use
+- **memory**: `/think` what the AI noted for this task and this project · `/compact --yes` shrink a
+  long chat · `/export` save it as Markdown
 - **shortcuts**: `/recipe` one-line task templates (code-review, write-tests, explain,
   summarize-docs, commit-message, plan) · `/delegate <persona> <task>` one task with a chosen hat ·
   `/task list` recent runs
@@ -107,11 +112,11 @@ because of it. `/cost` shows zero on a local model. Grade Laya with `/dd label`,
 ### Not built yet, honestly
 
 - Picking the cheapest way automatically is still a plan (milestones M3, M6 and M8). Today you
-  pick the model yourself.
-- Laya does not decide anything, and its gate is not built.
-- Each hat's list of allowed tools is written down but not enforced until M4.
-- The FiNess logo in the web UI is planned; the web UI still shows the DeepSeek Harness look.
-- Planned commands (`/compact`, `/todos`, `/export`, ...) are in `docs/03-BACKLOG.md`.
+  pick the model yourself; the capability router only says which model it *would* pick.
+- Laya does not decide anything: it guesses in shadow mode, and the gate says it has not earned it.
+- Each message starts a fresh engine process (~3 s); the fix is planned in
+  [docs/14-PERFORMANCE-PLAN.md](docs/14-PERFORMANCE-PLAN.md).
+- Skills (M5), an independent checker (M7) and governance (M9) are planned; see `docs/03-BACKLOG.md`.
 
 The full version: [docs/13-EXPLAINED-SIMPLY.md](docs/13-EXPLAINED-SIMPLY.md).
 
@@ -475,10 +480,10 @@ Engram: install with `npm i -g @sentropic/engram`, then `engram install` to give
 | M0 | Foundation & plan | ✅ done |
 | M1 | Load-bearing spike (`@finess/spike`) | ✅ done |
 | M2 | Contracts (`@finess/contracts`) | ✅ done |
-| M3 | Decisions (`@finess/decisions`) | 🔜 next (the launcher-level shadow, labelling and calibration are built) |
-| M4 | Personas (`@finess/personas`) | 📋 todo |
+| M3 | Decisions (`@finess/decisions`) | 🔜 next (launcher level built: shadow, labelling, calibration gate, composite rules -> model -> LLM) |
+| M4 | Personas (`@finess/personas`) | 🟡 partial (the tool policy is enforced by `@finess/tool-policy`) |
 | M5 | Skills (`@finess/skills`) | 📋 todo |
-| M6 | Routing (`@finess/routing`) | 📋 todo |
+| M6 | Routing (`@finess/routing`) | 🟡 partial (advisory capability router, route fallback) |
 | M7 | Evaluation & goal loop | 📋 todo |
 | M8 | Data plane (`@finess/data`) | 📋 todo |
 | M9 | Governance (`@finess/governance`) | 📋 todo |

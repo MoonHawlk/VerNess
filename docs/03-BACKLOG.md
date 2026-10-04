@@ -19,9 +19,6 @@ Keep one commit per task (or per small group), and log it in `04-PROGRESS.md`.
 
 ---
 
-## P0 — Safety
-- [ ] T-473 **P0** Block irreversible commands: `rm -rf`, recursive deletes, disk formatting, `git reset --hard`/`clean -f`/`push --force`, SQL `DROP`/`TRUNCATE`, remote code piped to a shell, and the like are shown to the user before they run and confirmed twice — for the model's shell tool calls (plugin on `tools/pre-execute`) and for the REPL's own `!cmd`; no terminal and no approval channel means denied, never allowed
-
 ## WS-A — Launcher, command layer, REPL (plan `01-launcher-commands.md`)
 
 Tier L — local, zero tokens

@@ -58,9 +58,10 @@ Harness.
 | **Web UI** | `web` opens a chat window in your browser instead of the terminal. It uses the same model, persona and plugins. It still shows the DeepSeek Harness logo. | The same school, reached through the front door instead of the side door. |
 
 **Two honest notes about job hats.** Each persona file *lists* which tools the AI may use (for
-example, the reviewer may not edit files). Those lists are **written down but not enforced yet**:
-that arrives in milestone M4. And the commands on each hat are **checklists and templates**, not
-magic. They print text; the AI is not involved.
+example, the reviewer may not edit files), and those lists are **enforced**: a forbidden tool is not
+even offered to the AI, and a call to it is refused with a reason (`/permissions` shows the rules).
+And the commands on each hat are **checklists and templates**, not magic. They print text; the AI is
+not involved.
 
 ---
 
@@ -199,20 +200,19 @@ From `docs/02-ROADMAP.md` and `docs/03-BACKLOG.md`. Milestones M0 to M2 are done
   M6, and the SQL/data engines that do big jobs without the AI are M8.)
 - **Laya does not decide anything.** It only practises in shadow mode. **The gate** (T-223) now
   checks whether it could, but only reports: it needs at least 50 graded tasks per question first.
-- **Tool rules on job hats are written down but not enforced** until M4 (T-042). The reviewer
-  "may not edit" today only because its instructions say so.
 - **Skills** (step-by-step know-how the AI loads when needed) are M5. **An independent checker**
-  that grades every answer is M7. **Budgets and an audit log** are M9.
-- **Web UI:** the FiNess logo and name are planned (T-398); today it shows the DeepSeek Harness
-  branding. The quick-commands do not appear in the web UI's `/` menu yet (T-374..T-378). After
-  switching persona, model or access, you must restart it (`off`, then `web`).
-- **Commands that are planned, not built:** `/btw` (side notes for the next task), `/exit`,
-  `/config`, `/workspace`, `/api test`, `/team status`, `/task`, `/delegate`, `/permissions`,
-  `/goal`, `/todos`, `/export`, plus typing `/mo` as a shortcut for `/model`.
-- **Teams** run one task after another (`--parallel` exists, but nobody has measured whether it
-  helps on one computer). Team failure rules (stop, skip, retry) are not finished.
-- **Ness's animations** (blinking, a drifting "z" when sleepy) are planned.
+  that grades every answer is M7. Budgets exist at the launcher (`/budget`); limits inside the
+  model stream and an audit log are M9.
+- **Web UI:** after switching persona, model or access, you must restart it (`off`, then `web`).
+  The FiNess mark is installed but has not been checked in a browser yet (T-471).
+- **Commands that are planned, not built:** `/goal`, `/schedule`, and Ness moving while you type.
+- **Teams** run one task after another by default (`--parallel` exists, but nobody has measured
+  whether it helps on one computer).
+- **Speed:** each message starts a fresh engine process, which costs about 3 seconds; the plan to
+  fix that is `docs/14-PERFORMANCE-PLAN.md`.
 - **A first real task on a hosted model** has not been recorded yet (T-357).
+- **Safety:** commands that cannot be undone (`rm -rf`, `git push --force`, formatting a disk,
+  `DROP TABLE`, ...) are shown to you and must be confirmed twice before they run (`/guard`).
 
 ---
 

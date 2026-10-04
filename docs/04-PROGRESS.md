@@ -735,3 +735,17 @@
   writes (live evidence for T-467).
 - P0 T-473 (block irreversible commands, confirmed twice) opened and in progress.
 - `npm test` 786/786, typecheck clean.
+
+## 2026-10-04 (afternoon) — P0 guard, loose ends
+- P0 T-473 merged after its agent was resumed from an API rate limit: `@finess/guard` asks twice
+  before any irreversible shell command and denies without a channel; synced into both profiles.
+- Found while checking it: from Git Bash a `/command` argument became a model task; six `/guard
+  check rm -rf ...` lines reached the 0.6B model, which tried one `Remove-Item -Recurse` with
+  malformed arguments (refused, target absent, nothing deleted). Fixed in the CLI (`unmangleSlash`).
+- Backlog: 24 IDs closed inside combined DONE entries had no definition line and showed as "unused";
+  each now has one (305 definitions, no duplicates). T-451 first CI run was green (6/6).
+- Docs revised to match the build: the tool policy is enforced (README, 07, 12, 13), the roadmap
+  marks M4 and M6 partial, COMMANDS.md gains Safety and Memory sections and the context-window knobs.
+- Qwen3.8-27B: the first pull resolved `:Q4_K_XL` to the UD file and downloaded it (17.6 GB) but
+  failed writing the manifest ("file does not exist"); re-pulled as `:UD-Q4_K_XL`.
+- `npm test` 818/818, typecheck clean.

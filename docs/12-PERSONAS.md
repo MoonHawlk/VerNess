@@ -1,7 +1,8 @@
 # 12 — Personas: creating one, and giving it commands only it can run
 
-> Status: persona files and persona-scoped commands are **built** (M2, ADR-0008). Tool policy,
-> skills and evaluators are **declared, not enforced** until M4–M7. The planned catalog of new
+> Status: persona files and persona-scoped commands are **built** (M2, ADR-0008). The tool policy
+> is **enforced** (`@finess/tool-policy`, T-042/T-234); skills and evaluators are **declared, not
+> enforced** until M5–M7. The planned catalog of new
 > personas is WS-I (`superpowers/plans/2026-09-26-09-persona-catalog.md`); the catalog is section 5.
 
 A persona is **one JSON file** (who the agent is and what it may use) plus, optionally, **its own

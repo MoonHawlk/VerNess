@@ -117,8 +117,10 @@ Optional fields: `model`, `models.requirements` (capability levels, see `capabil
   warning that names the owner. Ids and command names must match `^[a-z][a-z0-9-]*$`. How to write
   one, and what "only this persona" means: `docs/12-PERSONAS.md`.
 
-`tools`, `skills`, `evaluators` and `models.requirements` are **declared, not enforced** until
-M4–M7 land. Any command that displays them must label them as declared, or the surface lies.
+`tools` are **enforced** by `@finess/tool-policy` (T-042, T-234): denied tools are not offered and
+a call is refused with a reason. `models.requirements` feed the advisory capability router (T-253).
+`skills` and `evaluators` are **declared, not enforced** until M5–M7; any command that displays them
+must label them as declared, or the surface lies.
 
 ## Teams and multiple tasks (T-150..T-154)
 
