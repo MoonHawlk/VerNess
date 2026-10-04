@@ -174,7 +174,7 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-443 `/stats` in the REPL has no `--watch` (CLI only); decide whether a watching quick-tool fits the prompt
 
 ## Follow-ups from the 2026-10-02 third round
-- [ ] T-449 Live check with a running model: a `/workspace` turn and its continuation, `@path`/`@url`/`!!` reaching the model, `/recipe` runs, `/delegate`, a persona `model` preset, and the 30 s finish notification (all unit-tested; the engine was down: `OLLAMA_MODELS` points at a missing drive)
+- [ ] T-449 *(remaining part)* Live check with a running model: a `/workspace` turn and its continuation, `@url` and `!!` reaching the model, `/delegate`, a persona `model` preset, and the 30 s finish notification. Verified 2026-10-04 on the local model: `@path` (the file reached the model and the answer used it) and `/recipe` (the template ran as the task)
 - [ ] T-450 Real-terminal check of the wrapped editor (T-302): conhost wrap at the last column, drag-resize with the dropdown open, emoji sequences
 - [ ] T-451 *(remaining part, owner action)* Require the CI check on `main` (branch protection). The first run after the push (2026-10-02) was green on all six jobs
 
