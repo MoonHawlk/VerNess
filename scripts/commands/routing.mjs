@@ -9,7 +9,7 @@
  */
 
 import { LABEL_QUESTIONS, ROUTING_QUESTIONS, decisionsDir } from '../lib/decisions.mjs'
-import { latestGate, readShadow } from '../lib/labels.mjs'
+import { latestGate, readShadow, routingRecords } from '../lib/labels.mjs'
 import { activePersonaId, loadPersonas, readState } from '../lib/personas.mjs'
 import { catalogModelSpec, effectiveRoute } from '../lib/routes.mjs'
 import { TIER_REQUIREMENTS, readRouterRecords, routeByCapability, routerAgreement, routerDir } from '../lib/router.mjs'
@@ -176,7 +176,7 @@ export default {
  * @param {number} limit - how many recent records to show.
  */
 export function printRouting(dir, limit) {
-  const records = readShadow(dir)
+  const records = routingRecords(readShadow(dir))
   if (records.length === 0) {
     warn('no shadow decisions logged yet')
     info('turn on decisions.enabled and decisions.shadow, start the sidecar (/decision up), or try /decide <task>')

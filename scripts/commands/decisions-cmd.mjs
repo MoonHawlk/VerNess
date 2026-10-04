@@ -18,7 +18,7 @@ import { createInterface } from 'node:readline'
 import { GATE, MIN_LABELS } from '../lib/calibration.mjs'
 import { LABEL_QUESTIONS, decisionsDir, optionHash, temperaturesFile } from '../lib/decisions.mjs'
 import {
-  appendLabel, currentReport, labelCounts, latestGate, matchRecords, parseLabelInput, readLabels, readShadow, unlabelled,
+  appendLabel, currentReport, labelCounts, latestGate, matchRecords, parseLabelInput, readLabels, readShadow, routingRecords, unlabelled,
 } from '../lib/labels.mjs'
 import { REPO, head, info, ok, paint, table, warn } from '../lib/util.mjs'
 
@@ -43,7 +43,7 @@ function sameOptions(rec, q) {
  * @param {string[]} questions - the question keys.
  */
 function printStatus(dir, questions) {
-  const recs = readShadow(dir)
+  const recs = routingRecords(readShadow(dir))
   const labels = readLabels(dir)
   const counts = labelCounts(labels, questions)
   const rows = questions.map(q => {
@@ -88,7 +88,7 @@ async function askLabel(lines, options) {
 async function label(dir, questions, limit, relabel) {
   if (process.stdin.isTTY !== true) { warn('labelling needs a terminal'); return 1 }
   const labels = readLabels(dir)
-  const records = relabel === undefined ? readShadow(dir) : matchRecords(readShadow(dir), relabel)
+  const records = relabel === undefined ? routingRecords(readShadow(dir)) : matchRecords(routingRecords(readShadow(dir)), relabel)
   const pending = records
     .map(rec => ({ rec, qs: questions.filter(q => (relabel !== undefined || labels.get(rec.id)?.[q] === undefined) && sameOptions(rec, q)) }))
     .filter(p => p.qs.length > 0)

@@ -51,6 +51,15 @@ export function readShadow(dir) {
 }
 
 /**
+ * The records that ask the routing/guard/supervisor questions: thought-graph assist records
+ * (`source: 'thoughts'`, T-295) share the log but ask other questions, so labelling and `/routing`
+ * leave them out (the dashboard's thought panel shows them).
+ * @param {object[]} records - shadow records.
+ * @returns {object[]} the records without thought-graph ones.
+ */
+export const routingRecords = records => records.filter(r => r.source !== 'thoughts')
+
+/**
  * @param {string} dir - the decisions directory.
  * @returns {Map<string, Record<string, string>>} record id → question → label (`'skip'` included).
  */
