@@ -9,7 +9,7 @@ import { unmangleSlash } from '../finess.mjs'
 
 test('a rewritten /word under the Git root is read back as a slash command', () => {
   assert.equal(unmangleSlash('C:/Program Files/Git/guard'), '/guard')
-  assert.equal(unmangleSlash('C:\Program Files\Git\models'), '/models')
+  assert.equal(unmangleSlash('C:\\Program Files\\Git\\models'), '/models')
   assert.equal(unmangleSlash('D:/tools/Git/usr/think'), '/think')
 })
 
