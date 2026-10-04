@@ -66,6 +66,7 @@ const DEFAULTS = {
   tips: [],
   settings: { toolsMode: 'native', plugins: [], webBundles: [], allowBuilds: {}, linkedSubstratePackages: ['@deepseek-ai/dsh-tools'] },
   pet: { enabled: true, name: 'Ness', animate: true },
+  dashboard: { port: 4180 },
   notes: { maxChars: 2000, briefMaxChars: 4000 },
   attach: { maxChars: 50000, maxTotal: 150000 },
   // autoPercent: automatic compaction starts at this % of the window (20-95; 0 keeps the substrate default).
@@ -621,7 +622,7 @@ function makeArgsSupplier(cfg) {
       access: ['read-only', 'workspace', 'full', 'reset'],
       workspace: ['reset'],
       decision: ['up', 'stats', 'down', '--force'],
-      dashboard: ['--no-open', '--limit'],
+      dashboard: ['serve', '--watch', '--no-open', '--limit', '--port', '--host'],
       usage: ['--all', '--limit'],
       cost: ['--all', '--limit'],
       sessions: ['--all', '--limit'],
