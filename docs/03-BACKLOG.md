@@ -179,7 +179,7 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-451 *(remaining part, owner action)* Require the CI check on `main` (branch protection). The first run after the push (2026-10-02) was green on all six jobs
 
 ## Follow-ups from the 2026-10-03 waves
-- [ ] T-467 `@finess/tool-policy` live check: boot a session per persona and confirm denied calls come back with the policy reason; check whether `ask` should reach an approval channel in the REPL
+- [ ] T-467 *(remaining part)* Confirm a denied call returns the policy reason in a live session, and whether `ask` should reach an approval channel in the REPL. Verified 2026-10-04: the plugin activates and hides denied tools (data-scientist 16 of 28)
 - [ ] T-468 Enforce budgets inside the substrate (`llm/stream`), so one long task or a `--parallel` team batch cannot overshoot between checks (T-091 checks only before a task)
 - [ ] T-470 Install `laya[mcp]` in the decision venv and confirm the `decisions.mcp` row exposes the tools in `/tools` (T-240; the entry point `python -m laya.mcp.server` is confirmed in the installed package)
 
@@ -193,7 +193,7 @@ Measured 2026-10-03: ~3 s to boot a new dsh per message, 91% of generated text i
 - [ ] T-460 Shadow decision call in parallel with the task, never awaited before the spawn
 - [ ] T-461 Launcher pre-task diet: config read once per turn, mtime-cached session listing and budget usage, concurrent snapshot/attach/probe, skip the probe after a recent answer; < 100 ms before the spawn
 - [ ] T-462 Persistent dsh session for the REPL instead of one process per message (research the substrate's stdio/ACP app, SDK client or web API first, with file:line); cancel aborts the turn; fallback to spawn-per-message
-- [ ] T-463 Smaller requests: offer only the persona's permitted tools (T-234 `tools.restrict`), trimmed descriptions for small models
+- [ ] T-463 *(remaining part)* Trimmed tool descriptions for small models. Done 2026-10-04: a persona is offered only its permitted tools (T-234; data-scientist 28 -> 16, verified live)
 - [ ] T-464 Stable prompt prefix for the engine's prompt cache: system prompt and tools byte-identical across turns, volatile context last; verify with `prompt_eval_count`
 - [ ] T-465 Right-size the model per task through the capability router (T-253): small fast model for chat, 4B+ or API for tool work
 - [ ] T-466 Stream the first token in the terminal and web UI; judge latency by time-to-first-token
