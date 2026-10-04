@@ -12,6 +12,11 @@
  *   /think link <a> <b>                persistent <a> was derived from persistent <b>
  *   /think promote <n-id>              copy an ephemeral node into the persistent store (re-read to verify)
  *   /think forget <p-id>               remove a persistent node and the edges to it
+ *   /think restore <p-id>              re-inflate a demoted stub from the session log it points at
+ *
+ * A full store demotes older recoverable nodes to stubs on add/promote (T-288). Promoting a
+ * "verified" node re-checks its turn's reads in the log and downgrades it when unproven (T-287);
+ * the operator's own `add --verified` is taken at the operator's word.
  * @module scripts/commands/think
  */
 
@@ -19,15 +24,17 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { fileStore, storeFile } from '../../packages/thoughts/src/adapters.js'
+import { gatePromotion } from '../../packages/thoughts/src/evidence.js'
+import { demoteToFit, findOriginal, isStubNode, recoveryOf, restoreStub } from '../../packages/thoughts/src/evict.js'
 import { foldEvents } from '../../packages/thoughts/src/fold.js'
 import { THOUGHT_KINDS } from '../../packages/thoughts/src/schema.js'
 import { nodeDetail, nodeLine, subgraph } from '../../packages/thoughts/src/search.js'
-import { DEFAULT_CAP_BYTES, addPersistent, forget, link, projectKey, promote, recordBytes, storedNodes } from '../../packages/thoughts/src/store.js'
+import { DEFAULT_CAP_BYTES, ThoughtStoreFullError, addPersistent, forget, link, projectKey, promote, recordBytes, storedNodes } from '../../packages/thoughts/src/store.js'
 import { listSessions, readSessionEvents } from '../lib/sessions.mjs'
 import { head, info, ok, warn } from '../lib/util.mjs'
 import { activeWorkspace } from '../lib/workspace.mjs'
 
-const USAGE = '/think [list | show <id> | add <kind> <claim> [:: <evidence>; ...] [--verified] | link <a> <b> | promote <n-id> | forget <p-id>]'
+const USAGE = '/think [list | show <id> | add <kind> <claim> [:: <evidence>; ...] [--verified] | link <a> <b> | promote <n-id> | forget <p-id> | restore <p-id>]'
 
 /**
  * Parse `/think add` arguments.
@@ -51,14 +58,16 @@ export function parseAdd(args) {
  * The command body, with every effect injected so tests run against temp files.
  * @param {string[]} args - the words after `/think`.
  * @param {{store: {read: Function, mutate: Function}, project: string, session?: string,
- *   events: () => object[]|undefined, now?: () => Date, cap?: number}} deps - the store adapter,
- *   the project key, the current session id, its decoded log (undefined when there is none).
+ *   events: () => object[]|undefined, eventsOf?: (id: string) => object[]|undefined, now?: () => Date, cap?: number}} deps -
+ *   the store adapter, the project key, the current session id, its decoded log (undefined when
+ *   there is none), and any session's log by id (for restore).
  * @returns {number} exit code.
  */
-export function runThink(args, { store, project, session, events, now = () => new Date(), cap = DEFAULT_CAP_BYTES }) {
+export function runThink(args, { store, project, session, events, eventsOf = () => undefined, now = () => new Date(), cap = DEFAULT_CAP_BYTES }) {
   const [sub = 'list', ...rest] = args
   const eph = () => { const ev = events(); return ev === undefined ? [] : foldEvents(ev).nodes }
   const origin = { by: 'operator', ...(session === undefined ? {} : { session }) }
+  const demotedNote = ids => { if (ids.length > 0) info(`store was full: demoted ${ids.join(', ')} to stubs (/think restore <id> brings one back)`) }
   try {
     if (sub === 'list' && rest.length === 0) {
       const e = eph()
@@ -81,8 +90,9 @@ export function runThink(args, { store, project, session, events, now = () => ne
     if (sub === 'add' && rest.length > 0) {
       const p = parseAdd(rest)
       if ('error' in p) { warn(`${p.error} - ${USAGE}`); return 1 }
-      const { node } = store.mutate(project, r => addPersistent(r, p.input, { at: now().toISOString(), origin, cap }))
+      const { node, demoted } = store.mutate(project, r => addPersistent(r, p.input, { at: now().toISOString(), origin, cap }))
       ok(`stored and verified ${nodeLine(node)}`)
+      demotedNote(demoted)
       return 0
     }
     if (sub === 'link' && rest.length === 2) {
@@ -93,8 +103,27 @@ export function runThink(args, { store, project, session, events, now = () => ne
     if (sub === 'promote' && rest.length === 1) {
       const n = eph().find(x => x.id === rest[0])
       if (n === undefined) { warn(`no ephemeral node ${rest[0]} in this task - /think lists them`); return 1 }
-      const { node } = store.mutate(project, r => promote(r, n, { at: now().toISOString(), origin, cap }))
+      // T-287: a "verified" node is promoted as such only if its own turn's log shows the read.
+      const gated = gatePromotion(n, events() ?? [], project)
+      if (gated.note !== undefined) warn(`${n.id}: ${gated.note}`)
+      const { node, demoted } = store.mutate(project, r => promote(r, gated.node, { at: now().toISOString(), origin, cap }))
       ok(`promoted ${n.id} as ${node.id} (verified on re-read)`)
+      demotedNote(demoted)
+      return 0
+    }
+    if (sub === 'restore' && rest.length === 1) {
+      const s = store.read(project).nodes.find(x => x.node.id === rest[0])
+      if (s === undefined || !isStubNode(s.node)) { warn(`${rest[0]} is not a demoted stub - /think list shows them as [demoted]`); return 1 }
+      const ptr = recoveryOf(s.node)
+      const original = ptr === undefined ? undefined : findOriginal(s.node, eventsOf(ptr.session) ?? [])
+      if (original === undefined) { warn(`the full node is not in session ${ptr?.session ?? '?'} any more (log missing or pruned); the stub stays`); return 1 }
+      const { demoted } = store.mutate(project, r => {
+        const fit = demoteToFit(restoreStub(r, rest[0], original), cap, [rest[0]])
+        if (recordBytes(fit.record) > cap) throw new ThoughtStoreFullError(recordBytes(fit.record), cap)
+        return { record: fit.record, demoted: fit.demoted }
+      })
+      ok(`restored ${rest[0]} from ${ptr.session}#${ptr.from}`)
+      demotedNote(demoted)
       return 0
     }
     if (sub === 'forget' && rest.length === 1) {
@@ -113,11 +142,12 @@ export function runThink(args, { store, project, session, events, now = () => ne
 export default {
   name: 'think',
   group: 'core',
-  summary: 'the thought graph: list | show <id> | add | link <a> <b> | promote <n-id> | forget <p-id>',
+  summary: 'the thought graph: list | show <id> | add | link <a> <b> | promote <n-id> | forget <p-id> | restore <p-id>',
   usage: USAGE,
   details: [
     'ephemeral nodes are what the model recorded this task (think_add); they reset on the next task',
-    'persistent nodes outlive sessions, per project, capped in bytes; a full store refuses writes',
+    'persistent nodes outlive sessions, per project, capped in bytes; when full, older promoted nodes are demoted to stubs, and only a write that cannot make room that way is refused',
+    'restore <p-id> brings a demoted stub back from the session log it points at',
     'promote and add re-read the store to verify; link <a> <b> means a was derived from b',
   ],
   /**
@@ -128,16 +158,17 @@ export default {
   run(ctx, args) {
     const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
     const cur = ctx.conversation?.id()
-    const events = () => {
-      if (cur === undefined) return undefined
-      const s = listSessions({ workspace: ctx.workspaceKey, limit: 50 }).find(x => x.id === String(cur).replace(/^session-/, ''))
+    const logOf = (id, limit) => {
+      const s = listSessions({ workspace: ctx.workspaceKey, ...(limit === undefined ? {} : { limit }) }).find(x => x.id === String(id).replace(/^session-/, ''))
       return s === undefined ? undefined : readSessionEvents(join(s.dir, 'session.v4.jsonl.zstd'))
     }
+    const events = () => (cur === undefined ? undefined : logOf(cur, 50))
     return runThink(args, {
       store: fileStore(storeFile(home)),
       project: projectKey(activeWorkspace().dir),
       ...(cur === undefined ? {} : { session: String(cur) }),
       events,
+      eventsOf: id => logOf(id),
     })
   },
 }

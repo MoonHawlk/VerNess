@@ -9,14 +9,18 @@
  * - exec.agent.session (runtime-types.ts:168), session.header.cwd (core/session/src/types.ts:105),
  *   session.snapshotEvents() (core/session/src/index.ts:649)
  * - ctx.storageDomain.open (packages/storage/storage-domain/src/index.ts:103, provided at :236)
+ * - `agent/pre-step` and `tools/pre-execute` waterfalls, through context.js (T-285, T-286, T-289);
+ *   think_add's "verified" gate reads the turn's tool/call + tool/result pairs (evidence.js, T-287)
  * @module @finess/thoughts/plugin
  */
 
 import { domainStore } from './adapters.js'
+import { contextState, mountContext, visibleNodes } from './context.js'
+import { gateVerified, turnReads } from './evidence.js'
 import { MAX_EPHEMERAL_NODES, PROJECTION_KEY, STATE_VERSION, foldEvents, foldThought, initState, nodeRecord, stateSchema } from './fold.js'
 import { THOUGHT_CONFIDENCE, THOUGHT_KINDS, buildNode, formatIssues } from './schema.js'
 import { nodeDetail, nodeLine, searchNodes, subgraph } from './search.js'
-import { projectKey, storedNodes } from './store.js'
+import { isChildSession, seedFloor } from './subagent.js'
 
 /** Output-schema spec of one node (the tools registry validates every value against it). */
 const NODE = {
@@ -54,16 +58,13 @@ function sessionOf(exec, tool) {
   return session
 }
 
-/** @param {object} session @returns {string} the session's project key (its cwd). */
-const projectOf = session => projectKey(session.header?.cwd ?? process.cwd())
-
 /**
  * The three tool definitions (before `defineTool`).
  * @param {{projections: object, store: ReturnType<typeof domainStore>, now?: () => Date}} deps - seams.
  * @returns {object[]} `think_add`, `think_search`, `think_open` option objects.
  */
 export function toolSpecs({ projections, store, now = () => new Date() }) {
-  const allNodes = async session => [...sessionState(projections, session).nodes, ...storedNodes(await store.read(projectOf(session)))]
+  const allNodes = visibleNodes({ projections, store })
   const think_add = {
     name: 'think_add',
     description: 'Record one step of your reasoning as a small node: what you tried, found, decided, or must respect. '
@@ -77,8 +78,8 @@ export function toolSpecs({ projections, store, now = () => new Date() }) {
       derivedFrom: { type: 'array', items: { type: 'string' }, description: 'Ids of nodes this one builds on, e.g. ["n-2"].' },
     },
     output: {
-      schema: { type: 'object', additionalProperties: false, properties: { node: { ...NODE, required: true } } },
-      render: (_args, value) => [{ type: 'text', text: `Recorded ${nodeLine(value.node)}` }],
+      schema: { type: 'object', additionalProperties: false, properties: { node: { ...NODE, required: true }, note: { type: 'string' } } },
+      render: (_args, value) => [{ type: 'text', text: `Recorded ${nodeLine(value.node)}${value.note === undefined ? '' : `\nNote: ${value.note}`}` }],
       // The durable record: the projection folds it back out of tool/result.meta.
       presentationMeta: (_args, value) => nodeRecord(value.node),
     },
@@ -88,14 +89,17 @@ export function toolSpecs({ projections, store, now = () => new Date() }) {
       if (exec.parent !== undefined) throw new Error('think_add must be called directly, not from inside another tool call: the node would not be recorded')
       const state = sessionState(projections, session)
       if (state.nodes.length >= MAX_EPHEMERAL_NODES) throw new Error(`this task already holds ${MAX_EPHEMERAL_NODES} nodes; open or search the ones you have instead of adding more`)
-      const built = buildNode(args, { id: `n-${state.nextId}`, scope: 'ephemeral', turn: state.turn ?? 0, at: now().toISOString() })
+      // A child's own ids start above the ones its parent passed in (T-289).
+      const nextId = isChildSession(session.header) ? Math.max(state.nextId, seedFloor(contextState(projections, session).seeds)) : state.nextId
+      const built = buildNode(args, { id: `n-${nextId}`, scope: 'ephemeral', turn: state.turn ?? 0, at: now().toISOString() })
       if (!built.ok) throw new Error(`invalid node: ${formatIssues(built.errors)}`)
-      const node = built.value
       const known = new Set(state.nodes.map(n => n.id))
-      if (node.derivedFrom.some(id => id.startsWith('p-'))) for (const n of storedNodes(await store.read(projectOf(session)))) known.add(n.id)
-      const unknown = node.derivedFrom.filter(id => !known.has(id))
+      if (built.value.derivedFrom.some(id => !known.has(id))) for (const n of await allNodes(session)) known.add(n.id)
+      const unknown = built.value.derivedFrom.filter(id => !known.has(id))
       if (unknown.length > 0) throw new Error(`derivedFrom names unknown nodes: ${unknown.join(', ')} (think_search lists what exists)`)
-      return { node }
+      // T-287: "verified" only with evidence read in this turn, judged from the log.
+      const { node, note } = gateVerified(built.value, turnReads(session.snapshotEvents(), state.turn), session.header?.cwd ?? process.cwd())
+      return note === undefined ? { node } : { node, note }
     },
     presentCall: args => ({ card: 'generic', title: `Think: ${String(args?.claim ?? '').slice(0, 60)}`, kind: 'other' }),
   }
@@ -126,7 +130,8 @@ export function toolSpecs({ projections, store, now = () => new Date() }) {
   }
   const think_open = {
     name: 'think_open',
-    description: 'Open one thought node by id with the nodes it was derived from (up to `depth` edges, default 1).',
+    description: 'Open one thought node by id with the nodes it was derived from (up to `depth` edges, default 1). '
+      + 'A subagent sees none of your nodes unless you name them in its prompt as [thoughts: n-2 p-1]; it then receives exactly those.',
     parameters: {
       id: { type: 'string', required: true, description: 'A node id, e.g. "n-3" or "p-1".' },
       depth: { type: 'integer', description: 'Edges to follow back (0-3, default 1).' },
@@ -160,9 +165,12 @@ export function toolSpecs({ projections, store, now = () => new Date() }) {
  * Mount everything on a registrant context.
  * @param {object} ctx - carries `sessionProjections`, `tools`, `storageDomain`.
  * @param {{defineTool: (o: object) => object, now?: () => Date}} deps - the substrate's `defineTool`.
- * @returns {{store: ReturnType<typeof domainStore>}} the persistent store handle (tests use it).
+ * @returns {{store: ReturnType<typeof domainStore>, stash: object}} the persistent store handle and the subagent seed stash (tests use them).
  */
 export function mount(ctx, { defineTool, now }) {
+  const store = domainStore(ctx.storageDomain)
+  // T-285/T-286/T-289: the context projection and its pre-step / pre-execute listeners (context.js).
+  const { stash } = mountContext(ctx, { store })
   ctx.sessionProjections.register({
     key: PROJECTION_KEY,
     stateSchema,
@@ -171,7 +179,6 @@ export function mount(ctx, { defineTool, now }) {
     wire: { viewSchema: stateSchema, view: s => s },
     stateVersion: STATE_VERSION,
   })
-  const store = domainStore(ctx.storageDomain)
   for (const spec of toolSpecs({ projections: ctx.sessionProjections, store, now })) ctx.tools.register(defineTool(spec))
-  return { store }
+  return { store, stash }
 }

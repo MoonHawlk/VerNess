@@ -6,11 +6,13 @@
  *
  * One domain, `finess_thoughts`, table `projects`, keyed by project (see {@link projectKey}). Each
  * project record is capped in bytes; a write that would exceed the cap THROWS
- * {@link ThoughtStoreFullError} and changes nothing. There is no eviction here (T-288).
+ * {@link ThoughtStoreFullError} and changes nothing - unless a node write (add, promote) can make
+ * room by demoting older recoverable nodes to stubs (T-288, evict.js); demoted ids are returned.
  * Each stored node carries a provenance envelope (`origin`) so T-297 can trace and revoke.
  * @module @finess/thoughts/store
  */
 
+import { demoteToFit } from './evict.js'
 import { buildNode, formatIssues, isPlainObject, validateThoughtNode } from './schema.js'
 
 /** Domain (= storage-json unit file) name; must match the substrate's UNIT_NAME_RE `^[a-z][a-z0-9_]*$`. */
@@ -97,6 +99,19 @@ function capped(r, cap) {
   return r
 }
 
+/**
+ * Fit a node write under the cap by demotion (T-288), else refuse it unchanged.
+ * @param {ProjectRecord} r - the candidate.
+ * @param {number} cap - bytes.
+ * @param {string} id - the node being written (never demoted).
+ * @returns {{record: ProjectRecord, demoted: string[]}} the record that fits and what was demoted.
+ */
+function fitted(r, cap, id) {
+  const out = demoteToFit(r, cap, [id])
+  if (recordBytes(out.record) > cap) throw new ThoughtStoreFullError(recordBytes(r), cap)
+  return out
+}
+
 /** @param {ProjectRecord} r @param {string} id @returns {StoredNode|undefined} the entry. */
 export const findStored = (r, id) => r.nodes.find(s => s.node.id === id)
 
@@ -105,7 +120,7 @@ export const findStored = (r, id) => r.nodes.find(s => s.node.id === id)
  * @param {ProjectRecord} r - the project.
  * @param {object} input - `{kind, claim, evidence?, confidence?, derivedFrom?}`.
  * @param {{at: string, origin: Origin, cap?: number}} opts - timestamp, provenance, byte cap.
- * @returns {{record: ProjectRecord, node: ThoughtNode}} the next record and the stored node.
+ * @returns {{record: ProjectRecord, node: ThoughtNode, demoted: string[]}} the next record, the stored node, and the ids demoted to make room.
  */
 export function addPersistent(r, input, { at, origin, cap = DEFAULT_CAP_BYTES }) {
   const built = buildNode(input, { id: `p-${r.nextId}`, scope: 'persistent', turn: 0, at })
@@ -113,8 +128,8 @@ export function addPersistent(r, input, { at, origin, cap = DEFAULT_CAP_BYTES })
   const node = built.value
   const unknown = node.derivedFrom.filter(id => findStored(r, id) === undefined)
   if (unknown.length > 0) throw new Error(`derivedFrom names nodes not in the persistent store: ${unknown.join(', ')}`)
-  const record = capped({ nextId: r.nextId + 1, nodes: [...r.nodes, { node, origin, storedAt: at }] }, cap)
-  return { record, node }
+  const { record, demoted } = fitted({ nextId: r.nextId + 1, nodes: [...r.nodes, { node, origin, storedAt: at }] }, cap, node.id)
+  return { record, node, demoted }
 }
 
 /**
@@ -123,7 +138,7 @@ export function addPersistent(r, input, { at, origin, cap = DEFAULT_CAP_BYTES })
  * @param {ProjectRecord} r - the project.
  * @param {ThoughtNode} eph - the ephemeral node.
  * @param {{at: string, origin: Origin, cap?: number}} opts - timestamp, provenance, byte cap.
- * @returns {{record: ProjectRecord, node: ThoughtNode}} the next record and the stored node.
+ * @returns {{record: ProjectRecord, node: ThoughtNode, demoted: string[]}} the next record, the stored node, and the ids demoted to make room.
  */
 export function promote(r, eph, { at, origin, cap = DEFAULT_CAP_BYTES }) {
   if (eph.scope !== 'ephemeral') throw new Error(`${eph.id} is already persistent`)
@@ -131,8 +146,8 @@ export function promote(r, eph, { at, origin, cap = DEFAULT_CAP_BYTES }) {
   if (dup !== undefined) throw new Error(`${eph.id} was already promoted as ${dup.node.id}`)
   const v = validateThoughtNode({ ...eph, id: `p-${r.nextId}`, scope: 'persistent', derivedFrom: eph.derivedFrom.filter(id => findStored(r, id) !== undefined) })
   if (!v.ok) throw new Error(`invalid node: ${formatIssues(v.errors)}`)
-  const record = capped({ nextId: r.nextId + 1, nodes: [...r.nodes, { node: v.value, origin: { ...origin, from: eph.id }, storedAt: at }] }, cap)
-  return { record, node: v.value }
+  const { record, demoted } = fitted({ nextId: r.nextId + 1, nodes: [...r.nodes, { node: v.value, origin: { ...origin, from: eph.id }, storedAt: at }] }, cap, v.value.id)
+  return { record, node: v.value, demoted }
 }
 
 /**
