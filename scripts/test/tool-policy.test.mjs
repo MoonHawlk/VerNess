@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { apply, configOf, decide, policyOf, restricts, sameTool, verdict } from '../../packages/tool-policy/index.js'
+import { apply, configOf, decide, policyOf, restrictionFor, restricts, sameTool, verdict } from '../../packages/tool-policy/index.js'
 import { permissionLines } from '../commands/permissions.mjs'
 import { renderPatch } from '../finess.mjs'
 import { activePolicy, describePersona, loadPersonas, toolPolicyLines, writePersonaOverlay } from '../lib/personas.mjs'
@@ -162,4 +162,107 @@ test('capability aliases match their substrate tools, and harness tools pass an 
   assert.equal(decide(p, 'todo_write').kind, 'allow', 'planning is a harness tool')
   assert.equal(decide(p, 'subagent').kind, 'deny', 'delegation stays under the allow list')
   assert.equal(decide(policyOf({ persona: 'x', allow: ['read'], deny: ['todo_write'] }), 'todo_write').kind, 'deny', 'deny by name still wins over harness')
+})
+
+// T-234: hide denied tools from the request through the agent-scoped `tools.restrict`.
+
+/** The 25 tools a FiNess session offered on the wire (a recorded `request/header`, Windows). */
+const OFFERED = ['create_goal', 'edit', 'exit_plan_mode', 'finess_ping', 'get_goal', 'glob', 'grep', 'interrupt_agent', 'job_kill',
+  'job_list', 'job_output', 'list_agents', 'pwsh', 'read', 'read_image', 'send_message', 'skill', 'subagent', 'subagent_fork',
+  'todo_write', 'update_goal', 'web_fetch', 'web_search', 'workflow', 'write']
+
+/**
+ * A fake substrate behaving like `ToolRegistry`: inherited tools are restrictable, an agent's own
+ * registrations are not; `restrict` throws on `{}`, `run_code` and unknown names, and emits `tools/change`.
+ * @param {string[]} inherited - global/preset tools.
+ * @param {string[]} [own] - the agent's own registrations.
+ * @returns {object} the plugin ctx, the agent and helpers.
+ */
+function fakeSubstrate(inherited, own = []) {
+  const on = new Map()
+  const tools = [...inherited]
+  const emit = (event, ...a) => on.get(event)?.(...a)
+  const agent = {
+    hidden: new Set(),
+    ctx: { tools: { restrict(f) {
+      if (f.allow === undefined && f.deny === undefined) throw new Error('tools.restrict({}) is a no-op')
+      const names = [...f.allow ?? [], ...f.deny ?? []]
+      if (names.includes('run_code')) throw new Error('reserved run_code')
+      const bad = names.filter(n => !tools.includes(n))
+      if (bad.length > 0) throw new Error(`unknown global tool ${bad.join(', ')}`)
+      for (const n of f.deny ?? []) agent.hidden.add(n)
+      emit('tools/change')
+      return () => {}
+    } } },
+  }
+  const warned = []
+  const ctx = {
+    on: (event, fn) => on.set(event, fn),
+    logger: { warn: m => warned.push(m) },
+    agents: { list: () => [] },
+    tools: { schemas: a => [...tools.filter(n => !a.hidden.has(n)), ...own].map(name => ({ name, description: '' })) },
+  }
+  return {
+    ctx, agent, warned, emit, on,
+    register: n => { tools.push(n); emit('tools/change') },
+    offered: () => ctx.tools.schemas(agent).map(s => s.name),
+  }
+}
+
+/** @param {string} id @returns {object} the plugin row config for a shipped persona file. */
+const personaConfig = id => configOf({ id, tools: JSON.parse(readFileSync(new URL(`../../personas/${id}.json`, import.meta.url), 'utf8')).tools })
+
+test('restrictionFor: deny-only, hides what decide denies, keeps ask and harness tools, never names run_code', () => {
+  const p = policyOf({ persona: 'x', allow: ['read', 'shell.execute'], approval: { pwsh: 'ask' } })
+  assert.deepEqual(restrictionFor(p, ['read', 'pwsh', 'todo_write', 'write', 'run_code', 'write']), { deny: ['write'] })
+  assert.equal(restrictionFor(p, ['read', 'todo_write']), undefined, 'nothing to hide is no filter (restrict({}) throws)')
+  assert.equal(restrictionFor(policyOf({}), OFFERED), undefined)
+})
+
+test('restrictionFor: the MCP primitive, an allow/deny over MCP tool names with the same rules', () => {
+  const mcp = ['mcp__gh__list_issues', 'mcp__gh__create_issue', 'mcp__db__query']
+  assert.deepEqual(restrictionFor({ deny: ['mcp__gh__create_issue'] }, mcp), { deny: ['mcp__gh__create_issue'] })
+  assert.deepEqual(restrictionFor({ allow: ['mcp__db__query'] }, mcp), { deny: ['mcp__gh__list_issues', 'mcp__gh__create_issue'] })
+})
+
+test('apply: hides the denied tools on agent/created; reviewer 25 -> 15, data-scientist 25 -> 16', () => {
+  const counts = {}
+  for (const id of ['reviewer', 'data-scientist']) {
+    const s = fakeSubstrate(OFFERED)
+    apply(s.ctx, personaConfig(id))
+    s.emit('agent/created', { agent: s.agent })
+    const after = s.offered()
+    counts[id] = [OFFERED.length, after.length]
+    assert.deepEqual(s.warned, [])
+    for (const n of after) assert.notEqual(decide(policyOf(personaConfig(id)), n).kind, 'deny', `${id} still offers ${n}`)
+  }
+  console.log(`  T-234 offered tools: ${Object.entries(counts).map(([k, [b, a]]) => `${k} ${b} -> ${a}`).join(', ')}`)
+  assert.deepEqual(counts, { 'reviewer': [25, 15], 'data-scientist': [25, 16] })
+})
+
+test('apply: a late tool (MCP) is masked on tools/change; own-scope names are skipped with a warning', () => {
+  const s = fakeSubstrate(OFFERED, ['submit_result'])
+  apply(s.ctx, personaConfig('reviewer'))
+  s.emit('agent/created', { agent: s.agent })
+  assert.ok(s.offered().includes('submit_result'), 'an own registration cannot be restricted, so it stays')
+  assert.equal(s.warned.length, 1)
+  assert.match(s.warned[0], /cannot hide submit_result \(still refused when called\)/)
+  s.register('mcp__gh__create_issue')
+  assert.ok(!s.offered().includes('mcp__gh__create_issue'))
+  assert.equal(s.warned.length, 1, 'reruns do not retry a refused name')
+  s.emit('agent/disposed', { agent: s.agent })
+  s.register('mcp__gh__other')
+  assert.ok(s.offered().includes('mcp__gh__other'), 'a disposed agent is no longer tracked')
+})
+
+test('apply: pre-execute stays the backstop alongside hiding; an open policy hides nothing', async () => {
+  const s = fakeSubstrate(OFFERED)
+  apply(s.ctx, personaConfig('reviewer'))
+  const d = await s.on.get('tools/pre-execute')({ callId: 'c', name: 'write', arguments: {}, agent: {} }, async () => ({ kind: 'allow' }))
+  assert.equal(d.kind, 'deny')
+  const open = fakeSubstrate(OFFERED)
+  apply(open.ctx, { persona: 'g' })
+  open.emit('agent/created', { agent: open.agent })
+  assert.equal(open.offered().length, 25)
+  assert.equal(open.on.size, 0)
 })
