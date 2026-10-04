@@ -406,6 +406,44 @@ function resolvePersona(cfg, state = readState()) {
  */
 export const pluginOnSurface = (p, surface) => p.surfaces === undefined || p.surfaces.includes(surface)
 
+/** Plugins without which a run is unsafe: no task starts while one is configured but missing. */
+export const SAFETY_PLUGINS = ['@finess/guard']
+
+/**
+ * Configured, enabled plugins of a surface that the profile has not installed. dsh skips a patch row
+ * whose package is missing and boots anyway, so a plugin that `sync` listed but `setup` never
+ * installed is silently absent; for the guard that meant irreversible commands ran unconfirmed.
+ * @param {object[]|undefined} plugins - `settings.plugins`.
+ * @param {string} surface - the profile template (`headless` or `web`).
+ * @param {(pkg: string) => boolean} isInstalled - whether the profile has the package.
+ * @returns {string[]} the missing package names.
+ */
+export function missingPlugins(plugins, surface, isInstalled) {
+  return (plugins ?? []).filter(p => p.enabled !== false && pluginOnSurface(p, surface) && !isInstalled(p.package)).map(p => p.package)
+}
+
+/**
+ * Refuse to start tasks when a safety plugin is configured but not installed in the profile; warn
+ * about any other missing plugin.
+ * @param {typeof DEFAULTS} cfg - configuration.
+ * @param {string} name - the profile name.
+ * @param {string} surface - the profile template.
+ * @returns {boolean} whether tasks may run.
+ */
+function safetyPluginsInstalled(cfg, name, surface) {
+  const has = pkg => existsSync(join(profileDir(name), 'node_modules', ...pkg.split('/'), 'package.json'))
+  const missing = missingPlugins(cfg.settings.plugins, surface, has)
+  if (missing.length === 0) return true
+  const unsafe = missing.filter(p => SAFETY_PLUGINS.includes(p))
+  if (unsafe.length > 0) {
+    warn(`not starting the task: ${unsafe.join(', ')} is configured but not installed in profile ${name}, so irreversible commands would run unconfirmed`)
+    info('install it with: finess setup (sync only rewrites the patch; setup installs the plugins)')
+    return false
+  }
+  warn(`configured but not installed in profile ${name}: ${missing.join(', ')} - run finess setup`)
+  return true
+}
+
 /**
  * Render a profile patch from the configuration, for one surface.
  * @param {typeof DEFAULTS} cfg - configuration.
@@ -1076,6 +1114,7 @@ async function prepareBoot(cfg, name = cfg.profile.name) {
   if (version('dsh', '--version') === undefined) die('dsh is not installed', 'run: ./turn_on.sh setup')
   if (!existsSync(join(profileDir(name), 'package.json'))) die(`profile "${name}" is missing`, 'run: ./turn_on.sh setup')
   syncPatch(cfg)
+  if (name !== cfg.profile.name && !safetyPluginsInstalled(cfg, name, 'web')) die('a safety plugin is missing from the web profile (see above)', 'run: finess setup')
   const ready = await prepareRoute(cfg, new Set())
   if (ready === undefined) die('the selected route cannot run yet (see above)', 'back to the local model: /api local')
   return ready
@@ -1135,6 +1174,7 @@ async function fallbackRows(cfg) {
  *   environment, or undefined when the route cannot run.
  */
 async function prepareRoute(cfg, ready, { fallback = false } = {}) {
+  if (!safetyPluginsInstalled(cfg, cfg.profile.name, cfg.profile.template)) return undefined
   const fb = fallback ? await pickFallback(cfg) : undefined
   if (fb?.use === true) {
     // Said every time a fallback is used; never silent. The overlay pins this one task's model.
