@@ -29,13 +29,14 @@ test('apply occupies exactly the three brand slots', () => {
   const injected = []
   const slots = {
     inject: (key, cb) => { injected.push(key); const r = cb(); if (r?.[Symbol.iterator] && typeof r !== 'function') for (const _ of r) { /* run the yields */ } },
-    register: (opts, component) => { registered.push([opts.name, component]); return () => {} },
+    register: (opts, component) => { registered.push([opts.name, component, opts.priority]); return () => {} },
   }
   api.apply({ slots, effect: () => {} })
   assert.deepEqual(injected, ['sidebar.brand.mark', 'sidebar.brand.name', 'conversation.hero.brand.mark'])
   assert.deepEqual(registered.map(r => r[0]), ['sidebar.brand.mark', 'sidebar.brand.name', 'conversation.hero.brand.mark'])
   assert.equal(registered[0][1], api.Mark)
   assert.equal(registered[1][1], api.Name)
+  assert.ok(registered.every(r => r[2] < 0), 'below the official brand (priority 0), or the single slot throws')
 })
 
 test('mark is an accessible svg that honours size; name says FiNess', () => {

@@ -94,6 +94,8 @@ window.__ModuleLoader__.load({
 
 		/** Required service: the UI slot registry. */
 		const inject = ['slots']
+		/** Below the official brand's 0, so FiNess shadows it instead of clashing with it. */
+		const PRIORITY = -10
 
 		/**
 		 * Occupy the three brand slots as one declaration-aware set (nested injects wait for every
@@ -106,9 +108,11 @@ window.__ModuleLoader__.load({
 			slots.inject(SLOTS.sidebarMark, () =>
 				slots.inject(SLOTS.sidebarName, () =>
 					slots.inject(SLOTS.heroMark, function* () {
-						yield slots.register({ name: SLOTS.sidebarMark }, Mark)
-						yield slots.register({ name: SLOTS.sidebarName }, Name)
-						yield slots.register({ name: SLOTS.heroMark }, Mark)
+						// The shipped (official) build registers its mark and name in these single slots at
+						// priority 0; a second entry at the same priority throws, and the lowest renders.
+						yield slots.register({ name: SLOTS.sidebarMark, priority: PRIORITY }, Mark)
+						yield slots.register({ name: SLOTS.sidebarName, priority: PRIORITY }, Name)
+						yield slots.register({ name: SLOTS.heroMark, priority: PRIORITY }, Mark)
 					})))
 		}
 
