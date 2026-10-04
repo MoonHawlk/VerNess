@@ -305,3 +305,20 @@ export function priceUsage(routes, pricing = {}) {
   }
   return { rows, total, currency, unpriced }
 }
+
+/**
+ * Find one session's log by its identity, in any workspace, without summarising the others.
+ * @param {string} identity - `session-<id>` (the bare id is accepted too).
+ * @param {string} [root] - the sessions root.
+ * @returns {string|undefined} the `session.v4.jsonl.zstd` path, or undefined when absent.
+ */
+export function sessionLogFile(identity, root = sessionsRoot()) {
+  const name = String(identity).startsWith('session-') ? String(identity) : `session-${identity}`
+  let workspaces = []
+  try { workspaces = readdirSync(root) } catch { return undefined }
+  for (const ws of workspaces) {
+    const file = join(root, ws, name, 'session.v4.jsonl.zstd')
+    if (existsSync(file)) return file
+  }
+  return undefined
+}

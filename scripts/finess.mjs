@@ -41,6 +41,7 @@ import { activeWorkspace, resolveWorkspace, switchWorkspace, takeWorkspaceFlag, 
 import { takeSnapshot } from './lib/snapshots.mjs'
 import { GUARD_QUESTION, ROUTING_QUESTIONS, askDecision, decisionConfig, decisionFailure, decisionHealth, decisionsDir, loadTemperatures, logShadowDecision, mcpRowLines, modelAnswers, ruleRoute } from './lib/decisions.mjs'
 import { latestGate } from './lib/labels.mjs'
+import { shadowThoughts, thoughtRun } from './lib/thought-assist.mjs'
 import { anyBand, compositeRecord, compositeRoute, escalations, llmFallback } from './lib/routing.mjs'
 import { executePipeline } from './lib/pipeline.mjs'
 import { runSyncTree } from './lib/treerun.mjs'
@@ -1382,6 +1383,8 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
         info(`session ${shortSession(convo.id())} - following turns continue it`)
       }
     }
+    // T-295: shadow-ask the decision model about the thought nodes this run recorded (never acted on).
+    await shadowThoughts(loadConfig(), thoughtRun(convo.id(), t0, activeWorkspace().dir))
   }
   rl?.close()
 }
