@@ -11,6 +11,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -19,8 +20,13 @@ import { readShadow } from './lib/labels.mjs'
 import { parseLoopRuns } from './lib/loop.mjs'
 import { DEFAULT_HOST, DEFAULT_PORT, bindPlan, debounce, loadOrCreateToken, startDashboardServer, watchChanges } from './lib/dashserve.mjs'
 import { listSessions, readSessionEvents, sessionsRoot } from './lib/sessions.mjs'
+import { readThoughtsPanel, renderThoughtsPanel } from './lib/thoughts-panel.mjs'
 import { summarizeTools, toolRuns, toolstatsClientSource } from './lib/toolstats.mjs'
+import { readState } from './lib/personas.mjs'
 import { REPO, RUN_DIR, WIN, human, info, num, ok, step, warn } from './lib/util.mjs'
+
+/** @returns {string} $DSH_HOME, as the substrate resolves it. */
+const dshHome = () => process.env.DSH_HOME ?? join(homedir(), '.dsh')
 
 /** How many sessions get a full event timeline; older ones keep their summary row only. */
 const DETAIL_LIMIT = 25
@@ -196,7 +202,9 @@ export function readBacklog() {
  * @returns {string} the HTML document.
  */
 function render(data) {
-  const { sessions, decisions, teamRuns, loopRuns = [], totals, generated, backlog = { tasks: [], html: '' }, toolSummary = summarizeTools([]) } = data
+  const { sessions, teamRuns, loopRuns = [], totals, generated, backlog = { tasks: [], html: '' }, toolSummary = summarizeTools([]), thoughtsHtml = '' } = data
+  // Thought-graph shadow records (T-295) share the log but not the routing questions; the panel shows them.
+  const decisions = data.decisions.filter(d => d.source !== 'thoughts')
   const maxBucket = Math.max(1, ...toolSummary.histogram.map(h => h.count))
   const pct = r => `${(r * 100).toFixed(r > 0 && r < 0.1 ? 1 : 0)}%`
   const toolRows = toolSummary.tools.map(t => `
@@ -357,6 +365,8 @@ ${card('decisions', num(decisions.length), `p50 ${p50} · ${agreeRate} agree wit
 <table><thead><tr><th>when</th><th>task</th><th>level (model)</th><th>level (rules)</th><th>tier m/r</th><th>pipeline m/r</th><th class="n">agree</th><th class="n">latency</th></tr></thead>
 <tbody>${decisionRows || '<tr><td colspan="8" class="dim">no decisions logged — enable decisions.enabled or run /decide</td></tr>'}</tbody></table>
 
+${thoughtsHtml}
+
 <h2>Team runs</h2>
 <table><thead><tr><th>team</th><th>when</th><th class="n">tasks</th><th>outcome</th><th>transcripts</th></tr></thead>
 <tbody>${teamRows || '<tr><td colspan="5" class="dim">no team runs yet — /team run &lt;id&gt;</td></tr>'}</tbody></table>
@@ -461,7 +471,7 @@ document.querySelectorAll('.row').forEach(row => row.addEventListener('click', (
 
 /**
  * Gather the records and render the page (no output, no file).
- * @param {{limit?: number}} [opts] - options.
+ * @param {{limit?: number, session?: string}} [opts] - options; `session` overrides the current one (tests).
  * @returns {{html: string, totals: object, decisions: object[], teamRuns: object[], backlog: {tasks: object[]}}} the page and counts.
  */
 export function renderDashboard(opts = {}) {
@@ -481,7 +491,8 @@ export function renderDashboard(opts = {}) {
   }
   const backlog = readBacklog()
   const toolSummary = summarizeTools(sessions.flatMap(s => s.runs))
-  const html = render({ sessions, decisions, teamRuns, loopRuns, totals, backlog, toolSummary, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
+  const thoughts = readThoughtsPanel({ session: opts.session ?? readState().session, dshHome: dshHome(), sessionsRoot: sessionsRoot(), decisions })
+  const html = render({ sessions, decisions, teamRuns, loopRuns, totals, backlog, toolSummary, thoughtsHtml: renderThoughtsPanel(thoughts, esc), generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
   return { html, totals, decisions, teamRuns, backlog }
 }
 
@@ -512,7 +523,8 @@ export function watchTargets() {
   const root = sessionsRoot()
   let mine = []
   try { mine = readdirSync(root).filter(d => d.includes(ws)).map(d => join(root, d)) } catch { /* no sessions yet */ }
-  return [...(mine.length > 0 ? mine : [root]), ...['loops', 'decisions', 'runs'].map(d => join(REPO, '.finess', d))]
+  // storages: /think writes the thought store there (T-290).
+  return [...(mine.length > 0 ? mine : [root]), ...['loops', 'decisions', 'runs'].map(d => join(REPO, '.finess', d)), join(dshHome(), 'storages')]
 }
 
 /**

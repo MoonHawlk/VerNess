@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 import { fileStore, storeFile } from '../../packages/thoughts/src/adapters.js'
+import { guardedWrite } from '../../packages/thoughts/src/conflicts.js'
 import { STUB_PREFIX, demoteToFit, findOriginal, isStubNode, recoveryOf, restoreStub, stubOf } from '../../packages/thoughts/src/evict.js'
 import { nodeRecord } from '../../packages/thoughts/src/fold.js'
 import { ThoughtStoreFullError, addPersistent, emptyProject, parseProject, promote, recordBytes } from '../../packages/thoughts/src/store.js'
@@ -102,7 +103,7 @@ test('/think promote reports demotions and /think restore brings a stub back fro
     const deps = cap => ({ store, project: 'c:/proj', session: 'session-s1', events: () => events, eventsOf: id => (id === 'session-s1' ? events : undefined), now: () => new Date(AT), cap })
     assert.equal(runThink(['promote', 'n-1'], deps(1e9)), 0)
     assert.equal(runThink(['promote', 'n-2'], deps(1e9)), 0)
-    const cap = recordBytes(promote(store.read('c:/proj'), events[3].data.meta.node, { at: AT, origin: { by: 'operator', session: 'session-s1' }, cap: 1e9 }).record) - 1
+    const cap = recordBytes(promote(store.read('c:/proj'), events[3].data.meta.node, { at: AT, origin: { by: 'model', session: 'session-s1', model: 'unknown' }, cap: 1e9 }).record) - 1
     assert.equal(runThink(['promote', 'n-3'], deps(cap)), 0)
     assert.ok(lines.some(l => /demoted p-1 to stubs/.test(l)))
     assert.equal(isStubNode(store.read('c:/proj').nodes[0].node), true)
@@ -114,4 +115,23 @@ test('/think promote reports demotions and /think restore brings a stub back fro
     console.log = log
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('with T-296/T-297: a conflict target is never demoted, a stub keeps its provenance, a held write demotes nothing', () => {
+  const origin = { by: 'model', session: 'session-s1', model: 'deepseek/v4' }
+  let r = emptyProject()
+  for (const [i, kind] of ['attempt', 'finding'].entries()) r = promote(r, eph(`n-${i + 1}`, kind, i), { at: at(i), origin, cap: 1e9 }).record
+  const held = { ...r, conflicts: [{ id: 'c-1', entry: r.nodes[1], against: 'p-1', reason: 'test', at: AT }], nextConflict: 2 }
+  const d = demoteToFit(held, 10)
+  assert.deepEqual(d.demoted, ['p-2'], 'p-1 is what c-1 is held against')
+  const stub = d.record.nodes[1]
+  assert.deepEqual(stub.origin, { ...origin, from: 'n-2' })
+  assert.equal(stub.storedAt, r.nodes[1].storedAt)
+  assert.deepEqual(d.record.conflicts, held.conflicts)
+  assert.deepEqual(parseProject(JSON.parse(JSON.stringify(d.record))).nodes[1], stub)
+  const n3 = eph('n-3', 'finding', 3)
+  const cap = recordBytes(promote(r, n3, { at: AT, origin, cap: 1e9 }).record) - 1
+  const guarded = guardedWrite(r, x => promote(x, n3, { at: AT, origin, cap }), { at: AT, contradicts: 'p-2', cap: 1e9 })
+  assert.equal(guarded.conflict.id, 'c-1')
+  assert.equal(guarded.record.nodes.some(s => isStubNode(s.node)), false, 'the held write left the stored nodes whole')
 })

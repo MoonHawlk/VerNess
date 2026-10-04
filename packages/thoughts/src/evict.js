@@ -13,6 +13,8 @@
  * recovered, so only those are demotable. Operator-written nodes are not: a write that cannot be
  * made to fit by demoting still throws ThoughtStoreFullError and changes nothing (store.js).
  * Order: attempts, artifacts, findings, decisions, constraints last; oldest first within a kind.
+ * Never demoted: the node being written, and any node a pending conflict (`c-<k>`) is held against.
+ * A stub keeps its whole provenance envelope (`origin`: by, session, model, from) and `storedAt`.
  * @module @finess/thoughts/evict
  */
 
@@ -71,7 +73,8 @@ export function stubOf(s) {
  */
 export function demoteToFit(r, cap, protect = []) {
   if (bytes(r) <= cap) return { record: r, demoted: [] }
-  const keep = new Set(protect)
+  // A node a pending contradiction (T-296) is held against stays whole until it is resolved.
+  const keep = new Set([...protect, ...(r.conflicts ?? []).map(c => c.against)])
   const rank = s => DEMOTE_ORDER.indexOf(s.node.kind)
   const queue = r.nodes.filter(s => demotable(s) && !keep.has(s.node.id))
     .sort((a, b) => rank(a) - rank(b) || a.storedAt.localeCompare(b.storedAt) || Number(a.node.id.slice(2)) - Number(b.node.id.slice(2)))

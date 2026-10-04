@@ -91,7 +91,9 @@ async function resolveRef(input) {
   if (quants.size === 0) return { error: `${p.repo} publishes no GGUF files`, hint: `find a GGUF conversion: /models search ${p.repo.split('/')[1]}` }
   const available = [...quants.keys()]
   if (p.quant !== undefined) {
-    const hit = available.find(q => q === p.quant.toUpperCase())
+    // Unsloth names its dynamic quants `UD-Q4_K_XL` in the file list; the repo's quant is `Q4_K_XL`.
+    const want = p.quant.toUpperCase().replace(/^UD-/, '')
+    const hit = available.find(q => q === want)
     if (hit === undefined) return { error: `${p.repo} has no ${p.quant} quant`, hint: `available: ${available.join(', ')}` }
     return { ref: `hf.co/${p.repo}:${hit}`, note: `${hit}, ${size(quants.get(hit))}`, quant: hit, quants }
   }

@@ -1,7 +1,7 @@
 # 10 — The thought graph: ephemeral and persistent working memory
 
-> Task block **T-280..T-297**. Status: **built: T-280..T-289 (`packages/thoughts`); T-290, T-295..T-297
-> not implemented.** See "As built" at the end. Grounded in two research
+> Task block **T-280..T-297**. Status: **built (T-280..T-290, T-295..T-297, `packages/thoughts`).**
+> See "As built" at the end. Grounded in two research
 > digests: `docs/research/dsh-state-and-memory-seams.md` (what the substrate forces) and
 > `docs/research/context-retention-patterns.md` (what Hermes and Anthropic learned the hard way).
 
@@ -154,7 +154,7 @@ a feature; it is a slow corruption with a good user interface.
   keyed by its normalised working directory), at `$DSH_HOME/storages/finess_thoughts.json`. 16 KB cap
   per project; a write past it demotes older nodes (T-288, below), and only one that cannot make room
   that way throws `ThoughtStoreFullError` and changes nothing. Ids are `p-<k>`,
-  never reused. Each stored node carries `origin {by, session?, from?}` (room for T-297). Writes are
+  never reused. Each stored node carries `origin {by, session?, model?, from?}` (T-297, below). Writes are
   re-read and verified. The plugin opens the domain per operation, because the json backend holds
   the file in memory while open and would overwrite `/think`'s edits; `/think` writes the same file
   directly and atomically.
@@ -228,7 +228,55 @@ A system-prompt section was rejected: its text is re-evaluated on every assembly
   unchanged (a version bump would make storage-domain refuse existing files). Only a node whose
   origin names the session and the ephemeral id it was promoted from is demotable; with nothing
   demotable the write still throws `ThoughtStoreFullError` and changes nothing. `link` does not
-  demote. Promotion recognises a node already promoted by session, source id and `at` (not the
+  demote. A node a pending conflict (`c-<k>`, T-296) is held against is never demoted, and a stub
+  keeps its whole provenance envelope (T-297), so `revoke` still finds it. A write that the
+  contradiction guard holds back discards any demotion it would have caused. Promotion recognises a node already promoted by session, source id and `at` (not the
   claim, which demotion rewrites). `/think` prints what it demoted, and `/think restore <p-id>` finds the original record in
   that session's log (matching id, `at` and kind, since ephemeral ids repeat across tasks) and puts it
   back under the same id, demoting others if it must.
+
+## As built (T-290, T-295..T-297)
+
+New modules beside the foundation: `packages/thoughts/src/envelope.js` (boundary parsing of `origin`
+and `conflicts`, called from `parseProject`), `src/provenance.js`, `src/conflicts.js`, `src/assist.js`;
+launcher side `scripts/lib/thought-assist.mjs` and `scripts/lib/thoughts-panel.mjs`. The stored record
+gained only optional fields (`origin.model`, `conflicts`, `nextConflict`), so `DOMAIN_VERSION` stays 1
+and the node contract (`packages/contracts/src/thought.ts`) is unchanged.
+
+- **T-297 provenance and revocation.** `/think promote` records `origin {by: 'model', session, model,
+  from}`: the claim is the model's, not the operator's. The model is the last `request/header`
+  (`data.header.config` provider/model) before the `tool/result` carrying the node, else `'unknown'`.
+  `/think add` stays `by: 'operator'`, with no model. `/think show` prints the provenance line.
+  `/think revoke <token>` matches, in order: an exact `p-<k>` id; else, among model-written nodes only,
+  a session prefix (at least 4 characters, `session-` ignored) or a model (`provider/model` or the bare
+  name). A token matching both a session and a model is refused. Matching nodes are removed with the
+  edges to them, plus every pending conflict they wrote or pointed at; the full removed entries are
+  appended to `$DSH_HOME/finess/thoughts-audit.jsonl` (outside `storages/`, which storage-json owns),
+  so a revoke is recoverable by hand. `resolve ... replace` is audited the same way.
+- **T-296 contradictions.** Rule (structural, no model): a claim is read as `subject predicate [not]
+  value` over a closed predicate list (is/are/was, equals, defaults to, must be, runs on, lives in,
+  returns, points to, belongs to: single-valued; uses, requires/needs, includes/contains, has:
+  multi-valued), with articles, quotes and end punctuation dropped and contractions expanded. Two
+  claims contradict when subject and predicate match and either the value is the same with one side
+  negated, or both are positive with different values on a single-valued predicate. `--contradicts
+  <p-id>` on `add`/`promote` marks one the rule cannot see. A contradicting write is not stored: it is
+  held in the project record as `c-<k>` (its reserved `p-` id is never reused; it counts against the
+  byte cap) and the command exits 2. `/think conflicts` lists them with both claims and provenance;
+  `/think resolve <c-id> keep|replace|both` drops the incoming node, forgets the stored one and stores
+  the incoming, or stores both. Only persistent writes are guarded; ephemeral `think_add` nodes never
+  overwrite anything.
+- **T-295 decision-model assist, shadow only.** One deviation: it runs **post-run in the launcher**,
+  not inside `think_add`. The plugin is a copy under the dsh profile and cannot reach the decision
+  client or the shadow log, and a call from inside the tool would race the dsh process exit. After
+  each REPL task, `shadowThoughts` takes this task's nodes stamped at or after the run's start (at
+  most 5) and per node asks, in one call, `persist` (yes/no) and `contradicts` (`none` plus up to 7
+  persistent candidates from `searchNodes`, so at most 8 options; omitted when there is no candidate,
+  since a choice needs two). Each answer is logged as a shadow record (`source: 'thoughts'`, `node`,
+  `session`, `candidates`) beside the rules (`persist: 'no'`; `contradicts`: the structural rule).
+  Nothing acts on them; decisions off means no call; failures are silent.
+- **T-290 dashboard panel** (static export and `serve`): the current session's task graph (the
+  `state.json` session, found in any workspace) as a tree, each node under its first parent, with
+  `← derives from` / `→ used by` links and evidence; the persistent inventory per project with byte
+  size, provenance and pending contradictions; and the latest `thoughts` shadow answers (model /
+  rules). Those records are left out of the routing decisions table and its agreement rate. `serve`
+  and `--watch` also watch `$DSH_HOME/storages`, so a `/think` write refreshes the page.
