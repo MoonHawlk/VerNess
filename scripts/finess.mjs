@@ -120,8 +120,12 @@ function parseJsonc(text) {
   return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'))
 }
 
-/** @returns {typeof DEFAULTS} the merged configuration. */
-function loadConfig() {
+/**
+ * @param {{machine?: boolean}} [opts] - `machine: false` leaves out this machine's `.env` sizing (for
+ *   the committed patch, which every machine shares).
+ * @returns {typeof DEFAULTS} the merged configuration.
+ */
+function loadConfig({ machine = true } = {}) {
   // Provider keys live in the gitignored .env; load it before anything reads a key variable.
   loadDotEnv()
   const file = join(REPO, 'finess.config.json')
@@ -132,7 +136,7 @@ function loadConfig() {
   for (const [k, v] of Object.entries(raw)) {
     cfg[k] = v !== null && typeof v === 'object' && !Array.isArray(v) ? { ...cfg[k], ...v } : v
   }
-  cfg.model = machineModelOverrides(cfg.model, process.env)
+  if (machine) cfg.model = machineModelOverrides(cfg.model, process.env)
   return cfg
 }
 
@@ -546,7 +550,9 @@ function writePatch(cfg) {
   const dir = join(REPO, 'profiles', cfg.profile.name)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, 'cordis.patch.yml')
-  writeFileSync(file, renderPatch(cfg, { surface: cfg.profile.template }), 'utf8')
+  // The committed copy comes from the committed config alone: no /model, /persona or /access choice
+  // (state) and no per-machine sizing (.env), or one machine's choices would reach every other.
+  writeFileSync(file, renderPatch(loadConfig({ machine: false }), { surface: cfg.profile.template, state: {} }), 'utf8')
   return file
 }
 
