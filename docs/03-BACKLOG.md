@@ -180,7 +180,7 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 ## Follow-ups from the 2026-10-02 third round
 - [ ] T-449 Live check with a running model: a `/workspace` turn and its continuation, `@path`/`@url`/`!!` reaching the model, `/recipe` runs, `/delegate`, a persona `model` preset, and the 30 s finish notification (all unit-tested; the engine was down: `OLLAMA_MODELS` points at a missing drive)
 - [ ] T-450 Real-terminal check of the wrapped editor (T-302): conhost wrap at the last column, drag-resize with the dropdown open, emoji sequences
-- [ ] T-451 First CI run (T-446) after the next push: confirm all six jobs, then require it on `main`
+- [ ] T-451 *(remaining part, owner action)* Require the CI check on `main` (branch protection). The first run after the push (2026-10-02) was green on all six jobs
 
 ## Follow-ups from the 2026-10-03 waves
 - [ ] T-467 `@finess/tool-policy` live check: boot a session per persona and confirm denied calls come back with the policy reason; check whether `ask` should reach an approval channel in the REPL
