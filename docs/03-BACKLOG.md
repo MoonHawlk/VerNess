@@ -54,15 +54,10 @@ Autonomous task loop
 
 Static dashboard
 - [ ] T-272 *(remaining part)* Filter by persona: the session logs do not record the persona, so record it first (the route filter is done)
-- [ ] T-273 `--watch`: rebuild on change
 
 Standalone dashboard service (deferred by request; do after T-271..T-273)
 - [ ] T-279 Decide the read path (in-process `lib/sessions.mjs` vs `@deepseek-ai/dsh-session-query`). Measure first
-- [ ] T-274 Own process `finess-dashboard`, independent of any REPL; the harness works with it down
-- [ ] T-275 HTTP on loopback by default; a generated token is required before any non-loopback bind
 - [ ] T-276 Multi-environment: several `DSH_HOME`s / workspaces from config, environment as a column and filter
-- [ ] T-277 Live updates: watch the logs and push via SSE
-- [ ] T-278 Keep the static export first-class; it must not regress
 
 Cost control (Engram)
 - [ ] T-102 Code-only graph of `deepseek-harness` outside the submodule (`engram clone`); time-boxed; measure tokens-per-question before/after
@@ -99,7 +94,6 @@ M3 Decisions
 - [ ] T-037 Tests: unit per provider, composite fallthrough, HMR-safety, 100% per-file coverage on `src`
 
 M4 Personas
-- [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin, the primitive MCP filtering and M4 tool policy both need
 - [ ] T-040 `packages/personas/`: loader (reads `personas/*.json`) + registry + validation
 - [ ] T-041 `system-prompt/assemble` contribution (identity + persona sections)
 - [ ] T-043 Persona files used by the plugin: `data-analyst`, `data-scientist`
@@ -151,20 +145,6 @@ Tier S commands: surface existing substrate capabilities, never rebuild them
 - [ ] T-161 Promote `/btw` notes to a durable `SessionEvent` contributed by a plugin
 
 ## WS-H — Thought graph (plan `08-thought-graph.md`, design `docs/10-THOUGHT-GRAPH.md`)
-- [ ] T-280 `thought/node` session event + `thoughts` projection: log-only, versioned `stateVersion`, folds to empty on task start
-- [ ] T-281 Node schema + boundary validation (`claim` ≤ 200 chars, one sentence)
-- [ ] T-282 `/think add | list | show | link | promote | forget`
-- [ ] T-283 `think_add` / `think_search` / `think_open` tools
-- [ ] T-284 Persistent tier in `ctx.storage`, project-scoped, byte-capped, **errors when full**
-- [ ] T-285 Frozen session-start injection of `constraint` nodes only, hard-capped
-- [ ] T-286 Compaction hook: render the task's findings and decisions into the compacted context
-- [ ] T-287 `confidence: verified` requires evidence read in-turn, enforced structurally
-- [ ] T-288 Eviction by demotion to a stub with a recovery pointer, never deletion
-- [ ] T-289 Subagents receive only explicitly passed nodes
-- [ ] T-290 Dashboard panel: the graph and the promoted-node inventory
-- [ ] T-295 Decision-model assist, shadowed: "worth persisting?" and "contradicts?"
-- [ ] T-296 Contradictions surface for resolution; never a silent overwrite
-- [ ] T-297 Poisoning guard: each persistent node records its session and model; revocable
 
 ## Models & API routes — ADR-0010, guide in `docs/11-MODELS-AND-API.md`
 Goal: installing a new model, or moving the agent onto a hosted API model that can act on the
@@ -205,10 +185,8 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 ## Follow-ups from the 2026-10-03 waves
 - [ ] T-467 `@finess/tool-policy` live check: boot a session per persona and confirm denied calls come back with the policy reason; check whether `ask` should reach an approval channel in the REPL
 - [ ] T-468 Enforce budgets inside the substrate (`llm/stream`), so one long task or a `--parallel` team batch cannot overshoot between checks (T-091 checks only before a task)
-- [ ] T-469 The one-shot `finess "<task>"` path still calls dsh directly; move it onto the pipeline executor (T-254) for headless profiles
 - [ ] T-470 Install `laya[mcp]` in the decision venv and confirm the `decisions.mcp` row exposes the tools in `/tools` (T-240; the entry point `python -m laya.mcp.server` is confirmed in the installed package)
 - [ ] T-471 Web UI brand plugin (T-398) seen in a browser: sidebar mark and name, hero mark, tab title; remove the `ui-brand-official` row if the substrate mark still shows
-- [ ] T-472 The sync `dsh()` path (spawnSync with `timeoutMs`) kills only its direct child; move it onto the tree kill of T-433
 
 ## WS-P — Performance between chats (plan `14-PERFORMANCE-PLAN.md`)
 Measured 2026-10-03: ~3 s to boot a new dsh per message, 91% of generated text is reasoning, a 2.3 s title LLM call per new session, ~20 KB request per step, ~1 s awaited decision call. Target: < 1.5 s to first token on the next message.
