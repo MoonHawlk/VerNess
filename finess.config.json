@@ -162,6 +162,9 @@
       // One corrective line (a concrete fixed call) on a failed tool result - small local models
       // misuse glob/pwsh/edit args and skip read-before-write (T-438). Zero prompt tokens.
       { "id": "finess-tool-hints", "package": "@finess/tool-hints", "path": "packages/tool-hints", "enabled": true },
+      // Thought graph (docs/10-THOUGHT-GRAPH.md, T-280..T-284): think_add / think_search / think_open,
+      // the `thoughts` projection, and the capped persistent tier in ctx.storage. /think reads the same store.
+      { "id": "finess-thoughts", "package": "@finess/thoughts", "path": "packages/thoughts", "enabled": true },
       // The launcher's quick-tools as slash commands in the web UI's message bar (ADR-0011). Web
       // profile only; `repoConfig` gives it this checkout's path (profile copy only, never committed).
       { "id": "finess-commands", "package": "@finess/commands", "path": "packages/commands", "enabled": true, "surfaces": ["web"], "repoConfig": true },
