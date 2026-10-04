@@ -46,11 +46,12 @@ export const ALIASES = {
 }
 
 /**
- * Harness tools an allow list never blocks: they plan, track or read, and change nothing outside
+ * Harness tools an allow list never blocks: they plan, track, read or take session notes (the
+ * thought graph), and change nothing outside
  * the session. Naming one in `deny` still blocks it. Tools that hand work to another agent
  * (`subagent`, `workflow`, ...) are not here: a subagent can write.
  */
-export const HARNESS = ['todo_write', 'create_goal', 'get_goal', 'update_goal', 'exit_plan_mode', 'job_list', 'job_output', 'job_kill', 'read_image', 'skill', 'list_agents']
+export const HARNESS = ['think_add', 'think_search', 'think_open', 'todo_write', 'create_goal', 'get_goal', 'update_goal', 'exit_plan_mode', 'job_list', 'job_output', 'job_kill', 'read_image', 'skill', 'list_agents']
 
 /** @param {string} n @returns {string[]} the substrate tool names a policy entry stands for. */
 const expand = n => ALIASES[n] ?? [n]

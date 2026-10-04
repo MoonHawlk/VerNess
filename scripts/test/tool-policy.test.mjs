@@ -272,3 +272,8 @@ test('the plugin declares the services it reads, or Cordis refuses to activate i
   assert.equal(mod.inject?.tools?.required, true)
   assert.equal(mod.inject?.agents?.required, false)
 })
+
+test('the thought-graph tools pass any allow list, as harness tools', () => {
+  const p = policyOf({ persona: 'ds', allow: ['read'], deny: [] })
+  for (const t of ['think_add', 'think_search', 'think_open']) assert.equal(decide(p, t).kind, 'allow', t)
+})
