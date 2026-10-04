@@ -10,6 +10,19 @@ evidence are in `docs/03-BACKLOG-DONE.md` and `docs/04-PROGRESS.md`.
 tool-failure hints for small models, and an animated Ness.**
 
 ### Added
+- **Persona tool policy enforced**: a persona's `tools.allow`/`deny` now blocks calls, with a reason
+  the model reads; `/permissions` shows it and `/tools` marks each tool (T-042, T-116, T-154, T-155).
+- **`/diff`** and **`/undo --yes`**: see and revert what the last task changed (git workspaces) (T-454).
+- **Budgets**: `budget.sessionTokens`, `dailyTokens`, `dailyCost`, `taskSeconds`; `/budget` (T-091).
+- **`/compact --yes`** shrinks the conversation into a fresh session; automatic compaction now works
+  on small context windows (`compact.autoPercent`) (T-151).
+- **`/export`** a session as Markdown (T-152) · **`/todos`** the agent's plan (T-150).
+- **`/task cancel <id>`** stops a delegated, team or loop run with its whole process tree (T-169, T-433).
+- **`model.fallback`**: a usable route when the default is down (T-453).
+- **The FiNess mark and name in the web UI** (T-398).
+- **Decision layer**: composite rules -> model -> LLM with bands and gate (T-204); advisory capability
+  router (T-253); shadow supervisor and guard questions (T-231, T-243); hosted provider by config and
+  an opt-in Laya MCP row (T-205, T-240); decision calls and avoided LLM calls in `/cost` (T-232).
 - **`/workspace <dir>`** (and `--workspace`): point FiNess at any project; tasks, `!` commands and
   `@` files run there (T-363).
 - **`!<cmd>`** runs a shell command locally at no token cost; **`!!<cmd>`** also attaches its output
@@ -82,6 +95,10 @@ tool-failure hints for small models, and an animated Ness.**
   rendering and `.env` parsing are covered (T-365).
 
 ### Fixed
+- Long tasks no longer hit the Windows command-line limit: they reach dsh through stdin, and
+  attachments may be up to 50k per item, 150k in total (T-448).
+- `/doctor` and `up` say why the local engine cannot start (e.g. `OLLAMA_MODELS` on a missing drive),
+  with a fix line and the engine's own log (T-452).
 - Long input wraps across rows with the cursor in the right place and the suggestions below it;
   wide characters and emoji no longer shift the cursor (T-302).
 - `npm run model:up|stats|down` no longer hang (an import cycle deadlocked).

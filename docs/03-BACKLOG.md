@@ -32,7 +32,6 @@ Launcher lifecycle
 
 ## WS-B — Teams and multiple tasks (plan `02-teams.md`)
 - [ ] T-171 Measure before promising parallelism: time the same team at concurrency 1 and 2 on the local model and record the numbers in `04-PROGRESS.md`
-- [ ] T-169 *(remaining part)* `/task cancel <id>`: needs a registry of running delegated/team runs (pid + handle); `/delegate` and `/task list` are done
 - [ ] T-230 Team task router: pick the owning persona for a task with no `member` with one Laya `choice` over persona ids (shadow first, see WS-E). With more than 8 personas, build it as T-396's two-stage routing
 - [ ] T-172 Re-implement team dispatch on `ctx.subagents` + `ctx.jobs`, retiring the launcher loop (after WS-G M7)
 
@@ -73,21 +72,13 @@ Measurement, which gates everything else
 - [ ] T-392 **Operator step, not code**: label at least 50 shadow records per question with `/decisions-data label` (about 200 is better). Record the count and date in `04-PROGRESS.md`. T-221..T-223 only mean something after this
 
 Composition and routing
-- [ ] T-204 `CompositeDecisionModel` (launcher-level first): rules → decision model → LLM, with confidence bands and cost accounting
-- [ ] T-205 `JevProvider` proven by construction: the same client with a different `baseURL` and key env. If it needs code, the abstraction is wrong
-- [ ] T-253 Capability router: persona requirements + model capabilities → eligible → cost/latency/policy → model. Tier is an input, never a model id
-- [ ] T-254 Pipeline executor for `standard` (the other modes belong to M7)
 - [ ] T-262 Gated rollout, one question at a time, high-confidence band only: `pipeline`, then `level`, then `tier`
 
 First real uses
-- [ ] T-231 Supervisor decision: continue / retry / complete / escalate as a 4-option choice
-- [ ] T-232 Decision accounting in `/cost`: decision calls counted separately; LLM calls avoided reported
 
 Deferred / investigate
-- [ ] T-240 MCP path (`laya[mcp]`, stdio only): register as a loader row; complements, never replaces, harness-side control
 - [ ] T-241 `laya-ts` in-process provider over the split ONNX export (not on npm; vendor or build)
 - [ ] T-242 Fine-tune on our labelled decisions once T-220 has a set
-- [ ] T-243 Guardrail/moderation question on inbound tasks (one more question in an existing call)
 
 ## WS-I — Persona catalog: ten new personas (plan `09-persona-catalog.md`, full specs there)
 Catalog-wide (do T-393 first)
@@ -108,12 +99,8 @@ M4 Personas
 - [ ] T-234 `ctx.tools.restrict({allow, deny})` companion plugin, the primitive MCP filtering and M4 tool policy both need
 - [ ] T-040 `packages/personas/`: loader (reads `personas/*.json`) + registry + validation
 - [ ] T-041 `system-prompt/assemble` contribution (identity + persona sections)
-- [ ] T-042 Tool policy on `tools/pre-execute` (allow/deny/ask) + `ctx.approval` wiring (also closes T-116)
-- [ ] T-116 Enforce persona `tools.allow`/`tools.deny` (closed by T-042; flip the `[recorded]` labels to `[enforced]`)
 - [ ] T-043 Persona files used by the plugin: `data-analyst`, `data-scientist`
 - [ ] T-044 Tests including one REAL-composition boot test
-- [ ] T-154 `/tools` *(remaining part)*: show per-persona allow/deny next to the offered tools
-- [ ] T-155 `/permissions`: persona tool policy as enforced on `tools/pre-execute`
 
 M5 Skills
 - [ ] T-050 `packages/skills/`; `SKILL.md` front-matter spec doc `docs/11-SKILLS.md` (no YAML dependency: a documented front-matter subset)
@@ -146,16 +133,12 @@ M8 Data plane
 
 M9 Governance
 - [ ] T-090 `packages/governance/`; policy model (RBAC/ABAC)
-- [ ] T-091 Budgets (tokens/cost/time) on `tools/execute` + `llm/stream`
 - [ ] T-092 Audit trail as session events + projection
 - [ ] T-093 PII policy on `fs/*-intent` and tool arguments
 - [ ] T-094 `ctx.invariants` registrations for our subsystems
 - [ ] T-233 Tool-risk gate on `tools/pre-execute`, modelled on `packages/experimental/auto-review`. Blocked on T-223
 
 Tier S commands: surface existing substrate capabilities, never rebuild them
-- [ ] T-150 `/todos`: render the `ctx.todo` projection
-- [ ] T-151 *(remaining part)* `/compact` (`/context` is done)
-- [ ] T-152 `/export`: reuse `dsh-session-log-export`
 - [ ] T-153 `/mcp`: MCP servers and their tool filters
 - [ ] T-156 `/hooks`: read-only list of mounted Cordis listeners per event
 - [ ] T-157 `/goal`: drive `ctx.goals` (with M7)
@@ -202,11 +185,9 @@ conversation-hero mark are **slots** that `dsh-client-ui-brand-official` occupie
 deployment with another identity "leaves this package out and composes another package that
 occupies the sidebar slots — and the hero slot". The tab title and favicons are build-time
 (`DSH_CLIENT_TITLE`, `dsh-web-frontend/dist`) and not configurable in the prebuilt frontend.
-- [ ] T-398 `@finess/client-ui-brand` (`packages/client-ui-brand`), a browser plugin that occupies `sidebar.brand.mark`, `sidebar.brand.name` and `conversation.hero.brand.mark` with the FiNess mark and name, mounted in the web profile in place of the `ui-brand-official` row (profile patch, generated from `finess.config.json`). **Spike first**: prove an out-of-tree browser plugin row loads in the `finess-web` profile, as M1 did for node plugins. The client half also sets `document.title` and swaps the favicon `<link>` at load: the tab title is otherwise build-time, and a brief "DeepSeek Harness" flash on first paint is acceptable and documented. Done: `/web` shows the FiNess mark, name and tab title; the README "Web UI" section says what is branded and what is not
 - [ ] T-430 Replace the web UI's current look (the `dsh-web-all` skin center default and the substrate theme) with a FiNess skin: pick the palette and fonts, ship it as a skin/preset the skin center can apply by default (or as theme tokens in T-398's brand package), light and dark. Done: `./turn_on.sh web` opens in the FiNess skin on a fresh profile, on macOS and Windows; the owner approves the look
 
 ## Launcher follow-ups from the web bridge (ADR-0011)
-- [ ] T-433 *(remaining part)* On Windows, cancelling a command can leave a grandchild process (`/team` dsh run) behind: kill the process tree (the worktree `sync` warning is done)
 
 ## Follow-ups from the 2026-10-02 round
 - [ ] T-440 Live check of `@finess/tool-hints` (T-438): run a session on the local 0.6B model and on a 4B+ model, then compare `/dashboard` tool failures before and after; the hints are unit-tested only
@@ -214,10 +195,17 @@ occupies the sidebar slots — and the hero slot". The tab title and favicons ar
 - [ ] T-443 `/stats` in the REPL has no `--watch` (CLI only); decide whether a watching quick-tool fits the prompt
 
 ## Follow-ups from the 2026-10-02 third round
-- [ ] T-448 Pass the task to dsh through a file or stdin instead of one argv string: Windows caps a command line at 32,767 characters, so `@` attachments are capped at 20k and a composed task over 30k is refused (T-181)
 - [ ] T-449 Live check with a running model: a `/workspace` turn and its continuation, `@path`/`@url`/`!!` reaching the model, `/recipe` runs, `/delegate`, a persona `model` preset, and the 30 s finish notification (all unit-tested; the engine was down: `OLLAMA_MODELS` points at a missing drive)
 - [ ] T-450 Real-terminal check of the wrapped editor (T-302): conhost wrap at the last column, drag-resize with the dropdown open, emoji sequences
 - [ ] T-451 First CI run (T-446) after the next push: confirm all six jobs, then require it on `main`
+
+## Follow-ups from the 2026-10-03 waves
+- [ ] T-467 `@finess/tool-policy` live check: boot a session per persona and confirm denied calls come back with the policy reason; check whether `ask` should reach an approval channel in the REPL
+- [ ] T-468 Enforce budgets inside the substrate (`llm/stream`), so one long task or a `--parallel` team batch cannot overshoot between checks (T-091 checks only before a task)
+- [ ] T-469 The one-shot `finess "<task>"` path still calls dsh directly; move it onto the pipeline executor (T-254) for headless profiles
+- [ ] T-470 Install `laya[mcp]` in the decision venv and confirm the `decisions.mcp` row exposes the tools in `/tools` (T-240; the entry point `python -m laya.mcp.server` is confirmed in the installed package)
+- [ ] T-471 Web UI brand plugin (T-398) seen in a browser: sidebar mark and name, hero mark, tab title; remove the `ui-brand-official` row if the substrate mark still shows
+- [ ] T-472 The sync `dsh()` path (spawnSync with `timeoutMs`) kills only its direct child; move it onto the tree kill of T-433
 
 ## WS-P — Performance between chats (plan `14-PERFORMANCE-PLAN.md`)
 Measured 2026-10-03: ~3 s to boot a new dsh per message, 91% of generated text is reasoning, a 2.3 s title LLM call per new session, ~20 KB request per step, ~1 s awaited decision call. Target: < 1.5 s to first token on the next message.

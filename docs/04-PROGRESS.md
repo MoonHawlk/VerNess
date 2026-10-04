@@ -705,3 +705,19 @@
   16% of 32k), `/recipe` lists. Not live: anything needing a model (T-449; the engine cannot
   start because `OLLAMA_MODELS` points at a missing drive).
 - `npm test` 515/515, typecheck clean, clean-clone check ok.
+
+## 2026-10-03 — fourth and fifth waves, WS-E, the performance plan
+- Merged into epic: T-448 (stdin), T-169/T-433 (registry, tree kill), T-152, T-150, T-232, T-452,
+  T-453, T-398, T-042/T-116/T-154/T-155 (tool policy), T-454 (/diff, /undo), T-091 (budgets),
+  T-151 (/compact), and WS-E T-204, T-205, T-231, T-240, T-243, T-253, T-254. WS-E left: T-392
+  (operator labelling), T-242 and T-262 (need the labels), T-241 (ONNX build outside npm).
+- Fixed at merge: the tool policy as delivered blocked 20 of 25 tools for the active persona
+  (capability names vs substrate names, harness tools caught by allow lists); the budget gate,
+  workspace cwd, snapshot, notification and stdin options all meet on the REPL's task call and were
+  combined by hand; the pipeline executor now carries `budget.taskSeconds`. The substrate's
+  `compaction-basic` default could never trigger on a 32k window; the patch now sets a threshold.
+- Measured for the performance plan (docs/14): ~3 s to boot a new dsh per message, 91% of
+  generated text is reasoning, a 2.3 s title LLM call per new session, ~20 KB request per step.
+  WS-P T-455..T-466 opened.
+- WS-H base agent stopped on an API rate limit and was resumed; its foundation lands next.
+- `npm test` 683/683, typecheck clean.
