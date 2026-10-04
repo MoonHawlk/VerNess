@@ -17,9 +17,10 @@ import { fileURLToPath } from 'node:url'
 import { inline, markdownToHtml, parseBacklog } from './lib/backlog.mjs'
 import { readShadow } from './lib/labels.mjs'
 import { parseLoopRuns } from './lib/loop.mjs'
-import { listSessions, readSessionEvents } from './lib/sessions.mjs'
+import { DEFAULT_HOST, DEFAULT_PORT, bindPlan, debounce, loadOrCreateToken, startDashboardServer, watchChanges } from './lib/dashserve.mjs'
+import { listSessions, readSessionEvents, sessionsRoot } from './lib/sessions.mjs'
 import { summarizeTools, toolRuns, toolstatsClientSource } from './lib/toolstats.mjs'
-import { REPO, WIN, human, info, num, ok, step } from './lib/util.mjs'
+import { REPO, RUN_DIR, WIN, human, info, num, ok, step, warn } from './lib/util.mjs'
 
 /** How many sessions get a full event timeline; older ones keep their summary row only. */
 const DETAIL_LIMIT = 25
@@ -459,15 +460,13 @@ document.querySelectorAll('.row').forEach(row => row.addEventListener('click', (
 }
 
 /**
- * Build the dashboard from local records.
- * @param {object} cfg - the FiNess configuration (unused today; kept for future filters).
- * @param {{open?: boolean, limit?: number}} [opts] - options.
- * @returns {string} the path written.
+ * Gather the records and render the page (no output, no file).
+ * @param {{limit?: number}} [opts] - options.
+ * @returns {{html: string, totals: object, decisions: object[], teamRuns: object[], backlog: {tasks: object[]}}} the page and counts.
  */
-export function buildDashboard(cfg, opts = {}) {
+export function renderDashboard(opts = {}) {
   const limit = opts.limit ?? DETAIL_LIMIT
   const workspace = REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, '')
-  step('reading session logs')
   const sessions = listSessions({ workspace, limit }).map(detail)
   const decisions = readDecisions()
   const teamRuns = readTeamRuns()
@@ -483,6 +482,18 @@ export function buildDashboard(cfg, opts = {}) {
   const backlog = readBacklog()
   const toolSummary = summarizeTools(sessions.flatMap(s => s.runs))
   const html = render({ sessions, decisions, teamRuns, loopRuns, totals, backlog, toolSummary, generated: new Date().toISOString().replace('T', ' ').slice(0, 19) })
+  return { html, totals, decisions, teamRuns, backlog }
+}
+
+/**
+ * Build the dashboard from local records: the static export, `.finess/dashboard.html`.
+ * @param {object} cfg - the FiNess configuration (unused today; kept for future filters).
+ * @param {{open?: boolean, limit?: number}} [opts] - options.
+ * @returns {string} the path written.
+ */
+export function buildDashboard(cfg, opts = {}) {
+  step('reading session logs')
+  const { html, totals, decisions, teamRuns, backlog } = renderDashboard(opts)
   const out = join(REPO, '.finess', 'dashboard.html')
   mkdirSync(join(REPO, '.finess'), { recursive: true })
   writeFileSync(out, html, 'utf8')
@@ -495,12 +506,70 @@ export function buildDashboard(cfg, opts = {}) {
   return out
 }
 
-// Standalone CLI: `node scripts/dashboard.mjs [--no-open] [--limit N]`.
+/** @returns {string[]} the directories whose changes make the page stale (existing or not yet). */
+export function watchTargets() {
+  const ws = REPO.replace(/[\\/:]+/g, '-').replace(/^-+|-+$/g, '')
+  const root = sessionsRoot()
+  let mine = []
+  try { mine = readdirSync(root).filter(d => d.includes(ws)).map(d => join(root, d)) } catch { /* no sessions yet */ }
+  return [...(mine.length > 0 ? mine : [root]), ...['loops', 'decisions', 'runs'].map(d => join(REPO, '.finess', d))]
+}
+
+/**
+ * @param {string[]} args - flags.
+ * @param {string} name - flag name.
+ * @returns {string|undefined} the value after the flag.
+ */
+const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined }
+
+/**
+ * Run the dashboard: the static export (default), `--watch` to rebuild on change, or `serve`.
+ * `serve` flags: `--port N` (config `dashboard.port`, default 4180), `--host ADDR` (default 127.0.0.1;
+ * anything non-loopback needs the generated token), `--open`.
+ * @param {{dashboard?: {port?: number}}} cfg - configuration.
+ * @param {string[]} args - flags.
+ * @returns {Promise<number>} exit code (after Ctrl-C for the long-running modes).
+ */
+export async function runDashboard(cfg, args) {
+  const limit = flagValue(args, '--limit') === undefined ? undefined : Number(flagValue(args, '--limit'))
+  const stop = new Promise(resolve => { process.once('SIGINT', resolve); process.once('SIGTERM', resolve) })
+  const opener = () => (WIN ? 'explorer' : process.platform === 'darwin' ? 'open' : 'xdg-open')
+  if (args[0] === 'serve') {
+    const host = flagValue(args, '--host') ?? DEFAULT_HOST
+    const port = Number(flagValue(args, '--port') ?? cfg.dashboard?.port ?? DEFAULT_PORT)
+    if (!Number.isInteger(port) || port < 0 || port > 65535) { warn(`bad port: ${port}`); return 1 }
+    let token
+    if (bindPlan(host).requireToken) {
+      const file = join(RUN_DIR, 'dashboard.token')
+      const t = loadOrCreateToken(file)
+      token = t.token
+      if (t.created) warn(`non-loopback bind: token (shown once) ${t.token}`)
+      else info(`non-loopback bind: token is in ${file}`)
+      info('pass it as ?token=... or the x-finess-token header')
+    }
+    let srv
+    try {
+      srv = await startDashboardServer({ host, port, token, render: () => renderDashboard({ limit }).html, targets: watchTargets })
+    } catch (e) { warn(`cannot serve: ${e?.message ?? e}`); return 1 }
+    ok(`dashboard on ${srv.url}  (Ctrl-C to stop)`)
+    if (args.includes('--open')) spawn(opener(), [srv.url], { detached: true, stdio: 'ignore', shell: WIN }).on('error', () => {}).unref()
+    await stop
+    await srv.close()
+    return 0
+  }
+  buildDashboard(cfg, { open: !args.includes('--no-open') && !args.includes('--watch'), limit })
+  if (!args.includes('--watch')) return 0
+  info('watching for changes (Ctrl-C to stop)')
+  const rebuild = debounce(() => { try { buildDashboard(cfg, { open: false, limit }) } catch (e) { warn(`rebuild failed: ${e?.message ?? e}`) } }, 300)
+  const w = watchChanges(watchTargets, rebuild.trigger, { debounceMs: 0, ignore: n => /dashboard\.html$/.test(n) })
+  await stop
+  w.close()
+  rebuild.cancel()
+  return 0
+}
+
+// Standalone CLI: `node scripts/dashboard.mjs [serve] [--no-open] [--limit N] [--watch] [--port N] [--host A]`.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const { loadConfigForCli } = await import('./finess.mjs')
-  const at = process.argv.indexOf('--limit')
-  buildDashboard(loadConfigForCli(), {
-    open: !process.argv.includes('--no-open'),
-    limit: at >= 0 ? Number(process.argv[at + 1]) : undefined,
-  })
+  process.exitCode = await runDashboard(loadConfigForCli(), process.argv.slice(2))
 }
