@@ -9,7 +9,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { questionErrors } from '../lib/decisions.mjs'
+import { logShadowDecision, questionErrors } from '../lib/decisions.mjs'
+import { readShadow, routingRecords } from '../lib/labels.mjs'
 import { MAX_ASSESSED, runNodes, shadowThoughts } from '../lib/thought-assist.mjs'
 import { MAX_CANDIDATES, assistQuestions, assistRules, assistState } from '../../packages/thoughts/src/assist.js'
 import { claimTriple, contradiction, findContradiction, guardedWrite, pendingConflicts, resolveConflict } from '../../packages/thoughts/src/conflicts.js'
@@ -228,6 +229,17 @@ test('shadowThoughts is silent when decisions are off, the service fails, or the
     assert.deepEqual(await shadowThoughts(on, { ...run, stored: () => { throw new Error('boom') } }, { ask: fakeAsk(calls), dir }), [], 'never throws')
     const many = { ...run, events: () => [human, ...Array.from({ length: 9 }, (_, i) => result(eph(`n-${i + 1}`, `Fact ${i}.`)))] }
     assert.equal((await shadowThoughts(on, many, { ask: fakeAsk([]), dir })).length, MAX_ASSESSED)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('thought shadow records stay out of labelling and /routing (routingRecords)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'finess-tassist-'))
+  try {
+    logShadowDecision({ source: 'repl', task: 'route me' }, dir)
+    logShadowDecision({ source: 'thoughts', task: 'A claim.', node: 'n-1' }, dir)
+    logShadowDecision({ source: 'loop', task: 'a round' }, dir)
+    assert.equal(readShadow(dir).length, 3, 'the log keeps every record (the panel reads them)')
+    assert.deepEqual(routingRecords(readShadow(dir)).map(r => r.source), ['repl', 'loop'])
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
