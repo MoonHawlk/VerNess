@@ -1,0 +1,9 @@
+{
+  "name": "@finess/guard",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Blocks irreversible shell commands (rm -rf, git reset --hard, DROP TABLE, format, ...) until the user confirms them twice; on tools/pre-execute and the REPL's !cmd.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": { ".": "./index.js", "./classify": "./classify.js" }
+}

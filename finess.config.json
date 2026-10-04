@@ -189,6 +189,11 @@
       // The active persona's tools allow/deny/approval, enforced on tools/pre-execute (T-042). Sync and
       // every per-run persona overlay write its config; a denied call returns a reason the model reads.
       { "id": "finess-tool-policy", "package": "@finess/tool-policy", "path": "packages/tool-policy", "enabled": true },
+      // Irreversible shell commands (rm -rf, git reset --hard, DROP TABLE, format, ...) are shown in
+      // full and must be confirmed twice before they run (T-473, docs/15-COMMAND-GUARD.md).
+      // irreversible: "confirm-twice" (default) | "deny" (refuse without asking). The REPL's !cmd
+      // follows the same setting. `surfaceConfig` tells it which surface it runs on (web: no terminal).
+      { "id": "finess-guard", "package": "@finess/guard", "path": "packages/guard", "enabled": true, "surfaceConfig": true, "config": { "irreversible": "confirm-twice" } },
       // Thought graph (docs/10-THOUGHT-GRAPH.md, T-280..T-284): think_add / think_search / think_open,
       // the `thoughts` projection, and the capped persistent tier in ctx.storage. /think reads the same store.
       { "id": "finess-thoughts", "package": "@finess/thoughts", "path": "packages/thoughts", "enabled": true },
