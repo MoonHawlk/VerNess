@@ -9,6 +9,11 @@
       name: '@finess/tool-hints'
     - id: finess-tool-policy
       name: '@finess/tool-policy'
+    - id: finess-guard
+      name: '@finess/guard'
+      config:
+        irreversible: "confirm-twice"
+        surface: "headless"
     - id: finess-thoughts
       name: '@finess/thoughts'
     # Model routes. No adapter of ours is needed: dsh-llm-pi-ai serves hand-declared

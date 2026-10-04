@@ -24,6 +24,7 @@ Read in this order:
 | [11-MODELS-AND-API.md](11-MODELS-AND-API.md) | Install local models in one command, run the agent on a hosted API model, and choose how far its tools reach |
 | [12-PERSONAS.md](12-PERSONAS.md) | Personas: writing a persona file, and giving it its own commands that exist only while it is active |
 | [13-EXPLAINED-SIMPLY.md](13-EXPLAINED-SIMPLY.md) | The whole project, and every command, explained for a curious 12-year-old |
+| [15-COMMAND-GUARD.md](15-COMMAND-GUARD.md) | The command guard: irreversible shell commands are shown and confirmed twice before they run |
 | [RUNBOOK.md](RUNBOOK.md) | Manual commands behind the launcher, and every gotcha we hit |
 | [adr/](adr/) | Architecture Decision Records (one file per irreversible choice) |
 | [research/](research/) | Read-only digests of upstream repos (source of truth for seam names) |

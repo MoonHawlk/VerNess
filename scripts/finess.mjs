@@ -33,6 +33,7 @@ import { gatherFacts, runChecks } from './lib/engine-checks.mjs'
 import { shAsync, spawnAsync } from './lib/util.mjs'
 import { stageTask } from './lib/taskarg.mjs'
 import { loadRecipes } from './lib/recipes.mjs'
+import { guardShellLine, modeOf as guardModeOf, openTty, rowOf as guardRowOf } from '../packages/guard/index.js'
 import { attachCaps, attachedChars, expandRefs, runShell, shellAttachment } from './lib/attach.mjs'
 import { autoPercentOf, compactSettings, renderCompactRow } from './lib/compact.mjs'
 import { NEW_KEY, appendBrief, composeTask, markSent, moveNotes, pendingNotes, readBrief, readNotes } from './lib/notes.mjs'
@@ -225,6 +226,13 @@ function winQuote(a) {
   return `"${s.replaceAll('"', '\\"').replaceAll('%', '%^')}"`
 }
 
+/**
+ * A captured run shows nothing on the terminal the user watches, so the command guard must not prompt
+ * there (T-473): it denies instead, the same on Windows and macOS.
+ * @param {{capture?: boolean, env?: Record<string,string>}} opts - dsh options. @returns {object} the options.
+ */
+const guardEnv = opts => (opts.capture === true ? { ...opts, env: { ...opts.env, FINESS_GUARD_TTY: 'none' } } : opts)
+
 /** Cached path to the substrate's JS entry point, so the lookup happens at most once per process. */
 let dshEntry
 
@@ -243,6 +251,7 @@ let dshEntry
  * @returns {{code: number, out: string, timedOut?: boolean}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
+  opts = guardEnv(opts)
   resolveDshEntry()
   const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })
   try {
@@ -276,6 +285,7 @@ function dsh(args, opts = {}) {
  * @returns {Promise<{code: number, out: string}>} exit status and captured output.
  */
 async function dshAsync(args, opts = {}) {
+  opts = guardEnv(opts)
   resolveDshEntry()
   // A fresh stage per call: a retry must not reuse an fd the last run already read to EOF.
   const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })
@@ -406,10 +416,13 @@ export function renderPatch(cfg, { surface, repo, state = readState() }) {
     L.push(`    - id: ${p.id}`)
     L.push(`      name: ${yq(p.package)}`)
     if (p.enabled === false) L.push('      disabled: true')
-    if (p.repoConfig === true && repo !== undefined) {
-      L.push('      config:')
-      L.push(`        repo: ${yq(repo)}`)
-    }
+    // Row config: the row's own `config` object, `surface` when `surfaceConfig`, `repo` when `repoConfig`.
+    const conf = p.config !== null && typeof p.config === 'object' && !Array.isArray(p.config) ? Object.entries(p.config) : []
+    if (p.surfaceConfig === true) conf.push(['surface', surface])
+    const withRepo = p.repoConfig === true && repo !== undefined
+    if (conf.length > 0 || withRepo) L.push('      config:')
+    for (const [k, v] of conf) L.push(`        ${k}: ${JSON.stringify(v)}`)
+    if (withRepo) L.push(`        repo: ${yq(repo)}`)
   }
   // The command is a machine path, so only the per-machine copy carries it (never the committed one).
   if (repo !== undefined) L.push(...mcpRowLines(decisionConfig(cfg), { repo }))
@@ -1287,6 +1300,11 @@ async function cmdRun(cfg, task, { noModel = false } = {}) {
         warn('access is read-only - ! commands are refused (change it: /access workspace)')
         continue
       }
+      // T-473: an irreversible line is shown and confirmed twice on the terminal; piped = refused.
+      const tty = interactive ? openTty() : null
+      let gate
+      try { gate = guardShellLine(parsed.text, { mode: guardModeOf(guardRowOf(loadConfig())?.config), io: tty }) } finally { tty?.close() }
+      if (!gate.run) { warn(`${gate.message}: ${gate.reasons.join('; ')}`); continue }
       const res = runShell(parsed.text, { cwd: activeWorkspace().dir, spawnSync })
       if (res.out !== '') console.log(res.out)
       if (res.error !== undefined) warn(`could not run the shell: ${res.error}`)

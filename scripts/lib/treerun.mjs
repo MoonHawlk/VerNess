@@ -30,7 +30,7 @@ export function runSyncTree(file, args, opts) {
     writeFileSync(spec, JSON.stringify({ file, args, timeoutMs: opts.timeoutMs, capture: opts.capture === true, hasStdin: opts.stdin !== undefined }))
     const io = opts.capture === true ? 'pipe' : 'inherit'
     const r = spawnSync(process.execPath, [SELF, spec], {
-      cwd: opts.cwd, env: { ...process.env, ...opts.env }, encoding: 'utf8', windowsHide: true,
+      cwd: opts.cwd, env: { ...process.env, ...opts.env }, encoding: 'utf8', windowsHide: opts.capture === true || process.stdout.isTTY !== true,
       maxBuffer: opts.maxBuffer ?? 64 * 1024 * 1024,
       stdio: [opts.stdin ?? 'ignore', io, io, 'pipe'],
     })

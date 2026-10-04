@@ -140,7 +140,9 @@ export function spawnAsync(file, args, opts = {}) {
         stdio: opts.capture === true ? [opts.stdin ?? 'ignore', 'pipe', 'pipe'] : [opts.stdin ?? 'ignore', 'inherit', 'inherit'],
         shell: opts.shell === true,
         detached: !WIN,
-        windowsHide: true,
+        // A hidden child gets its own invisible console (no CONIN$ for the command guard, T-473), so only
+        // a captured or console-less run is hidden.
+        windowsHide: opts.capture === true || process.stdout.isTTY !== true,
       })
     } catch (e) {
       chunks.push(Buffer.from(String(e.message)))
