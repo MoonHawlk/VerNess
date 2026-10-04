@@ -19,6 +19,7 @@
  */
 
 import { closeSync, openSync, readSync, writeSync } from 'node:fs'
+import { isatty as ttyIsatty } from 'node:tty'
 
 import { classifyCommand } from './classify.js'
 
@@ -67,7 +68,7 @@ export function commandOf(exec) {
  * escapes, so a destructive line cannot be drawn as a harmless one. Never truncated.
  * @param {string} text - the raw command. @returns {string} the printable form.
  */
-export const shown = text => String(text).replace(/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g, c => (c === '\n' ? '\\n' : c === '\t' ? '\\t' : `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`))
+export const shown = text => String(text).replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, c => (c === '\n' ? '\\n' : c === '\t' ? '\\t' : `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`))
 
 /** @param {string} command @returns {string} the command's first word (an accepted second answer). */
 export const firstWord = command => String(command).trim().split(/\s+/)[0] ?? ''
@@ -81,21 +82,29 @@ export const firstWord = command => String(command).trim().split(/\s+/)[0] ?? ''
 
 /**
  * Open the controlling terminal, bypassing stdin/stdout (which may be pipes or a captured run).
+ * On POSIX without `/dev/tty` (a setsid child), a stderr that is a terminal is used instead.
  * `FINESS_GUARD_TTY=none` forces "no terminal", which can only make the guard deny.
- * @param {{platform?: string, env?: Record<string, string|undefined>}} [opts] - for tests.
+ * @param {{platform?: string, env?: Record<string, string|undefined>, isatty?: (fd: number) => boolean}} [opts] - for tests.
  * @returns {TtyIO|null} the terminal, or null when there is none.
  */
-export function openTty({ platform = process.platform, env = process.env } = {}) {
+export function openTty({ platform = process.platform, env = process.env, isatty = fd => ttyIsatty(fd) } = {}) {
   if (env.FINESS_GUARD_TTY === 'none') return null
   const [inPath, outPath] = platform === 'win32' ? ['\\\\.\\CONIN$', '\\\\.\\CONOUT$'] : ['/dev/tty', '/dev/tty']
   let fin
   let fout
+  /** Descriptors this function opened (an inherited stderr is never closed). */
+  const own = []
   try {
-    fin = openSync(inPath, 'r')
-    fout = openSync(outPath, 'w')
+    fin = openSync(inPath, 'r'); own.push(fin)
+    fout = openSync(outPath, 'w'); own.push(fout)
   } catch {
-    for (const fd of [fin, fout]) if (fd !== undefined) try { closeSync(fd) } catch { /* already closed */ }
-    return null
+    for (const fd of own) try { closeSync(fd) } catch { /* already closed */ }
+    // POSIX run in its own session (the launcher's timeout wrapper uses setsid): no /dev/tty, but a
+    // stderr that is the user's terminal still reads and writes it.
+    if (platform === 'win32' || !isatty(2)) return null
+    fin = 2
+    fout = 2
+    own.length = 0
   }
   return {
     write: s => { writeSync(fout, s) },
@@ -113,7 +122,7 @@ export function openTty({ platform = process.platform, env = process.env } = {})
       }
       return Buffer.from(bytes).toString('utf8').replace(/\r$/, '')
     },
-    close: () => { for (const fd of [fin, fout]) try { closeSync(fd) } catch { /* already closed */ } },
+    close: () => { for (const fd of own) try { closeSync(fd) } catch { /* already closed */ } },
   }
 }
 

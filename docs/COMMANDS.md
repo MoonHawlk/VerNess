@@ -125,6 +125,7 @@ A persona is a hat: a role prompt, a tool policy, its own commands and, optional
 | Validate every persona file | `/persona check` |
 | Every persona and team at a glance | `/agents` |
 | The tool policy enforced for the active persona | `/permissions` · `/tools` marks each tool allowed, denied or ask |
+| Whether irreversible commands are guarded, and how a line is judged | `/guard` · `/guard check rm -rf build` (nothing is run) |
 
 Give a persona its own model in its JSON file (for example a reviewer on a stronger model than the
 worker): `"model": { "route": "anthropic", "id": "<model>" }`. A `/model` or `/api use` choice in

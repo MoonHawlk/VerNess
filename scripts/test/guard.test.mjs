@@ -188,6 +188,18 @@ test('openTty: FINESS_GUARD_TTY=none means no terminal', () => {
   assert.equal(openTty({ env: { FINESS_GUARD_TTY: 'none' } }), null)
 })
 
+test('openTty: a POSIX run with no /dev/tty uses a terminal stderr and never closes it', () => {
+  // Opened only, never read. Where /dev/tty exists this is the real device; elsewhere stderr.
+  const io = openTty({ platform: 'linux', env: {}, isatty: fd => fd === 2 })
+  assert.notEqual(io, null)
+  io.close()
+  process.stderr.write('') // fd 2 still open
+})
+
+test('shown: bidi overrides are escaped too', () => {
+  assert.equal(shown('rm -rf \u202e/'), 'rm -rf \\u202e/')
+})
+
 test('REPL gate: harmless runs, irreversible needs yes + DELETE, piped or deny mode refuses', () => {
   assert.equal(guardShellLine('echo hi', { mode: 'confirm-twice', io: null }).run, true)
   const tty = fakeTty(['yes', 'DELETE'])

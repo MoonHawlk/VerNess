@@ -226,6 +226,13 @@ function winQuote(a) {
   return `"${s.replaceAll('"', '\\"').replaceAll('%', '%^')}"`
 }
 
+/**
+ * A captured run shows nothing on the terminal the user watches, so the command guard must not prompt
+ * there (T-473): it denies instead, the same on Windows and macOS.
+ * @param {{capture?: boolean, env?: Record<string,string>}} opts - dsh options. @returns {object} the options.
+ */
+const guardEnv = opts => (opts.capture === true ? { ...opts, env: { ...opts.env, FINESS_GUARD_TTY: 'none' } } : opts)
+
 /** Cached path to the substrate's JS entry point, so the lookup happens at most once per process. */
 let dshEntry
 
@@ -244,6 +251,7 @@ let dshEntry
  * @returns {{code: number, out: string, timedOut?: boolean}} exit status and captured output.
  */
 function dsh(args, opts = {}) {
+  opts = guardEnv(opts)
   resolveDshEntry()
   const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })
   try {
@@ -277,6 +285,7 @@ function dsh(args, opts = {}) {
  * @returns {Promise<{code: number, out: string}>} exit status and captured output.
  */
 async function dshAsync(args, opts = {}) {
+  opts = guardEnv(opts)
   resolveDshEntry()
   // A fresh stage per call: a retry must not reuse an fd the last run already read to EOF.
   const staged = stageTask(args, RUN_DIR_LOCAL, { enabled: opts.task === true, always: dshEntry === null })

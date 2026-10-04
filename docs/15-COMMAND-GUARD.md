@@ -71,7 +71,12 @@ off the terminal channel; it can only make the guard deny.
 
 - `terminal_send` with `submit: false` can build a command across several calls. Each call is
   classified separately.
-- Parallel `/team` runs share one console, so their prompts can appear together. Each prompt reads its
-  own line.
+- Runs whose output the launcher captures (`/team` tasks) have no terminal the user is watching. The
+  launcher sets `FINESS_GUARD_TTY=none` for them, so an irreversible command is refused there, the
+  same on Windows and macOS. Run it from the REPL instead.
+- A REPL task with `budget.taskSeconds` set runs under a timeout wrapper. On Windows that wrapper and
+  `dsh` now share the REPL's console, because a hidden child gets its own invisible console. On POSIX
+  the wrapper's `setsid` removes `/dev/tty`, so the guard prompts on stderr when stderr is a terminal.
+- A heredoc body is data. It is classified only when it feeds a shell (`bash <<EOF`) or a SQL client.
 - The guard reads command text. A script file the model wrote and then runs (`bash x.sh`) is not
   opened. The sandbox (`/access`) is the boundary for that.
