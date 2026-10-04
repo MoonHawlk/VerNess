@@ -83,6 +83,12 @@ const POSITIVE = [
   ['Stop-Process -Name *', /Stop-Process/],
   ['Get-Process | Stop-Process', /kills every process/],
   ['Clear-RecycleBin -Force', /Clear-RecycleBin/],
+  ['Get-ChildItem -Recurse *.log | Remove-Item', /get-childitem \| remove-item/],
+  ['gci | ri', /gci \| ri/],
+  ['ls | del', /ls \| del/],
+  ['gci | % { Remove-Item $_ }', /\$_/],
+  ['bash <<EOF\nrm -rf build\nEOF', /rm -r/],
+  ['psql <<-SQL\n\tTRUNCATE orders;\n\tSQL', /TRUNCATE/],
   // disks
   ['mkfs.ext4 /dev/sdb1', /mkfs|erases|raw/],
   ['sudo mkfs -t vfat /dev/sdc', /mkfs|erases/],
@@ -226,6 +232,10 @@ const NEGATIVE = [
   'cmd /c dir /s',
   'format',
   '',
+  'Get-ChildItem | Select-Object Name',
+  'git commit -m "$(cat <<\'EOF\'\nfix: don\'t rely on it\ngit reset --hard is gone now\nEOF\n)"',
+  'cat > README.md <<EOF\nrun git reset --hard to start over\nrm -rf build\nEOF',
+  'cat <<EOF > notes.sql\nDROP TABLE x;\nEOF',
 ]
 
 test('classifier: every irreversible line is blocked, with a readable reason', () => {

@@ -11,13 +11,13 @@
  * @module @finess/guard/classify
  */
 
-/** @typedef {{words: string[], redirects: string[], subs: string[]}} Cmd */
+/** @typedef {{words: string[], redirects: string[], subs: string[], heredocs: string[]}} Cmd */
 
 /** Characters a backslash escapes outside quotes; any other `\` stays (Windows paths, `\rm`). */
 const ESCAPABLE = new Set([' ', '\t', ';', '&', '|', "'", '"', '\\', '(', ')', '$', '`', '<', '>', '{', '}', '*', '?', '#', '!'])
 
 /**
- * Read a balanced `( ... )` body, respecting quotes.
+ * Read a balanced `( ... )` body, respecting quotes (a lone apostrophe, as in a heredoc's "don't", is text).
  * @param {string} s - the text. @param {number} start - index just after the `(`.
  * @returns {{text: string, end: number, closed: boolean}} the body and the index after `)`.
  */
@@ -25,7 +25,7 @@ function readParen(s, start) {
   let depth = 1
   for (let i = start; i < s.length; i++) {
     const c = s[i]
-    if (c === "'" || c === '"') { const j = s.indexOf(c, i + 1); if (j < 0) break; i = j; continue }
+    if (c === "'" || c === '"') { const j = s.indexOf(c, i + 1); if (j >= 0) i = j; continue }
     if (c === '\\') { i++; continue }
     if (c === '(') depth++
     else if (c === ')' && --depth === 0) return { text: s.slice(start, i), end: i + 1, closed: true }
@@ -69,23 +69,26 @@ export function parseLine(line) {
   /** @type {Cmd[]} */
   let pipeline = []
   /** @type {Cmd} */
-  let cmd = { words: [], redirects: [], subs: [] }
+  let cmd = { words: [], redirects: [], subs: [], heredocs: [] }
   /** @type {string|null} */
   let word = null
-  /** @type {'out'|'skip'|null} */
+  /** @type {'out'|'skip'|'heredoc'|'heredoc-'|null} */
   let redirect = null
   let unbalanced = false
+  /** Heredocs whose body starts on the next line: the owning command and the delimiter. */
+  const pending = []
   const endWord = () => {
     if (word === null) return
     if (redirect === 'out') cmd.redirects.push(word)
+    else if (redirect === 'heredoc' || redirect === 'heredoc-') pending.push({ cmd, delim: word, strip: redirect === 'heredoc-' })
     else if (redirect !== 'skip') cmd.words.push(word)
     redirect = null
     word = null
   }
   const endCmd = () => {
     endWord()
-    if (cmd.words.length + cmd.redirects.length + cmd.subs.length > 0) pipeline.push(cmd)
-    cmd = { words: [], redirects: [], subs: [] }
+    if (cmd.words.length + cmd.redirects.length + cmd.subs.length > 0 || pending.some(p => p.cmd === cmd)) pipeline.push(cmd)
+    cmd = { words: [], redirects: [], subs: [], heredocs: [] }
   }
   const endPipeline = () => { endCmd(); if (pipeline.length > 0) pipelines.push(pipeline); pipeline = [] }
   const add = t => { word = (word ?? '') + t }
@@ -127,9 +130,11 @@ export function parseLine(line) {
     if (c === '&' && n === '>') { endWord(); i += 2; if (s[i] === '>') i++; redirect = 'out'; continue }
     if (c === '<') {
       endWord()
-      i += s.startsWith('<<<', i) ? 3 : s.startsWith('<<', i) ? 2 : 1
-      if (s[i] === '-') i++
-      redirect = 'skip'
+      const here = s.startsWith('<<', i) && !s.startsWith('<<<', i)
+      i += s.startsWith('<<<', i) ? 3 : here ? 2 : 1
+      const strip = here && s[i] === '-'
+      if (strip) i++
+      redirect = here ? (strip ? 'heredoc-' : 'heredoc') : 'skip'
       continue
     }
     if (c === '>') {
@@ -143,11 +148,32 @@ export function parseLine(line) {
       continue
     }
     if (c === '|') { if (n === '|') { endPipeline(); i += 2; continue } endCmd(); i += n === '&' ? 2 : 1; continue }
+    // A heredoc body is data for its command, never commands of this line: read it whole here.
+    if (c === '\n' && (endWord(), pending.length > 0)) {
+      endPipeline()
+      let at = i + 1
+      for (const p of pending.splice(0)) {
+        const body = []
+        while (at < s.length) {
+          const nl = s.indexOf('\n', at)
+          const ln = s.slice(at, nl < 0 ? s.length : nl).replace(/\r$/, '')
+          at = nl < 0 ? s.length : nl + 1
+          if ((p.strip ? ln.replace(/^\t+/, '') : ln) === p.delim) break
+          body.push(ln)
+        }
+        p.cmd.heredocs.push(body.join('\n'))
+      }
+      i = at
+      continue
+    }
     if (c === ';' || c === '\n' || c === '&' || c === '(' || c === ')' || c === '}' || (c === '{' && word === null)) {
       endPipeline(); i += c === '&' && n === '&' ? 2 : 1; continue
     }
     add(c); i++
   }
+  endWord()
+  // A heredoc opened on the last line has no body.
+  for (const p of pending.splice(0)) p.cmd.heredocs.push('')
   endPipeline()
   return { pipelines, unbalanced }
 }
@@ -262,6 +288,12 @@ const DOWNLOADERS = new Set(['curl', 'wget', 'iwr', 'irm', 'invoke-webrequest', 
 
 /** Commands that execute what they read. */
 const RUNNERS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'python', 'python3', 'perl', 'ruby', 'node', 'iex', 'invoke-expression', 'pwsh', 'powershell', 'cmd', 'source', '.', 'eval'])
+
+/** Shells whose heredoc body is a script. */
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd'])
+
+/** PowerShell/POSIX listers: piped into a remover, they make a bulk delete (`gci | ri`). */
+const LISTERS = new Set(['get-childitem', 'gci', 'ls', 'dir', 'get-item', 'gi'])
 
 /** SQL command-line clients. */
 const SQL_CLIENTS = new Set(['sqlite3', 'sqlite', 'psql', 'mysql', 'mariadb', 'sqlcmd', 'duckdb', 'clickhouse-client'])
@@ -551,7 +583,10 @@ function checkCmd(cmd, depth, push) {
     default:
       break
   }
-  if (SQL_CLIENTS.has(name)) for (const sql of sqlOf(name, args)) for (const r of sqlReasons(sql)) push(r)
+  if (SQL_CLIENTS.has(name)) for (const sql of [...sqlOf(name, args), ...(cmd.heredocs ?? [])]) for (const r of sqlReasons(sql)) push(r)
+  // `bash <<EOF ... EOF` runs its body; `cat > f <<EOF` only writes it.
+  if (SHELLS.has(name)) for (const body of cmd.heredocs ?? []) nested(body)
+  if (REMOVERS.has(name) && args.some(a => /^\$(_|psitem)$/i.test(a))) push(`${name} $_: deletes every item it is fed`)
   return name
 }
 
@@ -584,6 +619,8 @@ function classifyText(text, depth) {
         if (EMITTERS.has(stages[k])) for (const r of sqlReasons(unwrap(pipeline[k].words).words.slice(1).join(' '))) push(r)
       }
     }
+    const ls = stages.findIndex(n => LISTERS.has(n))
+    if (ls >= 0 && stages.slice(ls + 1).some(n => REMOVERS.has(n))) push(`${stages[ls]} | ${stages.slice(ls + 1).find(n => REMOVERS.has(n))}: deletes every listed item`)
     if (stages.includes('stop-process') && pipeline.length > 1 && ['get-process', 'gps', 'ps'].includes(stages[0]) && pipeline[0].words.length === 1) {
       push('Get-Process | Stop-Process: kills every process')
     }
@@ -591,12 +628,6 @@ function classifyText(text, depth) {
   // `iex (iwr ...)`, `iex (New-Object Net.WebClient).DownloadString(...)`
   if (names.some(n => n === 'iex' || n === 'invoke-expression') && (names.some(n => DOWNLOADERS.has(n)) || /downloadstring|downloadfile|net\.webclient/i.test(text))) {
     push('iex <download>: runs code fetched from the network')
-  }
-  // A heredoc body (`sqlite3 db <<EOF ... DROP TABLE t; EOF`) arrives as its own lines.
-  if (names.some(n => SQL_CLIENTS.has(n))) {
-    for (const pipeline of pipelines) {
-      for (const c of pipeline) if (/^(drop|truncate|delete|update|alter)$/i.test(c.words[0] ?? '')) for (const r of sqlReasons(c.words.join(' '))) push(r)
-    }
   }
   if (unbalanced && depth < 8) out.push(...classifyText(String(text).replace(/["'`]/g, ' '), 8))
   return out
