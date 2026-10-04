@@ -748,4 +748,9 @@
   marks M4 and M6 partial, COMMANDS.md gains Safety and Memory sections and the context-window knobs.
 - Qwen3.8-27B: the first pull resolved `:Q4_K_XL` to the UD file and downloaded it (17.6 GB) but
   failed writing the manifest ("file does not exist"); re-pulled as `:UD-Q4_K_XL`.
-- `npm test` 818/818, typecheck clean.
+- Live guard probe through a real dsh run: the first attempt deleted the probe folder, because the
+  guard was listed in the patch (sync) but never installed (setup) and dsh skips a missing plugin
+  without a word. After setup the same call was refused with the guard's reason and the folder
+  survived; the launcher now refuses to start a task while a safety plugin is missing.
+- Per-machine context window and KV cache from `.env` (`FINESS_CONTEXT_WINDOW`, `FINESS_KV_CACHE`).
+- `npm test` 821/821, typecheck clean.

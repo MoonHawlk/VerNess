@@ -14,7 +14,7 @@ persona tool policies, `/workspace` for any project, `@`/`!` context, recipes, a
   disk formatting, `git reset --hard`/`push --force`/`clean -f`, SQL `DROP`/`TRUNCATE`, remote code
   piped to a shell and the like are shown before they run and need `yes`, then `DELETE`; without a
   terminal or approval channel they are refused. Covers the model's shell calls and your `!cmd`;
-  `/guard check <cmd>` tests a line (T-473).
+  `/guard check <cmd>` tests a line. No task starts while the guard is configured but not installed (T-473).
 - **Thought graph** (`@finess/thoughts`, `/think`): the model records findings, decisions and
   constraints with `think_add`; a capped per-project memory with provenance, contradictions held
   for you to resolve, demotion instead of deletion, constraints injected at session start and kept
@@ -128,8 +128,9 @@ persona tool policies, `/workspace` for any project, `@`/`!` context, recipes, a
   contracts (T-383).
 
 ### Upgrade
-- Run `setup` (or `sync`) once so the new plugins (`@finess/guard`, `@finess/thoughts`,
-  `@finess/tool-policy`) reach your profiles. The tool policy now restricts personas such as
+- Run `setup` once so the new plugins (`@finess/guard`, `@finess/thoughts`, `@finess/tool-policy`)
+  are installed in your profiles; `sync` alone only lists them, and no task starts until the guard
+  is installed. The tool policy now restricts personas such as
   `reviewer` and `data-scientist` for real; widen a persona's `tools.allow` if it needs more.
 - **Rename:** run `setup` once (creates `~/.dsh/profiles/finess` and `finess-web`), then `npm link`
   again for the `finess` command. Move the old state directory to `.finess/` and carry config edits over to
