@@ -1,0 +1,16 @@
+{
+  "name": "@finess/thoughts",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Thought graph foundation: thought/node records, the thoughts projection, think_* tools, and the capped persistent tier in ctx.storage.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./src/*": "./src/*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2"
+  }
+}

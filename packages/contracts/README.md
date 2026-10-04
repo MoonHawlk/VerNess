@@ -35,6 +35,10 @@ typechecking (`pnpm typecheck`).
   and records). `personaToFile` turns a `Persona` back into a file that re-validates to the same
   value. v1 files (`id`, `name`, `description`, `prompt`, `tools`, `skills`, `evaluators`, `tips`)
   are valid v2 files unchanged.
+- **Thought** (`src/thought.ts`) — the thought-graph node (docs/10-THOUGHT-GRAPH.md, T-281):
+  scopes, kinds, confidence, the one-sentence ≤200-char `claim` rule (`claimProblem`), and
+  `validateThoughtNode`. Its runtime twin is `packages/thoughts/src/schema.js` (the dsh plugin cannot
+  load `.ts`); `scripts/test/thoughts.parity.test.mjs` keeps them identical.
 - **Decision** (`src/decision.ts`) — the vocabulary for the small-choice decision path:
   `REASON_CODES`/`ReasonCode` (13 codes covering rule matches, model confidence, fallbacks,
   escalation, tool and budget failures, and provider/answer problems), `ChoiceQuestion` (a fixed
