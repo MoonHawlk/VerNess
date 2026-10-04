@@ -221,12 +221,13 @@ export async function modelUp(cfg, model) {
           // Load with the route's window, or the engine loads its own default and reloads later.
           options: { num_predict: 1, ...(m.contextWindow > 0 ? { num_ctx: m.contextWindow } : {}) },
         }),
-        signal: AbortSignal.timeout(180000),
+        // A 16 GB model read from a spinning disk takes ~4 min to load; closing the request aborts the load.
+        signal: AbortSignal.timeout(Math.max(60, Number(m.loadTimeoutSeconds) || 900) * 1000),
       })
       return r.ok ? await r.json() : undefined
     } catch { return undefined }
   })()
-  if (warm === undefined) { fail('the model did not answer a warm-up request'); return false }
+  if (warm === undefined) { fail(`the model did not answer a warm-up request within ${Math.max(60, Number(m.loadTimeoutSeconds) || 900)} s (model.loadTimeoutSeconds; engine log: ${ENGINE_LOG})`); return false }
   ok(`warm in ${((Date.now() - t0) / 1000).toFixed(1)}s, resident for ${m.keepAliveMinutes ?? 10}m of idleness`)
 
   writeRunState({ pid, startedByUs, model: ref, baseURL: base, at: new Date().toISOString() })

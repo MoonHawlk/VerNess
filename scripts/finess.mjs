@@ -60,7 +60,7 @@ const DEFAULTS = {
     route: 'ollama-local', displayName: 'Ollama (local)', id: 'qwen3:0.6b',
     baseURL: 'http://127.0.0.1:11434/v1', apiKeyEnv: 'OLLAMA_API_KEY',
     apiKeyValue: 'ollama-local-no-auth', contextWindow: 32768, maxTokens: 4096,
-    engine: 'ollama', source: undefined, keepAliveMinutes: 10, autoInstallEngine: true,
+    engine: 'ollama', source: undefined, keepAliveMinutes: 10, loadTimeoutSeconds: 900, autoInstallEngine: true,
     reasoning: false, autoServe: true, autoPull: true, fallback: [],
   },
   extraRoutes: {}, activeRoute: '',
