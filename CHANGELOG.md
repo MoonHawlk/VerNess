@@ -21,8 +21,8 @@ persona tool policies, `/workspace` for any project, `@`/`!` context, recipes, a
   through compaction; a dashboard panel (T-280..T-290, T-295..T-297).
 - **`finess dashboard serve`**: a live dashboard on 127.0.0.1:4180 (token for any other address);
   `finess dashboard --watch` (T-273..T-278).
-- **Context window reaches the engine**: `model.contextWindow` now sets the local engine's context;
-  `model.kvCache` (`q8_0`) saves VRAM for long contexts.
+- **Context window reaches the engine**: `model.contextWindow` (or `FINESS_CONTEXT_WINDOW` in `.env`, per machine) now sets the local engine's context;
+  `model.kvCache` or `FINESS_KV_CACHE` (`q8_0`) saves VRAM for long contexts.
 - **Persona tool policy enforced**: a persona's `tools.allow`/`deny` now blocks calls, with a reason
   the model reads; `/permissions` shows it and `/tools` marks each tool (T-042, T-116, T-154, T-155).
 - **`/diff`** and **`/undo --yes`**: see and revert what the last task changed (git workspaces) (T-454).

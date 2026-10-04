@@ -132,7 +132,25 @@ function loadConfig() {
   for (const [k, v] of Object.entries(raw)) {
     cfg[k] = v !== null && typeof v === 'object' && !Array.isArray(v) ? { ...cfg[k], ...v } : v
   }
+  cfg.model = machineModelOverrides(cfg.model, process.env)
   return cfg
+}
+
+/**
+ * Per-machine model sizing from the environment (the gitignored `.env`): the context window and KV
+ * cache depend on this machine's memory, so they must not be committed for every machine (a 64k
+ * window suits a 24 GB GPU and would swamp a laptop). `FINESS_CONTEXT_WINDOW` (a positive integer)
+ * and `FINESS_KV_CACHE` (`f16`, `q8_0`, `q4_0`) override `model.contextWindow` and `model.kvCache`.
+ * @param {object} model - the merged `model` block.
+ * @param {Record<string, string|undefined>} env - the environment.
+ * @returns {object} the block with any valid override applied.
+ */
+export function machineModelOverrides(model, env) {
+  const out = { ...model }
+  const ctx = Number(env.FINESS_CONTEXT_WINDOW)
+  if (Number.isInteger(ctx) && ctx > 0) out.contextWindow = ctx
+  if (/^(f16|q8_0|q4_0)$/.test(String(env.FINESS_KV_CACHE ?? ''))) out.kvCache = env.FINESS_KV_CACHE
+  return out
 }
 
 /** @returns {typeof DEFAULTS} the merged configuration, for the `scripts/model.mjs` entry point. */

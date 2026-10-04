@@ -145,9 +145,9 @@ given to every new session of the project. Design: [10-THOUGHT-GRAPH.md](10-THOU
 
 `/models add` warns when a model will not fit your free RAM/VRAM and suggests a smaller quant.
 `/doctor` and `/model` warn when a model is under 4B parameters (too small for reliable tool calls).
-Long contexts on a local model: set `"contextWindow": 65536` (and `"kvCache": "q8_0"` to halve its
-memory) in the `model` block; FiNess starts the engine with that window. Restart the engine after a
-change (`/down`, then `/up`).
+Long contexts on a local model, per machine: `FINESS_CONTEXT_WINDOW=65536` and `FINESS_KV_CACHE=q8_0`
+(halves the cache's memory) in `.env`; FiNess starts the engine with that window. Restart the engine
+after a change (`/down`, then `/up`).
 
 ## Personas
 
