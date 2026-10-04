@@ -210,7 +210,8 @@ export function mountContext(ctx, { store, subagentTools = SUBAGENT_TOOLS }) {
     if (seed === undefined) return next()
     if ('error' in seed) return { kind: 'deny', reason: seed.error }
     const decision = await next()
-    if (decision?.kind === 'allow') stash.put(prompt, seed)
+    // 'ask' may still be approved by the user: stash then too (bounded, consume-once, so a stale entry costs nothing).
+    if (decision?.kind === 'allow' || decision?.kind === 'ask') stash.put(prompt, seed)
     return decision
   })
   return { stash }

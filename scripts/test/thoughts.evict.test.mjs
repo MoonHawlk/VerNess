@@ -83,6 +83,7 @@ test('findOriginal picks the right node when ephemeral ids repeat across tasks; 
   const original = findOriginal(stub, events)
   assert.equal(original.claim, long(0))
   assert.equal(findOriginal(stub, events.slice(0, 2)), undefined)
+  assert.throws(() => promote(demoted, eph('n-1', 'finding', 0), { at: AT, origin: { by: 'operator', session: 'session-s1' }, cap: 1e9 }), /already promoted as p-1/, 'a demoted node is still recognised')
   const back = restoreStub(demoted, 'p-1', original)
   assert.deepEqual(back.nodes[0].node, r.nodes[0].node)
   assert.throws(() => restoreStub(back, 'p-1', original), /not a demoted stub/)

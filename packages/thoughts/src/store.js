@@ -142,7 +142,7 @@ export function addPersistent(r, input, { at, origin, cap = DEFAULT_CAP_BYTES })
  */
 export function promote(r, eph, { at, origin, cap = DEFAULT_CAP_BYTES }) {
   if (eph.scope !== 'ephemeral') throw new Error(`${eph.id} is already persistent`)
-  const dup = r.nodes.find(s => s.origin.session !== undefined && s.origin.session === origin.session && s.origin.from === eph.id && s.node.claim === eph.claim)
+  const dup = r.nodes.find(s => s.origin.session !== undefined && s.origin.session === origin.session && s.origin.from === eph.id && s.node.at === eph.at)
   if (dup !== undefined) throw new Error(`${eph.id} was already promoted as ${dup.node.id}`)
   const v = validateThoughtNode({ ...eph, id: `p-${r.nextId}`, scope: 'persistent', derivedFrom: eph.derivedFrom.filter(id => findStored(r, id) !== undefined) })
   if (!v.ok) throw new Error(`invalid node: ${formatIssues(v.errors)}`)

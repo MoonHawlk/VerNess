@@ -195,10 +195,13 @@ A system-prompt section was rejected: its text is re-evaluated on every assembly
   parent names nodes in the prompt: `[thoughts: n-2 p-1]` (`think_open`'s description says so). The
   pre-execute listener resolves them against what the parent sees and denies the call, with the known
   ids, when one is unknown or malformed or the set exceeds 12 nodes / 4 KB; once the rest of the
-  waterfall allows the call, it stashes the nodes under the prompt text (bounded, consume-once). The
-  child's first pre-step finds its prompt among the claimed messages and enters part `seed`, which
+  waterfall allows the call (or asks, since the user may approve), it stashes the nodes under the
+  prompt text (bounded, consume-once). The child's first pre-step finds its prompt among the claimed
+  messages (the prompt enters as its own text block, `tool-subagent/src/index.ts:517`; the plugin's
+  untagged listener sees every agent's events, `packages/core/scope/src/index.ts:158-181`) and enters part `seed`, which
   the context projection folds into the child's `seeds`. A child (header `origin: 'subagent'` or
-  `delegationDepth > 0`, `packages/core/session/src/types.ts:117,123`) gets no baseline, its
+  `delegationDepth > 0`, `packages/core/session/src/types.ts:117,123`, set for every in-process child
+  at `packages/subagent/subagent/src/child-agent.ts:153,155`) gets no baseline, its
   `think_search` / `think_open` see its own nodes plus its seeds and never the project store, and its
   own ids start above the seeded `n-` ids. A fork's inherited thought records fold away at the tagged
   `session/end-seed` cut (`types.ts:427`); the inherited conversation itself is model-visible
@@ -225,6 +228,7 @@ A system-prompt section was rejected: its text is re-evaluated on every assembly
   unchanged (a version bump would make storage-domain refuse existing files). Only a node whose
   origin names the session and the ephemeral id it was promoted from is demotable; with nothing
   demotable the write still throws `ThoughtStoreFullError` and changes nothing. `link` does not
-  demote. `/think` prints what it demoted, and `/think restore <p-id>` finds the original record in
+  demote. Promotion recognises a node already promoted by session, source id and `at` (not the
+  claim, which demotion rewrites). `/think` prints what it demoted, and `/think restore <p-id>` finds the original record in
   that session's log (matching id, `at` and kind, since ephemeral ids repeat across tasks) and puts it
   back under the same id, demoting others if it must.

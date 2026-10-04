@@ -96,7 +96,7 @@ test('stateSchema round-trips a folded state and refuses others', () => {
   assert.deepEqual(stateSchema.parse(JSON.parse(JSON.stringify(s))), s)
   assert.deepEqual(stateSchema.parse(initState()), initState())
   assert.throws(() => stateSchema.parse({ ...s, v: STATE_VERSION + 1 }))
-  assert.throws(() => stateSchema.parse({ ...s, v: 1 }), /not a v2 state/)
+  assert.throws(() => stateSchema.parse({ ...s, v: STATE_VERSION - 1 }), new RegExp(`not a v${STATE_VERSION} state`))
   assert.throws(() => stateSchema.parse({ ...s, nodes: [{}] }))
 })
 

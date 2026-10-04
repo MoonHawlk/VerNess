@@ -185,8 +185,10 @@ test('T-289: the parent names nodes in the prompt; unknown or malformed ids are 
   assert.match((await pre('subagent', '[thoughts: banana]')).reason, /not ids: banana/)
   assert.deepEqual(await pre('subagent', 'denied later [thoughts: n-1]', async () => ({ kind: 'deny', reason: 'policy' })), { kind: 'deny', reason: 'policy' })
   assert.equal(f.stash.size(), 0, 'a call denied downstream stashes nothing')
+  assert.deepEqual(await pre('subagent', 'Needs approval [thoughts: n-1]', async () => ({ kind: 'ask' })), { kind: 'ask' })
+  assert.equal(f.stash.size(), 1, 'an ask may still be approved, so it stashes')
   assert.deepEqual(await pre('subagent', 'Check the cache [thoughts: n-2 p-1]'), { kind: 'allow' })
-  assert.equal(f.stash.size(), 1)
+  assert.equal(f.stash.size(), 2)
 })
 
 test('T-289: a child gets exactly the passed nodes, once, sees no persistent store, and numbers its own nodes above them', async () => {
