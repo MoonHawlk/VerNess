@@ -1,2 +1,4 @@
 # Hooks run under sh: a CRLF checkout would break the shebang on Windows.
 scripts/hooks/* text eol=lf
+# The launcher writes the profile patch with LF on every OS; keep git from flagging it as changed.
+profiles/**/*.yml text eol=lf
