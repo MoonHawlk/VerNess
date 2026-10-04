@@ -1,6 +1,7 @@
 # 10 — The thought graph: ephemeral and persistent working memory
 
-> Task block **T-280..T-297**. Status: **designed, not implemented.** Grounded in two research
+> Task block **T-280..T-297**. Status: **foundation built (T-280..T-284, `packages/thoughts`); T-285..T-297
+> not implemented.** See "As built" at the end. Grounded in two research
 > digests: `docs/research/dsh-state-and-memory-seams.md` (what the substrate forces) and
 > `docs/research/context-retention-patterns.md` (what Hermes and Anthropic learned the hard way).
 
@@ -128,3 +129,34 @@ conclusion will keep reading it back as fact, and each session makes it more con
 persistence is explicit, capped, evidence-gated, attributed to its producer, and revocable — and why
 a contradiction surfaces rather than silently overwriting. An unbounded, self-written memory is not
 a feature; it is a slow corruption with a good user interface.
+
+## As built (T-280..T-284)
+
+`packages/thoughts` (`@finess/thoughts`, plugin row `finess-thoughts`), the contract in
+`packages/contracts/src/thought.ts`, and the operator command `scripts/commands/think.mjs`.
+
+- **One deviation, forced by the substrate: no bespoke `thought/node` SessionEvent.** `Session.append`
+  cannot set the envelope's `ignorable` marker (upstream `packages/core/session/src/index.ts:722`), and
+  the JSONL loader refuses any event type outside the generated `KNOWN_SESSION_EVENT_TYPES` that is not
+  marked ignorable (`packages/session/session-persistence/src/storage-contract.ts:75`). A plugin event
+  would make every later `--session-id` adoption fail. So each node is a `thought/node` *record*
+  carried in the `think_add` call's own `tool/result.meta`, written by the tool's
+  `output.presentationMeta`. It is still in the durable log, still folded by a projection, and still
+  out of compaction's reach, because the fold reads the log, not the surface. The payload can move to
+  a first-class event unchanged once the substrate lets a plugin mark one ignorable.
+- **Task boundary**: a direct human prompt (`user/message` with `source.kind === 'user'`) folds the
+  graph to empty. In FiNess one REPL line is one dsh run is one human prompt; goal rounds and
+  injected context do not reset it. A human follow-up in the web UI does.
+- **Projection** `thoughts`, `stateVersion: 1`, state `{v, task, turn, nextId, nodes}`, with a wire
+  view (for T-290). Ephemeral ids are `n-<k>`, per task; at most 200 nodes per task, then
+  `think_add` errors.
+- **Persistent tier**: storage domain `finess_thoughts` (table `projects`, one record per project,
+  keyed by its normalised working directory), at `$DSH_HOME/storages/finess_thoughts.json`. 16 KB cap
+  per project; a write past it throws `ThoughtStoreFullError` and changes nothing. Ids are `p-<k>`,
+  never reused. Each stored node carries `origin {by, session?, from?}` (room for T-297). Writes are
+  re-read and verified. The plugin opens the domain per operation, because the json backend holds
+  the file in memory while open and would overwrite `/think`'s edits; `/think` writes the same file
+  directly and atomically.
+- **Tools**: `think_add` (ephemeral only; promotion is the operator's `/think promote`),
+  `think_search`, `think_open`. `think_add` refuses nested (programmatic) calls, because
+  `presentationMeta` only runs for top-level ones.
